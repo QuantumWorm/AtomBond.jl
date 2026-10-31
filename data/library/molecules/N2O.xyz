@@ -1,5 +1,5 @@
 3
-Nitrous oxide N2O, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 10024-97-2
-N      0.0000     0.0000    -1.1998
-N      0.0000     0.0000    -0.0716
-O      0.0000     0.0000     1.1126
+Nitrous oxide N2O, experimental geometry (G. Herzberg, Molecular Spectra and Molecular Structure III. Electronic Spectra and Electronic Structure of Polyatomic Molecules, Van Nostrand (1966))
+N     -1.1469     0.0000     0.0000
+N     -0.0187     0.0000     0.0000
+O      1.1655     0.0000     0.0000

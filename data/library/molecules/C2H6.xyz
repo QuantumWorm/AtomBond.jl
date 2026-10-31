@@ -1,10 +1,10 @@
 8
-Ethane C2H6, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 74-84-0
-C      0.0000     0.0000     0.7680
-C      0.0000     0.0000    -0.7680
-H     -1.0192     0.0000     1.1573
-H      0.5096     0.8826     1.1573
-H      0.5096    -0.8826     1.1573
-H      1.0192     0.0000    -1.1573
-H     -0.5096    -0.8826    -1.1573
-H     -0.5096     0.8826    -1.1573
+Ethane C2H6, experimental geometry (G. Herzberg, Molecular Spectra and Molecular Structure III. Electronic Spectra and Electronic Structure of Polyatomic Molecules, Van Nostrand (1966))
+C      0.7680     0.0000    -0.0000
+C     -0.7680     0.0000    -0.0000
+H      1.1574     0.3989    -0.9378
+H      1.1574     0.6128     0.8144
+H      1.1574    -1.0116     0.1235
+H     -1.1574     1.0116    -0.1235
+H     -1.1574    -0.3989     0.9378
+H     -1.1574    -0.6128    -0.8144

@@ -786,7 +786,7 @@ function library_dialog(v::Viewer; show::Bool=true)
     fig, f = d
     heading!(f, "Open a known structure")
     note!(f, "Crystals: Crystallography Open Database (published structures).\n" *
-             "Molecules: experimental geometries from NIST CCCBDB.")
+             "Molecules: experimental gas-phase geometries from the literature.")
     menu_row(label, options) = (r = nextrow!(f);
         Makie.Label(f.g[r, 1], label; halign=:left, fontsize=PANEL_FONTSIZE);
         Makie.Menu(f.g[r, 2]; options, i_selected=1, fontsize=PANEL_FONTSIZE, width=Makie.Relative(1)))

@@ -1,6 +1,6 @@
 4
-Ammonia NH3, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 7664-41-7
-N      0.0000     0.0000     0.0000
-H      0.0000    -0.9377    -0.3816
-H      0.8121     0.4689    -0.3816
-H     -0.8121     0.4689    -0.3816
+Ammonia NH3, experimental geometry (G. Herzberg, Molecular Spectra and Molecular Structure III. Electronic Spectra and Electronic Structure of Polyatomic Molecules, Van Nostrand (1966))
+N      0.0000     0.0000    -0.2862
+H      0.7176     0.6036     0.0954
+H      0.1640    -0.9233     0.0954
+H     -0.8816     0.3196     0.0954

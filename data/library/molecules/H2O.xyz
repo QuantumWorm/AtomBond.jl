@@ -1,5 +1,5 @@
 3
-Water H2O, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 7732-18-5
-O      0.0000     0.0000     0.1173
-H      0.0000     0.7572    -0.4692
-H      0.0000    -0.7572    -0.4692
+Water H2O, experimental geometry (A. R. Hoy, P. R. Bunker, A precise solution of the rotation bending Schrödinger equation for a triatomic molecule with application to the water molecule, J. Mol. Spectrosc. 74, 1 (1979))
+O      0.0000    -0.3910     0.0000
+H      0.7572     0.1955     0.0000
+H     -0.7572     0.1955     0.0000

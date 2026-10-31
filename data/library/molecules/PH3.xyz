@@ -1,6 +1,6 @@
 4
-Phosphine PH3, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 7803-51-2
-P      0.0000     0.0000     0.0000
-H      0.0000    -1.1932    -0.7717
-H      1.0333     0.5966    -0.7717
-H     -1.0333     0.5966    -0.7717
+Phosphine PH3, experimental geometry (G. Herzberg, Molecular Spectra and Molecular Structure III. Electronic Spectra and Electronic Structure of Polyatomic Molecules, Van Nostrand (1966))
+P     -0.0000     0.0000    -0.5788
+H      0.7091     0.9596     0.1929
+H      0.4765    -1.0939     0.1929
+H     -1.1856     0.1343     0.1929

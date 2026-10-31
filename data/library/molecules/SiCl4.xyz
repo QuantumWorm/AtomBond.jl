@@ -1,7 +1,7 @@
 5
-Silicon tetrachloride SiCl4, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 10026-04-7
+Silicon tetrachloride SiCl4, experimental geometry (R. R. Ryan, K. Hedberg, Effect of temperature on the structure of gaseous molecules. II. An electron-diffraction investigation of the molecular structures of B2Cl4 and SiCl4, J. Chem. Phys. 50, 4986 (1969))
 Si     0.0000     0.0000     0.0000
-Cl     1.1657     1.1657     1.1657
-Cl    -1.1657    -1.1657     1.1657
-Cl    -1.1657     1.1657    -1.1657
-Cl     1.1657    -1.1657    -1.1657
+Cl     0.0000     1.1657    -1.6486
+Cl     1.6486    -1.1657     0.0000
+Cl    -1.6486    -1.1657    -0.0000
+Cl    -0.0000     1.1657     1.6486

@@ -28,8 +28,9 @@ ESPRESSO or CASTEP.
   ([Labels](labels.md)).
 - **DFT inputs:** fixed atoms and cell constraints, k-point meshes and spin
   ([DFT inputs](dft.md)).
-- **Structure library:** 61 crystals and molecules from the Crystallography
-  Open Database and NIST CCCBDB, each with its literature reference
+- **Structure library:** 61 crystals and molecules: Crystallography Open
+  Database structures and experimental geometries from the literature, each
+  with its reference
   ([Library and element data](library.md)).
 
 ![Methanol with bond lengths and angles](assets/methanol_labels.png)

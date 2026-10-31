@@ -1,4 +1,4 @@
 2
-Hydrogen fluoride HF, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 7664-39-3
-F      0.0000     0.0000     0.0000
-H      0.0000     0.0000     0.9168
+Hydrogen fluoride HF, experimental geometry (R. J. Le Roy, Improved parameterization for combined isotopomer analysis of diatomic spectra and its application to HF and DF, J. Mol. Spectrosc. 194, 189 (1999))
+H     -0.4584     0.0000     0.0000
+F      0.4584     0.0000     0.0000

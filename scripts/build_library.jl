@@ -8,14 +8,16 @@
 # cells written from the 300 K lattice constants of Vurgaftman, Meyer and
 # Ram-Mohan, J. Appl. Phys. 89, 5815 (2001) (one consistent review; COD's III-V
 # entries are mostly 1963 or older), with wurtzite u from Rietveld refinements.
-# Molecules: experimental geometries from the NIST Computational Chemistry
-# Comparison and Benchmark Database (CCCBDB, https://cccbdb.nist.gov, NIST
-# Standard Reference Database 101), stored as XYZ.
+# Molecules: experimental gas-phase geometries (bond lengths and angles) from
+# the cited spectroscopy and electron-diffraction literature; the coordinates
+# are computed from those values (scripts/molecules.jl) and stored as XYZ.
 # Writes data/library/crystals/*.cif, data/library/molecules/*.xyz and the
 # index data/library/library.toml. To add a structure, add an entry to CRYSTALS
 # or MOLECULES and run the script again. Only the Julia standard library is used.
 
 using Downloads, Printf
+
+include("molecules.jl")
 
 # name, file, COD id, category, description; optional formula, note, ordered_sige
 const CRYSTALS = [
@@ -113,60 +115,11 @@ function iii_v_entries()
     return out
 end
 
-# name, CAS number (the CCCBDB key, no dashes), formula, category; optional
-# note and point_group (a correction of CCCBDB's label).
-# The XYZ file is named after the formula; the point group is read from CCCBDB.
-spin_note(state) = "The ground state is a spin $state (open shell): use a spin-polarized calculation."
-const MOLECULES = [
-    # Diatomic molecules
-    (name="Hydrogen", cas="1333740", formula="H2", category="Diatomic molecules"),
-    (name="Nitrogen", cas="7727379", formula="N2", category="Diatomic molecules"),
-    (name="Oxygen", cas="7782447", formula="O2", category="Diatomic molecules", note=spin_note("triplet")),
-    (name="Carbon monoxide", cas="630080", formula="CO", category="Diatomic molecules"),
-    (name="Nitric oxide", cas="10102439", formula="NO", category="Diatomic molecules", note=spin_note("doublet")),
-    (name="Hydrogen fluoride", cas="7664393", formula="HF", category="Diatomic molecules"),
-    (name="Hydrogen chloride", cas="7647010", formula="HCl", category="Diatomic molecules"),
-    # Small molecules
-    (name="Water", cas="7732185", formula="H2O", category="Small molecules"),
-    (name="Ammonia", cas="7664417", formula="NH3", category="Small molecules"),
-    (name="Carbon dioxide", cas="124389", formula="CO2", category="Small molecules"),
-    (name="Hydrogen sulfide", cas="7783064", formula="H2S", category="Small molecules"),
-    (name="Nitrous oxide", cas="10024972", formula="N2O", category="Small molecules"),
-    (name="Sulfur dioxide", cas="7446095", formula="SO2", category="Small molecules"),
-    (name="Ozone", cas="10028156", formula="O3", category="Small molecules"),
-    (name="Hydrogen peroxide", cas="7722841", formula="H2O2", category="Small molecules"),
-    (name="Hydrogen cyanide", cas="74908", formula="HCN", category="Small molecules"),
-    # Organic molecules
-    (name="Methane", cas="74828", formula="CH4", category="Organic molecules"),
-    (name="Ethane", cas="74840", formula="C2H6", category="Organic molecules", point_group="D3d",
-     note="CCCBDB labels this geometry D3h, but its coordinates are staggered ethane (D3d): they have an " *
-          "inversion centre and H-C-C-H dihedrals of 60 and 180 degrees."),
-    (name="Ethylene", cas="74851", formula="C2H4", category="Organic molecules"),
-    (name="Acetylene", cas="74862", formula="C2H2", category="Organic molecules"),
-    (name="Benzene", cas="71432", formula="C6H6", category="Organic molecules"),
-    (name="Methanol", cas="67561", formula="CH3OH", category="Organic molecules"),
-    (name="Ethanol", cas="64175", formula="C2H5OH", category="Organic molecules"),
-    (name="Formaldehyde", cas="50000", formula="H2CO", category="Organic molecules"),
-    (name="Formic acid", cas="64186", formula="HCOOH", category="Organic molecules"),
-    # Process gases and precursors (CVD, ALD, etching). CCCBDB has no experimental
-    # geometry for GeH4, WF6, Ga(CH3)3 or Al(CH3)3 (checked October 2026).
-    (name="Silane", cas="7803625", formula="SiH4", category="Process gases and precursors"),
-    (name="Disilane", cas="1590870", formula="Si2H6", category="Process gases and precursors"),
-    (name="Phosphine", cas="7803512", formula="PH3", category="Process gases and precursors"),
-    (name="Arsine", cas="7784421", formula="AsH3", category="Process gases and precursors"),
-    (name="Diborane", cas="19287457", formula="B2H6", category="Process gases and precursors"),
-    (name="Dichlorosilane", cas="4109960", formula="SiH2Cl2", category="Process gases and precursors"),
-    (name="Silicon tetrachloride", cas="10026047", formula="SiCl4", category="Process gases and precursors"),
-    (name="Silicon tetrafluoride", cas="7783611", formula="SiF4", category="Process gases and precursors"),
-    (name="Nitrogen trifluoride", cas="7783542", formula="NF3", category="Process gases and precursors"),
-    (name="Carbon tetrafluoride", cas="75730", formula="CF4", category="Process gases and precursors"),
-    (name="Titanium tetrachloride", cas="7550450", formula="TiCl4", category="Process gases and precursors"),
-]
 
 """Text of `url`, downloaded to `path` unless it is already there."""
 function get_text(url, path)
     if !isfile(path)
-        # A browser-like User-Agent (CCCBDB refuses some default ones); one
+        # A browser-like User-Agent (some servers refuse default ones); one
         # request per second, and retries because COD resets connections under load.
         for attempt in 1:5
             try
@@ -226,67 +179,6 @@ ordered_sige(a, source_ref) = """
     Ge1 Ge 0.25 0.25 0.25
     """
 
-# The HTML entities on CCCBDB pages; an unknown one stops the build rather
-# than being copied into the library.
-const ENTITIES = Dict("amp" => "&", "lt" => "<", "gt" => ">", "quot" => "\"", "apos" => "'", "nbsp" => " ",
-                      "Aring" => "Å", "infin" => "∞", "rarr" => "→", "deg" => "°", "plusmn" => "±")
-
-function unescape_html(s)
-    return replace(s, r"&(#x[0-9A-Fa-f]+|#\d+|\w+);" => function (e)
-        k = e[2:end-1]
-        startswith(k, "#x") && return string(Char(parse(Int, k[3:end]; base=16)))
-        startswith(k, "#") && return string(Char(parse(Int, k[2:end])))
-        haskey(ENTITIES, k) || error("unknown HTML entity $e: add it to ENTITIES")
-        return ENTITIES[k]
-    end)
-end
-
-"""Release, Cartesian atoms and literature references of a CCCBDB experimental geometry page."""
-function cccbdb(page)
-    page = replace(page, r"<script.*?</script>"s => "")
-    text = unescape_html(replace(page, r"<[^>]+>" => "\n"))
-    lines = filter(!isempty, strip.(split(text, r"\R")))
-    k = findfirst(l -> startswith(l, "Release"), lines)
-    k === nothing && error("no CCCBDB release on the page")
-    release = match(r"^Release \d+ \([^)]*\)", lines[k]).match
-    pg = match(r"Point Group (.*?)</H2>", page)
-    point_group = pg === nothing ? "" : strip(unescape_html(replace(pg[1], r"<[^>]+>" => "")))
-    k = findfirst(==("z (Å)"), lines)
-    k === nothing && error("no experimental Cartesian coordinates on the CCCBDB page")
-    k += 1
-    atoms = []
-    while k + 3 <= length(lines) && occursin(r"^[A-Z][a-z]?\d+$", lines[k])
-        push!(atoms, (match(r"^[A-Z][a-z]?", lines[k]).match, parse.(Float64, lines[k+1:k+3])...))
-        k += 4
-    end
-    isempty(atoms) && error("no experimental coordinates at CCCBDB")
-    refs, doi = String[], String[]
-    r = findfirst(==("reference"), lines)
-    k = r === nothing ? length(lines) + 1 : r + 2                 # after "squib  reference  DOI"
-    while k + 1 <= length(lines) && !startswith(lines[k], "Got a better number")
-        push!(refs, lines[k+1])
-        k += 2
-        if k <= length(lines) && startswith(lines[k], "10.")
-            push!(doi, lines[k])
-            k += 1
-        end
-    end
-    return release, point_group, atoms, refs, doi
-end
-
-"""Element counts of a formula such as "Ga(CH3)3"."""
-function composition(formula)
-    while (m = match(r"\(([A-Za-z0-9]+)\)(\d*)", formula)) !== nothing
-        n = isempty(m[2]) ? 1 : parse(Int, m[2])
-        formula = formula[1:m.offset-1] * m[1]^n * formula[m.offset+ncodeunits(m.match):end]
-    end
-    counts = Dict{String,Int}()
-    for m in eachmatch(r"([A-Z][a-z]?)(\d*)", formula)
-        counts[m[1]] = get(counts, m[1], 0) + (isempty(m[2]) ? 1 : parse(Int, m[2]))
-    end
-    return counts
-end
-
 toml_string(s) = "\"" * replace(s, "\\" => "\\\\", "\"" => "\\\"") * "\""
 
 function main(args=ARGS)
@@ -317,40 +209,23 @@ function main(args=ARGS)
                         url=e.url, reference=e.reference, doi=e.doi, note=e.note))
     end
 
-    skipped = String[]
     for m in MOLECULES
-        url = "https://cccbdb.nist.gov/expgeom2x.asp?casno=$(m.cas)&charge=0"
-        local release, pg, atoms, refs, doi
-        try
-            release, pg, atoms, refs, doi = cccbdb(get_text(url, joinpath(cache, "cccbdb_$(m.cas).html")))
-            got = Dict{String,Int}()
-            for a in atoms
-                got[a[1]] = get(got, a[1], 0) + 1
-            end
-            got == composition(m.formula) ||          # CCCBDB shows another molecule for unknown entries
-                error("CCCBDB has no experimental geometry (it returned a different molecule)")
-        catch err
-            push!(skipped, "$(m.name) ($(sprint(showerror, err)))")
-            continue
-        end
-        pg = get(m, :point_group, pg)                  # corrections of CCCBDB's label
-        cas = "$(m.cas[1:end-3])-$(m.cas[end-2:end-1])-$(m.cas[end])"
+        syms, pos = m.geometry
         file = replace(m.formula, r"[()]" => "") * ".xyz"
         open(joinpath(root, "molecules", file), "w") do f
-            println(f, length(atoms))
-            println(f, "$(m.name) $(m.formula), experimental geometry, NIST CCCBDB $release, CAS $cas")
-            for (s, x, y, z) in atoms
-                @printf(f, "%-2s %10.4f %10.4f %10.4f\n", s, x, y, z)
+            println(f, length(syms))
+            println(f, "$(m.name) $(m.formula), experimental geometry ($(m.refs[1][1]))")
+            for (s, p) in zip(syms, orient(pos))
+                @printf(f, "%-2s %10.4f %10.4f %10.4f\n", s, p...)
             end
         end
+        dois = filter(!isempty, last.(m.refs))
         push!(entries, (name=m.name, kind="molecule", category=m.category, formula=m.formula,
-                        file="molecules/" * file,
-                        description="Experimental geometry" * (isempty(pg) ? "" : ", point group $pg"),
-                        source="NIST CCCBDB ($release), CAS $cas",
-                        url="https://cccbdb.nist.gov/expgeom2x.asp?casno=$(m.cas)",
-                        reference=join(refs, "; "), doi=join(doi, ", "), note=get(m, :note, "")))
+                        file="molecules/" * file, description="Experimental geometry, point group $(m.pg)",
+                        source="Experimental gas-phase structure from the literature",
+                        url=isempty(dois) ? "" : "https://doi.org/" * first(dois),
+                        reference=join(first.(m.refs), "; "), doi=join(dois, ", "), note=get(m, :note, "")))
     end
-    foreach(s -> println("skipped: ", s), skipped)
 
     order = ["Group IV", "III-V", "Oxides", "Diatomic molecules", "Small molecules", "Organic molecules",
              "Process gases and precursors"]

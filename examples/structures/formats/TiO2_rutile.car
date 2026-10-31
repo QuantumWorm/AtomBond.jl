@@ -1,6 +1,6 @@
 !BIOSYM archive 3
 PBC=ON
-Materials Studio Generated CAR File
+TiO2 rutile, hand-made example in the .car layout
 !DATE Thu Oct 30 10:00:00 2026
 PBC    4.5937    4.5937    2.9587   90.0000   90.0000   90.0000 (P42/MNM)
 Ti1       0.000000000    0.000000000    0.000000000 XXXX 1      xx      Ti  0.000

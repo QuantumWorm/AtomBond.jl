@@ -1,6 +1,6 @@
 4
-Acetylene C2H2, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 74-86-2
-C      0.0000     0.0000     0.6013
-C      0.0000     0.0000    -0.6013
-H      0.0000     0.0000     1.6644
-H      0.0000     0.0000    -1.6644
+Acetylene C2H2, experimental geometry (G. Herzberg, Molecular Spectra and Molecular Structure III. Electronic Spectra and Electronic Structure of Polyatomic Molecules, Van Nostrand (1966))
+H     -1.6644     0.0000     0.0000
+C     -0.6013     0.0000     0.0000
+C      0.6013     0.0000     0.0000
+H      1.6644     0.0000     0.0000

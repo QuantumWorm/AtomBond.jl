@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <modeling>
  <generator>
-  <i name="program" type="string">vasp </i>
+  <!-- hand-made example in the vasprun.xml layout, not VASP output -->
+  <i name="program" type="string">example</i>
  </generator>
  <atominfo>
   <atoms>       2 </atoms>

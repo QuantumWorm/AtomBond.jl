@@ -14,16 +14,18 @@ Untitled until saved, so Save never writes into the library. In code:
 | Group IV | Si, diamond, Si0.5Ge0.5 (ordered model) | COD (Hom et al. 1975 precision lattice constants; Dismukes 1964 for SiGe) |
 | III–V | GaAs, AlAs, InAs, GaP, AlP, InP, GaSb, AlSb, InSb (zincblende); GaN, AlN, InN (wurtzite) | 300 K lattice constants from Vurgaftman, Meyer, Ram-Mohan, *J. Appl. Phys.* 89, 5815 (2001); wurtzite u from Paszkowicz et al. (2003, 2004) |
 | Oxides | α-quartz SiO₂, corundum Al₂O₃, monoclinic HfO₂ and ZrO₂, rutile and anatase TiO₂, ZnO, MgO, β-Ga₂O₃, SrTiO₃ | COD (published refinements, listed per entry) |
-| Molecules | 36 diatomic, small, organic and process-gas molecules (H₂O, CH₄, SiH₄, TiCl₄, …) | NIST CCCBDB experimental geometries |
+| Molecules | 36 diatomic, small, organic and process-gas molecules (H₂O, CH₄, SiH₄, TiCl₄, …) | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
 
 - **Crystals** are CIFs from the
   [Crystallography Open Database](https://www.crystallography.net), stored as
   downloaded.
 - **III–V semiconductors** come from one review at 300 K instead, because
   COD's III–V entries are mostly old tables and some are off.
-- **Molecules** are experimental geometries from NIST's
-  [CCCBDB](https://cccbdb.nist.gov), with their point group and the papers
-  CCCBDB cites. They open in a non-periodic box with 5 Å of space; the
+- **Molecules** are experimental gas-phase geometries: the bond lengths and
+  angles of the cited papers and books, from which `scripts/molecules.jl`
+  computes the coordinates. Each entry gives its point group and references;
+  a few carry a note where the structure is approximate. They open in a
+  non-periodic box with 5 Å of space; the
   library's *Molecules: in a periodic cubic box* switch makes the box
   periodic for plane-wave codes.
 - **SiGe:** the real alloy is random; the library holds the ordered model
@@ -31,7 +33,8 @@ Untitled until saved, so Save never writes into the library. In code:
   constant.
 
 The library is `data/library/library.toml` with `crystals/` and `molecules/`
-beside it; `scripts/build_library.jl` downloads the sources and rebuilds it.
+beside it; `scripts/build_library.jl` downloads the COD files and rebuilds
+it, with the molecules from `scripts/molecules.jl`.
 Your own structures go into `~/.atombond/library/library.toml` (or
 `$ATOMBOND_HOME/library/`), in the same format with the files next to it.
 

@@ -1273,7 +1273,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
                 fill("Process gases and precursors", 11)]
         @test [e.name for e in lib[[1, 2, 3, 26, end]]] == ["Silicon", "Diamond", "Silicon-germanium Si0.5Ge0.5",
                                                              "Hydrogen", "Titanium tetrachloride"]
-        # every molecule: the atoms of its formula, all connected by bonds, point group from CCCBDB
+        # every molecule: the atoms of its formula, all connected by bonds, point group given
         natoms_of(f) = sum((isempty(m[1]) ? 1 : parse(Int, m[1]) for m in eachmatch(r"[A-Z][a-z]?(\d*)", f)); init=0)
         for e in structure_library(; kind=:molecule)
             c = load_library(e)
@@ -1315,7 +1315,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test lattice_parameters(gan.lattice)[[1, 3]] == (3.189, 5.185)                    # bulk (Vurgaftman 2001)
         @test minimum(AtomBond.min_image_distance(gan, i, j) for i in 1:2 for j in 3:4) ≈ sqrt(3.189^2 / 3 + (0.5 - 0.3789)^2 * 5.185^2) atol=1e-6
         @test occursin("Paszkowicz", library_entry("GaN").reference)
-        # molecules: NIST CCCBDB experimental geometries, boxed
+        # molecules: experimental geometries from the literature, boxed
         bond(c, i, j) = norm(cartesian_positions(c)[i] - cartesian_positions(c)[j])
         w = load_library("H2O")
         @test w.pbc == (false, false, false) && isapprox(bond(w, 1, 2), 0.958; atol=1e-3)
@@ -1405,7 +1405,8 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         # a molecule in a periodic box
         w = load_library("H2O")
         b = periodic_box(w; vacuum=10, cubic=false)
-        @test all(b.pbc) && collect(lattice_parameters(b.lattice)[1:3]) .- 10 ≈ [0, 2 * 0.7572, 0.5865]
+        @test all(b.pbc)
+        @test sort(collect(lattice_parameters(b.lattice)[1:3]) .- 10) ≈ [0, 0.5865, 2 * 0.7572] atol=1e-4
         @test cartesian_positions(b)[1] - cartesian_positions(b)[2] ≈ cartesian_positions(w)[1] - cartesian_positions(w)[2]
         @test_throws ArgumentError periodic_box(b)
         @test !any(as_molecule(b).pbc)

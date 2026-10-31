@@ -137,6 +137,9 @@ const HEADER = """
 # color_jmol          Jmol's CPK-style element colors (https://jmol.sourceforge.net/jscolors/),
 #                     the de facto standard: H white, C grey, N blue, O red, S yellow ...
 #
+# Covalent radii, Alvarez radii and Jmol colours were transcribed from ASE's data
+# files (https://gitlab.com/ase/ase, ase/data), which cite the same sources.
+#
 # Lines starting with # are comments. Empty values mean "not tabulated".
 """
 

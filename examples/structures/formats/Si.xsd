@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="latin1"?>
 <!DOCTYPE XSD []>
-<XSD Version="20.1" WrittenBy="Materials Studio 20.1">
+<XSD Version="20.1" WrittenBy="AtomBond test example (hand-made, not written by Materials Studio)">
 	<AtomisticTreeRoot ID="1">
 		<SymmetrySystem ID="2" Mapping="3" Children="ci(2):5-6" Normalized="1" Name="SymmetrySystem" UserID="1" XYZ="0,0,0">
 			<MappingSet ID="8" SymmetryDefinition="4" ActiveSystem="2" NumFamilies="1" OwnsTotalConstraintMapping="1" TotalConstraintMapping="3">

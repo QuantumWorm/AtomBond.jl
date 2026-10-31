@@ -1,7 +1,7 @@
 5
-Methane CH4, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 74-82-8
+Methane CH4, experimental geometry (E. Hirota, Anharmonic potential function and equilibrium structure of methane, J. Mol. Spectrosc. 77, 213 (1979))
 C      0.0000     0.0000     0.0000
-H      0.6276     0.6276     0.6276
-H      0.6276    -0.6276    -0.6276
-H     -0.6276     0.6276    -0.6276
-H     -0.6276    -0.6276     0.6276
+H      0.0000     0.8875     0.6276
+H      0.8875    -0.0000    -0.6276
+H     -0.8875     0.0000    -0.6276
+H     -0.0000    -0.8875     0.6276

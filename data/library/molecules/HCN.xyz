@@ -1,5 +1,5 @@
 3
-Hydrogen cyanide HCN, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 74-90-8
-C      0.0000     0.0000     0.0000
-H      0.0000     0.0000     1.0640
-N      0.0000     0.0000    -1.1560
+Hydrogen cyanide HCN, experimental geometry (G. Herzberg, Molecular Spectra and Molecular Structure III. Electronic Spectra and Electronic Structure of Polyatomic Molecules, Van Nostrand (1966))
+H     -1.0947     0.0000     0.0000
+C     -0.0307     0.0000     0.0000
+N      1.1253     0.0000     0.0000

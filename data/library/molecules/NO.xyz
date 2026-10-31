@@ -1,4 +1,4 @@
 2
-Nitric oxide NO, experimental geometry, NIST CCCBDB Release 22 (May 2022), CAS 10102-43-9
-O      0.0000     0.0000     0.0000
-N      0.0000     0.0000     1.1508
+Nitric oxide NO, experimental geometry (K. P. Huber, G. Herzberg, Molecular Spectra and Molecular Structure IV. Constants of Diatomic Molecules, Van Nostrand Reinhold (1979))
+N     -0.5754     0.0000     0.0000
+O      0.5754     0.0000     0.0000

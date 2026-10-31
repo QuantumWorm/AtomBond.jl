@@ -12,8 +12,9 @@ and export inputs for VASP, Quantum ESPRESSO or CASTEP.
 ![AtomBond window showing a GaN wurtzite supercell](docs/src/assets/window.png)
 
 - Reads and writes the common structure formats (CIF, POSCAR, CASTEP,
-  Quantum ESPRESSO, XYZ, …), with a built-in library of crystals and
-  molecules from the Crystallography Open Database and NIST CCCBDB.
+  Quantum ESPRESSO, XYZ, …), with a built-in library of crystals (from the
+  Crystallography Open Database) and molecules (experimental geometries
+  from the literature).
 - Builds supercells, slabs, superlattices and molecules in a box; edits
   atoms with undo; keeps several structures open in tabs.
 - Labels bond lengths, angles, dihedrals, coordinates, charges and magnetic
