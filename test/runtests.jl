@@ -429,6 +429,83 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test natoms(v.crystal) == 8 && startswith(v.status[], "Could not build")
     end
 
+    @testset "docked tools" begin
+        v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
+        nblocks, nboxes = length(v.figure.content), length(v.textboxes)
+        @test haskey(v.dialogs, :panel) && open_tool(v) === nothing
+        d = supercell_dialog(v)                                     # opens on the right, in the main figure
+        @test open_tool(v) === :supercell && d.figure === v.figure && !haskey(v.dialogs, :panel)
+        @test any(t -> t === d.repeats, v.textboxes)                # shortcuts pause while typing in it
+        @test supercell_dialog(v) === nothing && occursin("already open", v.status[])
+        shift_dialog(v)                                             # another tool replaces it
+        @test open_tool(v) === :shift && !any(t -> t === d.repeats, v.textboxes)
+        @test close_tool!(v) && open_tool(v) === nothing && haskey(v.dialogs, :panel)
+        @test length(v.figure.content) == nblocks && length(v.textboxes) == nboxes   # nothing left behind
+        @test !close_tool!(v)
+        # Long lines of a tool wrap at the column width.
+        @test AtomBond.wrap_text("aa bb cc dd", 5) == "aa bb\ncc dd"
+        @test AtomBond.wrap_text("x\nlongword y", 4) == "x\nlongword\ny"
+        library_dialog(v)
+        info = only(filter(b -> b isa AtomBond.Makie.Label && occursin("DOI", b.text[]), v.figure.content))
+        @test occursin('\n', info.text[]) && all(l -> length(l) < 80, split(info.text[], '\n'))
+        close_tool!(v)
+        # WSL: software rendering unless asked for the GPU or a driver is chosen.
+        @test !AtomBond.wsl_software_rendering!(Dict("ATOMBOND_GPU" => "1"))
+        @test !AtomBond.wsl_software_rendering!(Dict("LIBGL_ALWAYS_SOFTWARE" => "0"))
+        env = Dict{String,String}()
+        wsl = Sys.islinux() && occursin("microsoft", lowercase(read("/proc/version", String)))
+        @test AtomBond.wsl_software_rendering!(env) == wsl && haskey(env, "LIBGL_ALWAYS_SOFTWARE") == wsl
+    end
+
+    @testset "tabs" begin
+        si = joinpath(STRUCTS, "Si_conv.vasp")
+        v = visualize(si; show=false)
+        @test ntabs(v) == 1 && [b.label[] for b in v.dialogs[:tabbar].buttons] == ["Si_conv.vasp"]
+        select!(v, 1); AtomBond.delete_selected!(v)                 # an edit in tab 1
+        @test formula(v.crystal) == "Si7" && v.dialogs[:tabbar].buttons[1].label[] == "Si_conv.vasp *"
+        @test open_library!(v, "Water") && ntabs(v) == 2 && active_tab(v) == 2 && formula(v.crystal) == "O1H2"
+        @test isempty(v.history)                                    # each tab has its own undo history
+        select!(v, 1); select!(v, 2; add=true)
+        switch_tab!(v, 1)
+        @test formula(v.crystal) == "Si7" && length(v.history) == 1 && isempty(v.selection)
+        @test undo!(v) && formula(v.crystal) == "Si8"
+        switch_tab!(v, 2)
+        @test formula(v.crystal) == "O1H2" && length(v.selection) == 2   # its selection comes back
+        # A file already open (and unchanged) is shown in its tab, not opened twice.
+        @test open_structure!(v, si) && ntabs(v) == 2 && active_tab(v) == 1
+        # A structure tool follows the tab and names it.
+        supercell_dialog(v)
+        @test open_tool(v) === :supercell
+        switch_tab!(v, 2)
+        @test open_tool(v) === :supercell && any(b -> b isa AtomBond.Makie.Label && b.text[] == "on Water",
+                                                 v.figure.content)
+        close_tool!(v)
+        # Closing: unsaved changes need a second close; the last tab leaves an empty cell.
+        select!(v, 3); AtomBond.delete_selected!(v)
+        @test !close_tab!(v) && startswith(v.status[], "Unsaved changes in Water *")
+        @test close_tab!(v) && ntabs(v) == 1 && formula(v.crystal) == "Si8"
+        @test close_tab!(v) && ntabs(v) == 1 && natoms(v.crystal) == 0 && AtomBond.is_blank(v)
+        @test open_library!(v, "GaN") && ntabs(v) == 1                   # replaces the blank tab
+        # new_tab!() starts an empty cell with the New structure tool; Create fills that tab.
+        new_tab!(v)
+        @test ntabs(v) == 2 && open_tool(v) === :new && AtomBond.is_blank(v)
+        @test create_structure!(v, "Diamond", ["C"], (3.567, 3.567, 3.567)) && ntabs(v) == 2 && formula(v.crystal) == "C8"
+        # Exit warns about unsaved changes in any tab.
+        switch_tab!(v, 1); edit!(c -> supercell(c, 1, 1, 2), v, "double c")
+        switch_tab!(v, 2)
+        @test !exit!(v) && occursin("GaN", v.status[])
+        # Shortcuts: Ctrl+Tab next tab, Ctrl+W close.
+        M = AtomBond.Makie
+        ev = M.events(v.lscene.scene)
+        key(k) = (ev.keyboardbutton[] = M.KeyEvent(k, M.Keyboard.press); ev.keyboardbutton[] = M.KeyEvent(k, M.Keyboard.release))
+        ev.keyboardbutton[] = M.KeyEvent(M.Keyboard.left_control, M.Keyboard.press)
+        key(M.Keyboard.tab)
+        @test active_tab(v) == 1
+        key(M.Keyboard.w)
+        @test ntabs(v) == 2 && occursin("Unsaved changes", v.status[])     # modified: warns first
+        ev.keyboardbutton[] = M.KeyEvent(M.Keyboard.left_control, M.Keyboard.release)
+    end
+
     @testset "oxygen bridge" begin
         V = AtomBond.Vec3
         a, b, c = V(0, 0, 0), V(2, 0, 0), V(1, 3, 0)
@@ -800,8 +877,8 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test formula(v.crystal) == "Si8"                         # one click only selects
         b.last_click = (0, 0.0); press(); press()                 # double-click opens
         @test formula(v.crystal) == "Ti2O4" && v.original === v.crystal
-        @test startswith(v.status[], "Open TiO2_rutile.cif")
-        undo!(v)
+        @test startswith(v.status[], "Opened TiO2_rutile.cif") && ntabs(v) == 2 && active_tab(v) == 2   # a new tab
+        switch_tab!(v, 1)
         @test formula(v.crystal) == "Si8"
         # Keys and folders
         ev.keyboardbutton[] = M.KeyEvent(M.Keyboard.down, M.Keyboard.press)
@@ -974,7 +1051,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test AtomBond.save_extension("x.geom") == ".cell"
         b.format.i_selected[] = findfirst(f -> f[2] == ".png", AtomBond.SAVE_FORMATS)
         @test AtomBond.save_from_browser!(b) && isfile(joinpath(dir, "Si.png")) && v.path == joinpath(dir, "Si.xyz")
-        # New structure: undoable, unsaved, Save goes to Save as.
+        # New structure: a new tab, unsaved, Save goes to Save as.
         d = new_structure_dialog(v; show=false)
         d.proto.i_selected[] = findfirst(==("Rocksalt"), AtomBond.prototype_names())
         @test AtomBond.shown_text(d.elements) == "Na Cl"
@@ -982,7 +1059,8 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         d.create.clicks[] = 1
         @test formula(v.crystal) == "Mg4O4" && v.path === nothing && v.document[] == "Untitled — not saved"
         @test save!(v; show=false) isa AtomBond.FileBrowser
-        undo!(v)
+        n = ntabs(v)
+        @test close_tab!(v; force=true) && ntabs(v) == n - 1
         @test v.path == joinpath(dir, "Si.xyz") && v.document[] == "Si.xyz"
         d.proto.i_selected[] = 1                                    # empty cell
         AtomBond.settext!(d.abc, "4 4 6"); AtomBond.settext!(d.angles, "90 90 120")
@@ -1269,8 +1347,8 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test occursin("Venkateswarlu", d.info[])
         d.open.clicks[] = 1
         @test formula(v.crystal) == "C1O1H4" && v.path === nothing && v.document[] == "Untitled — not saved"
-        @test startswith(v.status[], "Open Methanol from the library")
-        undo!(v)
+        @test startswith(v.status[], "Opened Methanol from the library") && ntabs(v) == 2
+        @test close_tab!(v; force=true)
         @test formula(v.crystal) == "Si8" && v.path !== nothing
         @test open_library!(v, "GaN") && formula(v.crystal) == "Ga2N2"
         # a molecule in a periodic box, for plane-wave codes

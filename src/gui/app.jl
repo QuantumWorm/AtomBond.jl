@@ -29,6 +29,8 @@ mutable struct Viewer
     path::Union{Nothing,String}                   # file of the structure (Save writes here), if any
     saved::Dict{String,Crystal}                   # file => structure as last opened/saved there, for "modified"
     document::Makie.Observable{String}            # file name + "modified", in the menu bar
+    tabs::Vector{Any}                             # one Document per tab (tabs.jl); the active one's state is above
+    active::Int                                   # the tab shown
 end
 
 """Replace the structure plots after a settings change; the camera stays put."""
@@ -108,7 +110,8 @@ function visualize(c::Crystal; settings::ViewSettings=ViewSettings(),
     fig = Makie.Figure(; size, backgroundcolor=vs.background)
 
     header = Makie.Observable(header_text(c))
-    Makie.Label(fig[1, 1], header; fontsize=16, halign=:left, tellwidth=false)
+    top = Makie.GridLayout(fig[1, 1]; tellwidth=false, rowgap=6)     # row of tabs (with the panel), title
+    Makie.Label(top[panel ? 2 : 1, 1], header; fontsize=16, halign=:left, tellwidth=false)
 
     # SSAO radius/bias are in scene units (Å): sized for atoms ~0.2–2 Å.
     lscene = Makie.LScene(fig[2, 1]; show_axis=false,
@@ -123,7 +126,8 @@ function visualize(c::Crystal; settings::ViewSettings=ViewSettings(),
     v = Viewer(c, c, vs, fig, lscene, dm, plots, atom_plot, Tuple{Int,Shift}[], Any[],
                Makie.Observable(SELECTION_HINT), triad, lattice, header, Makie.Observable(""), nothing,
                nothing, [], [], [], Dict{Symbol,Any}(), folder, path === nothing ? nothing : abspath(path),
-               path === nothing ? Dict{String,Crystal}() : Dict(abspath(path) => c), Makie.Observable(""))
+               path === nothing ? Dict{String,Crystal}() : Dict(abspath(path) => c), Makie.Observable(""),
+               Any[Document(c; path)], 1)
     update_document!(v)
     update_legend!(v)
     install_picking!(v)
@@ -132,7 +136,10 @@ function visualize(c::Crystal; settings::ViewSettings=ViewSettings(),
     install_shortcuts!(v)
     if panel
         build_menubar!(fig[0, 1:2], v)
-        build_panel!(fig[1:3, 2], v)
+        v.dialogs[:has_panel] = true
+        show_panel!(v)
+        v.dialogs[:tabslot] = top
+        build_tabbar!(v)
         # Footer: what is selected / measured, then messages from the panel.
         Makie.Label(fig[4, 1:2], v.info; halign=:left, fontsize=14, tellwidth=false)
         Makie.Label(fig[5, 1:2], v.status; halign=:left, fontsize=13, color=Makie.lift(status_color, v.status),

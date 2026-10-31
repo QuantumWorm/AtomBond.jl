@@ -144,19 +144,20 @@ end
 """
     open_structure!(viewer, path) -> Bool
 
-Load a structure file into the viewer (undoable, and it becomes the
-"Original" structure).
+Open a structure file in a new tab (or in place of an untouched empty
+cell; a file already open in a tab is shown there).
 """
 function open_structure!(v::Viewer, path::AbstractString)
-    ok = edit!(_ -> load_structure(path), v, "open $(basename(path))"; reframe=true)
-    if ok
-        v.original = v.crystal
-        v.path = abspath(path)
-        v.saved[v.path] = v.crystal
-        add_recent!(v.path)
-        update_document!(v)
+    c = try
+        load_structure(path)
+    catch err
+        err isa InterruptException && rethrow()
+        v.status[] = "Could not open $(basename(path)): " * sprint(showerror, err)
+        return false
     end
-    return ok
+    open_in_tab!(v, c; path)
+    v.status[] = "Opened $(basename(path)): $(natoms(c)) atoms"
+    return true
 end
 
 """Save as: write to the folder shown and the typed file name in the chosen format."""

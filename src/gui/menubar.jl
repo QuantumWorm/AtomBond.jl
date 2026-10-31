@@ -47,6 +47,7 @@ end
 function update_document!(v::Viewer)
     v.document[] = v.path === nothing ? "Untitled — not saved" :
                    basename(v.path) * (get(v.saved, v.path, nothing) === v.crystal ? "" : " — modified")
+    refresh_tab_labels!(v)
 end
 
 """`name` with the extension of a save format (replacing a known one; POSCAR/CONTCAR names stay)."""
@@ -134,10 +135,10 @@ end
 """
     new_structure_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-New structure window: an empty cell (a b c, α β γ) to fill with Add, or a
+New structure tool: an empty cell (a b c, α β γ) to fill with Add, or a
 prototype (diamond, zincblende, rocksalt, wurtzite, perovskite, ...) with
-your elements and lattice constants. The new structure replaces the current
-one as an undoable step and is not saved until File → Save.
+your elements and lattice constants. The new structure opens in a new tab
+and is not saved until File → Save.
 """
 function new_structure_dialog(v::Viewer; show::Bool=true)
     d = new_dialog(v, :new, "New structure", 470; show)
@@ -185,14 +186,18 @@ function new_structure_dialog(v::Viewer; show::Bool=true)
     return (; figure=fig, proto, elements, abc, angles, title, create)
 end
 
-"""Replace the structure with a new, unsaved one (undoable)."""
+"""A new, unsaved structure in a new tab (or in place of an untouched empty cell)."""
 function create_structure!(v::Viewer, name, elements, abc, angles=(90, 90, 90); title::AbstractString="")
-    ok = edit!(_ -> prototype_crystal(name, elements, abc, angles; title), v, "new $(lowercase(name))"; reframe=true)
-    if ok
-        v.original, v.path = v.crystal, nothing
-        update_document!(v)
+    c = try
+        prototype_crystal(name, elements, abc, angles; title)
+    catch err
+        err isa InterruptException && rethrow()
+        v.status[] = "Could not create $(lowercase(name)): " * sprint(showerror, err)
+        return false
     end
-    return ok
+    open_in_tab!(v, c)
+    v.status[] = "New $(lowercase(name)): $(natoms(c)) atoms"
+    return true
 end
 
 # --- Exit -------------------------------------------------------------------------
@@ -208,10 +213,12 @@ unsaved changes the first Exit only warns in the status line; a second Exit
 (with no edits in between) closes without saving. Returns whether it closed.
 """
 function exit!(v::Viewer; force::Bool=false)
-    if !force && is_modified(v) && get(v.dialogs, :exit_armed, nothing) !== v.crystal
-        v.dialogs[:exit_armed] = v.crystal
-        name = v.path === nothing ? "the untitled structure" : basename(v.path)
-        v.status[] = "Unsaved changes in $name: choose Exit (Ctrl+Q) again to close without saving, or Save (Ctrl+S) first"
+    unsaved = filter(k -> tab_modified(v, k), eachindex(v.tabs))
+    state = [tab_crystal(v, k) for k in unsaved]
+    if !force && !isempty(unsaved) && get(v.dialogs, :exit_armed, nothing) != state
+        v.dialogs[:exit_armed] = state
+        names = join((tab_label(v, k) for k in unsaved), ", ")
+        v.status[] = "Unsaved changes in $names: choose Exit (Ctrl+Q) again to close without saving, or Save (Ctrl+S) first"
         return false
     end
     delete!(v.dialogs, :exit_armed)
@@ -234,7 +241,8 @@ function menubar_items(v::Viewer, name::AbstractString)
     if name == "File"
         items = [MenuItem("New structure…", () -> new_structure_dialog(v); shortcut="Ctrl+N"),
                  MenuItem("Open…", () -> open_dialog(v); shortcut="Ctrl+O"),
-                 MenuItem("Structure library…", () -> library_dialog(v); shortcut="Ctrl+L")]
+                 MenuItem("Structure library…", () -> library_dialog(v); shortcut="Ctrl+L"),
+                 MenuItem("Close tab", () -> close_tab!(v); shortcut="Ctrl+W")]
         recent = recent_files()
         if !isempty(recent)
             push!(items, SEPARATOR, menu_item("Recent files", nothing, false))

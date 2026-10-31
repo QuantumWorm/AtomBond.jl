@@ -53,7 +53,7 @@ visualize(load_library("GaN"))       # a structure from the built-in library
 visualize()                          # nothing yet: build a new structure
 ```
 
-`visualize()` opens an empty cell together with the *New structure* window.
+`visualize()` opens an empty cell with the *New structure* tool open on the right.
 There you pick a prototype (diamond, zincblende, rocksalt, wurtzite,
 perovskite, …) and type your elements and lattice constants, or keep the
 empty cell and add atoms one by one with *Add*. *File → Structure library…*
@@ -62,6 +62,12 @@ and *File → Open…* are in the menu bar as well.
 Left-drag rotates, the scroll wheel zooms and right-drag pans. From a script
 (`julia script.jl`) keep the window open with `v = visualize(...); wait(v.screen)`.
 The first start takes a minute or two while Julia compiles GLMakie.
+
+**WSL2 (Linux on Windows):** AtomBond draws with software OpenGL there, because
+the WSL GPU driver (Mesa D3D12) can freeze when a tool opens in the window.
+That is fast enough for typical cells. To use the GPU anyway, start Julia with
+`ATOMBOND_GPU=1`; setting `LIBGL_ALWAYS_SOFTWARE` or `GALLIUM_DRIVER`
+yourself also takes precedence. Native Windows, macOS and Linux use the GPU.
 
 ## Running from a clone
 
@@ -101,7 +107,7 @@ and right-drag still pans.
 *Replace* to substitute the selected atoms, *Delete* (or the Delete key) to
 remove them, *Move* to shift them by a Cartesian vector in Å, or *Add* to put
 a new atom of that element at a fractional position. Supercell / primitive /
-conventional changes are edits too. *Atoms…* opens an Edit atoms window: for
+conventional changes are edits too. *Atoms…* opens the Edit atoms tool: for
 one selected atom, change its element and set its exact position (fractional
 or Cartesian Å; for an image atom, ′, the position of that copy); for several,
 change all their elements at once. Its *Replace a species everywhere* section
@@ -120,7 +126,7 @@ has an audio server; `sudo apt install pulseaudio-utils`).
 
 | Menu | Items |
 |------|-------|
-| File | New structure… (Ctrl+N), Open… (Ctrl+O), Structure library… (Ctrl+L), recent files, Save (Ctrl+S), Save as… (Ctrl+Shift+S), Export DFT inputs…, Save image…, Exit (Ctrl+Q) |
+| File | New structure… (Ctrl+N), Open… (Ctrl+O), Structure library… (Ctrl+L), Close tab (Ctrl+W), recent files, Save (Ctrl+S), Save as… (Ctrl+Shift+S), Export DFT inputs…, Save image…, Exit (Ctrl+Q) |
 | Edit | Undo / Redo (named after the step), Select all (Ctrl+A), Clear selection, Delete selected atoms, Edit atoms… |
 | Build | New structure…, From library…, Cell and constraints…, Supercell…, Surface / superlattice…, Shift atoms…, Rotate atoms…, Oxygen bridge…, Wrap atoms into cell, Primitive / Conventional cell, Original structure |
 | View | Reset view, Label all atoms and bonds / selected atoms only, Show / Hide bond lengths, bond angles, dihedral angles, atom charges, magnetic moments, atom coordinates, Coordinates: fractional / Cartesian, view along a, b, c, a*, b*, c* |
@@ -129,6 +135,25 @@ Moving the mouse to another title while a menu is open switches to it; a
 click outside or Esc closes it. The current file is shown at the right of the
 menu bar, with "modified" after unsaved changes (undoing back to the saved
 state clears it). The panel's File row has New… / Open… / Save / Export….
+
+**Tabs.** Several structures can be open at once, one per tab in the row
+above the structure's title. Open…, recent files, New structure and the
+library each open a new tab (except in place of an untouched empty cell, as
+`visualize()` starts). Every tab keeps its own structure, *Original*, undo
+history, selection, view and file; edits, Undo and Save act on the tab shown.
+Click a tab to show it (Ctrl+Tab / Ctrl+Shift+Tab: next / previous), × or
+Ctrl+W closes it (with unsaved changes, close twice to discard them), and +
+starts a new structure. A "*" on a tab marks unsaved changes. In code:
+`new_tab!(v, crystal)`, `switch_tab!(v, k)`, `close_tab!(v)`, `ntabs(v)`.
+
+**Tools open on the right.** The menu items that end in "…" (New structure,
+Structure library, Cell and constraints, Supercell, Surface, Shift atoms,
+Rotate atoms, Oxygen bridge, Edit atoms, Export) open in the right-hand column
+of the main window, in place of the view controls. Tools that change the
+structure say which tab they work on ("on GaN.cif") and follow you when you
+switch tabs. One tool is open at a time: opening another replaces
+it, and its *Close* button (or `close_tool!(v)`) brings the view controls
+back. Only the Open / Save file browser is a separate window.
 
 **Supercell** (Build → *Supercell…*): repeats n1 n2 n3, or any cell whose
 vectors a′ b′ c′ are integer combinations of a, b, c (columns of the
@@ -171,7 +196,7 @@ cell itself does not turn.
 - **In code:** `rotate_atoms(c, angle, axis; center, atoms, images)`,
   `rotation_matrix`, `closest_contact`.
 
-**Wrap atoms into cell** (Build menu, the Shift atoms window, or the
+**Wrap atoms into cell** (Build menu, the Shift atoms tool, or the
 right-click menu for selected atoms outside the cell): moves atoms outside
 the cell back in by whole lattice vectors, so fractional coordinates end up in
 [0, 1). The periodic structure and its bonds don't change. "Wrap" is the usual
@@ -187,8 +212,8 @@ inside the cell regardless.
 lattice constants: simple / body-centred / face-centred cubic, diamond,
 zincblende, rocksalt, CsCl, fluorite, perovskite ABX₃, hcp, wurtzite. Cubic
 prototypes take a; hexagonal ones a and c. Choosing a prototype fills in an
-example (e.g. Ga As, 5.653 Å). The new structure replaces the current one as
-an undoable step and is "Untitled" until saved.
+example (e.g. Ga As, 5.653 Å). The new structure opens in a new tab and is
+"Untitled" until saved.
 
 **Saving**: *Save* writes back to the current file when it is a POSCAR or
 XYZ file, or one AtomBond saved. A CIF or CASTEP file opened from disk is not
@@ -206,8 +231,8 @@ folders and the files AtomBond can read (see **File formats** below).
 *All files* lists everything. Click a file to see its formula and
 cell, double-click (or *Open* / Enter) to load it. Arrow keys and Page Up/Down
 move the selection, Backspace goes up a folder, and the mouse wheel scrolls.
-You can also type a folder path. Opening is undoable and the opened structure
-becomes the *Original*. The browser starts in the folder of the current file.
+You can also type a folder path. The file opens in a new tab (a file already
+open there is just shown) and becomes that tab's *Original*. The browser starts in the folder of the current file.
 WSL has no native file dialog, so this is drawn by AtomBond itself.
 
 **File formats** (the format comes from the file name):
@@ -233,7 +258,7 @@ without lattice vectors) are put in a box with 5 Å of space and drawn as
 non-periodic. Examples of each format are in `examples/structures/formats`
 (hand-made in each program's documented layout).
 
-**Surfaces and superlattices** (Cell → *Surface…* opens a second window):
+**Surfaces and superlattices** (Cell → *Surface…* opens the Build surface tool):
 cleave a slab of the current structure along (h k l) with a number of layers,
 vacuum and termination (`auto` cuts where the fewest bonds break), or build an
 A/B superlattice of the current structure with a second structure file, with
@@ -327,9 +352,10 @@ model  = model_DFT(system; functionals=PBE(), temperature=1e-3,
 from_atomsbase(system)                          # and back to a Crystal
 ```
 
-**Exit** (File → *Exit*, Ctrl+Q) closes the window and its dialog windows.
-With unsaved changes the first Exit only warns in the status line; choosing
-Exit again (without editing in between) closes without saving.
+**Exit** (File → *Exit*, Ctrl+Q) closes the window (and an open file browser).
+With unsaved changes in any tab the first Exit only warns in the status line
+(naming the tabs); choosing Exit again (without editing in between) closes
+without saving.
 
 ## Bond lengths, angles, dihedrals, coordinates, charges and moments
 
@@ -438,8 +464,8 @@ repeat them. In code: `fix_atoms(c, idx, (x, y, z))`, `free_atoms`,
 
 File → *Structure library…* (Ctrl+L, also Build → *From library…*) lists
 known crystals and molecules. It shows each one's formula, symmetry, cell and
-source (database entry and paper), and *Open* loads it. Opening is undoable,
-and the structure is Untitled until you save it, so Save never writes into the
+source (database entry and paper), and *Open* loads it in a new tab. The
+structure is Untitled until you save it, so Save never writes into the
 library. In code: `structure_library()`, `load_library("Silicon")` (by name or
 formula), `open_library!(viewer, "H2O")`.
 
@@ -527,7 +553,7 @@ scheme is the other common one in papers, e.g. Si blue.
 | `src/analysis/` | periodic neighbor search (KD-tree), bond detection, space group / primitive / conventional cells (spglib), distances/angles/dihedrals |
 | `src/build/` | supercells, editing (delete / substitute / add / move / set position / replace species), surfaces / slabs / superlattices, bridging atoms |
 | `src/render/` | `ViewSettings` + styles, display model (what to draw), atoms, bonds, unit cell, camera presets, axes triad |
-| `src/gui/` | `Viewer` window (`visualize`), control panel, mouse picking and selection, undo/redo + shortcuts, Build surface / Export / Open (file browser) / Edit atoms windows |
+| `src/gui/` | `Viewer` window (`visualize`), control panel, mouse picking and selection, undo/redo + shortcuts, tools docked in the right-hand column (Build surface, Export, Edit atoms, …), Open / Save file browser |
 | `examples/structures/` | Si, GaAs, NaCl, GaN, water (POSCAR/XYZ); rutile TiO₂, ZnO, Si, GaN (CIF); GaAs (CASTEP .cell), a two-step Si relaxation (CASTEP .geom, hand-made) |
 | `scripts/` | command-line launcher |
 | `test/` | headless unit tests |
@@ -546,7 +572,7 @@ scheme is the other common one in papers, e.g. Si blue.
 8. ✅ Surface cells, slabs (automatic termination), superlattices; Build surface dialog
 9. ✅ Export: VASP, Quantum ESPRESSO, CASTEP, CIF, XYZ with k-point meshes; AtomsBase/DFTK conversion
 10. ✅ File browser (Open…, Ctrl+O); CASTEP `.cell` and `.geom` reading
-11. ✅ Edit atoms window (element / exact position of selected atoms, replace a species everywhere)
+11. ✅ Edit atoms tool (element / exact position of selected atoms, replace a species everywhere)
 12. ✅ Right-click atom menu; menu bar (File / Edit / Build / View), New structure (prototypes), Save / Save as, recent files
 13. ✅ Supercell dialog (repeats or general integer matrix, rotated-cell presets, live preview)
 14. ✅ Click feedback (button / menu flash, ripple in the 3D view, optional click sound)

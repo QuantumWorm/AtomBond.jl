@@ -11,6 +11,8 @@
 #   Ctrl+N / Ctrl+O   new structure / open a file
 #   Ctrl+S            save (Ctrl+Shift+S: save as)
 #   Ctrl+L            structure library
+#   Ctrl+W            close the tab
+#   Ctrl+Tab          next tab (Ctrl+Shift+Tab: previous)
 #   Ctrl+Q            exit (close the window and its dialogs)
 #
 # Shortcuts are ignored while a text box in the panel has keyboard focus.
@@ -377,6 +379,10 @@ function install_shortcuts!(v::Viewer)
             library_dialog(v)
         elseif ctrl && e.key == Makie.Keyboard.q
             exit!(v)
+        elseif ctrl && e.key == Makie.Keyboard.w
+            close_tab!(v)
+        elseif ctrl && e.key == Makie.Keyboard.tab                      # next tab (Shift: previous)
+            switch_tab!(v, mod1(v.active + (shift ? -1 : 1), ntabs(v)))
         else
             return Makie.Consume(false)
         end

@@ -239,3 +239,83 @@ function build_panel!(pos, v::Viewer)
     Makie.colsize!(g, 1, Makie.Relative(1 / 3))
     return g
 end
+
+# --- Docked tools -------------------------------------------------------------------
+#
+# The right-hand column (figure rows 1–3, column 2) holds either the view
+# controls above or one tool (Supercell, Shift atoms, ...). Makie blocks
+# cannot be hidden from the mouse, so the column's contents are deleted and
+# rebuilt when it switches.
+
+"""Delete every block of a layout (also those inside blocks like SliderGrid) and the layout itself."""
+function delete_layout!(g::Makie.GridLayout)
+    for c in copy(g.content)
+        x = c.content
+        if x isa Makie.GridLayout
+            delete_layout!(x)
+        else
+            hasproperty(x, :layout) && x.layout isa Makie.GridLayout && delete_layout!(x.layout)
+            delete!(x)
+        end
+    end
+    gc = Makie.GridLayoutBase.gridcontent(g)
+    gc === nothing || Makie.GridLayoutBase.remove_from_gridlayout!(gc)
+    return nothing
+end
+
+"""Forget text boxes that are being deleted, so shortcuts no longer check them."""
+forget_textboxes!(v::Viewer, boxes) = filter!(t -> !any(b -> b === t, boxes), v.textboxes)
+
+"""Show the view controls in the right-hand column (if the viewer has them)."""
+function show_panel!(v::Viewer)
+    haskey(v.dialogs, :panel) && return nothing
+    n = length(v.textboxes)
+    g = build_panel!(v.figure[1:3, 2], v)
+    v.dialogs[:panel] = (; layout=g, boxes=v.textboxes[n+1:end])
+    return g
+end
+
+function hide_panel!(v::Viewer)
+    p = pop!(v.dialogs, :panel, nothing)
+    p === nothing && return nothing
+    forget_textboxes!(v, p.boxes)
+    delete_layout!(p.layout)
+end
+
+"""
+Clear the right-hand column and start a tool there: a title with a Close
+button (and the tab it works on, `subject`), then an empty Form `width` px
+wide for the tool's controls.
+"""
+function dock_tool!(v::Viewer, title::AbstractString, width::Real; subject=nothing)
+    close_tool!(v; restore=false)
+    hide_panel!(v)
+    g = Makie.GridLayout(v.figure[1:3, 2]; width, valign=:top, tellheight=false, rowgap=6)
+    top = Makie.GridLayout(g[1, 1:2]; colgap=8)
+    Makie.Label(top[1, 1], title; font=:bold, fontsize=17, halign=:left, tellwidth=false)
+    close_btn = with_click_feedback!(Makie.Button(top[1, 2]; label="Close", fontsize=PANEL_FONTSIZE,
+                                                  padding=(10, 10, 4, 4)))
+    Makie.on(_ -> close_tool!(v), close_btn.clicks)
+    subject === nothing && return Form(g, 1)
+    Makie.Label(g[2, 1:2], "on $subject"; halign=:left, fontsize=13, color=:gray40)
+    return Form(g, 2)
+end
+
+"""
+    close_tool!(viewer; restore=true) -> Bool
+
+Close the tool open on the right; `restore` brings the view controls back.
+Returns whether a tool was open.
+"""
+function close_tool!(v::Viewer; restore::Bool=true)
+    t = pop!(v.dialogs, :tool, nothing)
+    if t !== nothing
+        forget_textboxes!(v, t.boxes)
+        delete_layout!(t.layout)
+    end
+    restore && get(v.dialogs, :has_panel, false) && show_panel!(v)
+    return t !== nothing
+end
+
+"""Key of the tool open on the right (:supercell, :shift, ...), or `nothing`."""
+open_tool(v::Viewer) = (t = get(v.dialogs, :tool, nothing)) === nothing ? nothing : t.key

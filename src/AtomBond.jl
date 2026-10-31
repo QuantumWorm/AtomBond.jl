@@ -73,6 +73,7 @@ include("gui/menubar.jl")
 include("gui/history.jl")
 include("gui/dialogs.jl")
 include("gui/filebrowser.jl")
+include("gui/tabs.jl")
 
 # core
 export Element, element, element_property, vdw_radius, ismetal, atomic_mass, override_elements!, use_vesta_colors!, Lattice, Crystal, crystal_from_cartesian, cubic
@@ -102,15 +103,39 @@ export bridge_position, bridge_offset_direction, bridge_max_offset, add_bridge
 export ViewSettings, DISPLAY_STYLES, build_display, draw_structure!, draw_crystal!
 export view_direction, view_along!, reset_camera!
 export Viewer, visualize, redraw!, set_crystal!, save_view, snapshot
-export select!, clear_selection!, edit!, undo!, redo!, surface_dialog, export_dialog, open_dialog, open_structure!, atoms_dialog
+export select!, clear_selection!, edit!, undo!, redo!, surface_dialog, close_tool!, open_tool, export_dialog, open_dialog, open_structure!, atoms_dialog
 export open_context_menu!, close_context_menu!, select_species!, select_all!
 export supercell_dialog, shift_dialog, shift_atoms!, wrap_atoms!, rotate_dialog, rotate_atoms!, click_feedback!
 export bridge_dialog, add_bridge!, flip_bridge!
 export set_bond_lengths!, set_bond_angles!, set_dihedrals!, set_coordinates!, set_charge_labels!, set_magmom_labels!, set_bond_length_labels!, cell_dialog, fix_selected!, free_selected!, free_all_atoms!, set_cell_constraints!, periodic_box!, make_molecule!
 export LibraryEntry, structure_library, library_entry, load_library, library_dialog, open_library!
 export save!, save_to!, save_dialog, new_structure_dialog, create_structure!, recent_files, exit!
+export new_tab!, switch_tab!, close_tab!, open_in_tab!, ntabs, active_tab
 
-# User overrides of element colors/radii (~/.atombond/elements.csv), read at load time.
-__init__() = load_user_elements!()
+"""
+In WSL2, Mesa's GPU OpenGL driver (D3D12) deadlocks when many plots are
+added to an open window, as when a tool opens in the right-hand column. Use
+software rendering there (no window is open yet at load time), unless
+ATOMBOND_GPU=1 or the user already chose a driver with LIBGL_ALWAYS_SOFTWARE
+or GALLIUM_DRIVER. Returns whether it switched.
+"""
+function wsl_software_rendering!(env=ENV)
+    Sys.islinux() || return false
+    get(env, "ATOMBOND_GPU", "") == "1" && return false
+    (haskey(env, "LIBGL_ALWAYS_SOFTWARE") || haskey(env, "GALLIUM_DRIVER")) && return false
+    wsl = try
+        occursin("microsoft", lowercase(read("/proc/version", String)))
+    catch
+        false
+    end
+    wsl || return false
+    env["LIBGL_ALWAYS_SOFTWARE"] = "1"
+    return true
+end
+
+function __init__()
+    load_user_elements!()      # user overrides of element colors/radii (~/.atombond/elements.csv)
+    wsl_software_rendering!()
+end
 
 end # module

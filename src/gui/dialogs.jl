@@ -1,4 +1,6 @@
-# Dialog windows next to the main viewer:
+# Tools of the main viewer. Each opens in the right-hand column of the main
+# window, in place of the view controls, with a Close button that brings the
+# view controls back (one tool at a time; see `dock_tool!` in panel.jl):
 #
 # - Build surface: cleave slabs from, and build superlattices on, the current
 #   structure. Results are undoable edits (Ctrl+Z in the main window).
@@ -13,15 +15,17 @@
 # - Cell and constraints: cell data, periodic box for molecules, lattice and
 #   atom constraints for geometry optimization.
 #
-# Both share the main window's status line, so messages appear in both.
+# Messages appear in the main window's status line.
 
 const DIALOG_WIDTH = 440
 
-"""Two-column form (label | control) used by the dialogs."""
+"""Two-column form (label | control) used by the dialogs; `boxes` are its text boxes."""
 mutable struct Form
     g::Makie.GridLayout
     row::Int
+    boxes::Vector{Any}
 end
+Form(g, row) = Form(g, row, Any[])
 
 nextrow!(f::Form) = (f.row += 1)
 
@@ -34,8 +38,10 @@ note!(f::Form, text) = Makie.Label(f.g[nextrow!(f), 1:2], text; halign=:left, fo
 function field!(f::Form, label, default, validator)
     r = nextrow!(f)
     Makie.Label(f.g[r, 1], label; halign=:left, fontsize=PANEL_FONTSIZE)
-    return sync_display!(Makie.Textbox(f.g[r, 2]; stored_string=default, validator, width=Makie.Relative(1),
-                         fontsize=PANEL_FONTSIZE, textpadding=(8, 8, 5, 5)))
+    t = sync_display!(Makie.Textbox(f.g[r, 2]; stored_string=default, validator, width=Makie.Relative(1),
+                                    fontsize=PANEL_FONTSIZE, textpadding=(8, 8, 5, 5)))
+    push!(f.boxes, t)
+    return t
 end
 
 button!(f::Form, label) = with_click_feedback!(Makie.Button(f.g[nextrow!(f), 1:2]; label, width=Makie.Relative(1),
@@ -51,29 +57,80 @@ function form_value(v::Viewer, t, what)
 end
 
 """
-New dialog figure, or `nothing` (with a message) if this dialog is already
-open. Returns the figure and a Form to fill.
+Start a tool: with `show`, a Form docked in the main window's right-hand
+column (replacing the view controls or another tool), or `nothing` (with a
+message) if this tool is already open. Without `show` (tests), a Form in a
+figure of its own that is never displayed. Returns the figure and the Form.
 """
 function new_dialog(v::Viewer, key::Symbol, title::AbstractString, height::Integer; show::Bool,
                     width::Integer=DIALOG_WIDTH)
-    if show && haskey(v.dialogs, key) && isopen(v.dialogs[key])
-        v.status[] = "The $title window is already open"
+    if !show
+        fig = Makie.Figure(; size=(width, height), backgroundcolor=v.settings.background)
+        return fig, Form(Makie.GridLayout(fig[1, 1]; valign=:top, rowgap=6, width=width - 32), 0)
+    end
+    tool = get(v.dialogs, :tool, nothing)
+    if tool !== nothing && tool.key === key
+        v.status[] = "$title is already open on the right"
         return nothing
     end
-    fig = Makie.Figure(; size=(width, height), backgroundcolor=v.settings.background)
-    return fig, Form(Makie.GridLayout(fig[1, 1]; valign=:top, rowgap=6, width=width - 32), 0)
+    subject = haskey(STRUCTURE_TOOLS, key) ? tab_label(v, v.active) : nothing   # the tab it works on
+    return v.figure, dock_tool!(v, title, width - 32; subject)
 end
 
-"""Status line at the bottom of a dialog, then show it in its own window."""
+"""
+Break `s` into lines of at most `n` characters at spaces (existing line
+breaks stay; a word longer than `n` gets a line of its own).
+"""
+function wrap_text(s::AbstractString, n::Integer)
+    lines = String[]
+    for para in split(s, '\n')
+        line = ""
+        for word in split(para, ' ')
+            if isempty(line) || length(line) + 1 + length(word) <= n
+                line = isempty(line) ? String(word) : line * " " * word
+            else
+                push!(lines, line)
+                line = String(word)
+            end
+        end
+        push!(lines, line)
+    end
+    return join(lines, '\n')
+end
+
+"""
+Wrap the text of a form's labels at the width of their columns (the form is
+`width` px wide, column 1 takes `labelwidth` of it), now and whenever the
+text changes, so long lines do not widen the column. Makie's own word_wrap,
+or a fixed label width, hangs the layout here.
+"""
+function wrap_labels!(f::Form, width::Real, labelwidth::Real)
+    for c in f.g.content
+        x = c.content
+        x isa Makie.Label || continue
+        cols = c.span.cols
+        w = cols == 1:2 ? width : first(cols) == 1 ? labelwidth * width : (1 - labelwidth) * width - 10
+        n = floor(Int, w / (0.55 * x.fontsize[]))          # characters per line, a little conservatively
+        rewrap(s) = s isa AbstractString && (t = wrap_text(s, n)) != s && (x.text[] = t)
+        x.justification[] = :left
+        Makie.on(rewrap, x.text)
+        rewrap(x.text[])
+    end
+end
+
+"""Finish a tool's form; a docked tool becomes the open tool of the viewer."""
 function finish_dialog!(v::Viewer, key::Symbol, title::AbstractString, fig, f::Form; show::Bool,
                         labelwidth::Real=0.4)
-    Makie.Label(f.g[nextrow!(f), 1:2], v.status; halign=:left, fontsize=12, color=Makie.lift(status_color, v.status),
-                word_wrap=true, width=fig.scene.viewport[].widths[1] - 40)
+    # A tool built off-screen keeps a status line of its own.
+    show || Makie.Label(f.g[nextrow!(f), 1:2], v.status; halign=:left, fontsize=12,
+                        color=Makie.lift(status_color, v.status), word_wrap=true,
+                        width=fig.scene.viewport[].widths[1] - 40)
     Makie.colsize!(f.g, 1, Makie.Relative(labelwidth))
     Makie.colsize!(f.g, 2, Makie.Auto(false))     # take the remaining width, not the widest item
     if show
-        v.dialogs[key] = GLMakie.Screen(; title="AtomBond — $title", ssao=false)
-        display(v.dialogs[key], fig)
+        wrap_labels!(f, f.g.width[], labelwidth)  # long lines wrap instead of widening the column
+        append!(v.textboxes, f.boxes)             # keyboard shortcuts pause while typing in them
+        v.dialogs[:tool] = (; key, title, layout=f.g, boxes=f.boxes)
     end
 end
 
@@ -701,14 +758,18 @@ open_library!(v::Viewer, name::AbstractString; kw...) = open_library!(v, library
 
 function open_library!(v::Viewer, e::LibraryEntry; box::Union{Nothing,Real}=nothing, cubic::Bool=true)
     load(_) = (c = load_library(e); box === nothing || e.kind !== :molecule ? c : periodic_box(c; vacuum=box, cubic))
-    what = "open $(e.name) from the library" *
+    what = "$(e.name) from the library" *
            (box !== nothing && e.kind === :molecule ? " in a $(vector_text([box])) Å vacuum box" : "")
-    ok = edit!(load, v, what; reframe=true)
-    if ok
-        v.original, v.path = v.crystal, nothing
-        update_document!(v)
+    c = try
+        load(nothing)
+    catch err
+        err isa InterruptException && rethrow()
+        v.status[] = "Could not open $what: " * sprint(showerror, err)
+        return false
     end
-    return ok
+    open_in_tab!(v, c)
+    v.status[] = "Opened $what: $(natoms(c)) atoms"
+    return true
 end
 
 """
@@ -723,7 +784,7 @@ function library_dialog(v::Viewer; show::Bool=true)
     d = new_dialog(v, :library, "Structure library", 640; show, width)
     d === nothing && return nothing
     fig, f = d
-    heading!(f, "Structure library")
+    heading!(f, "Open a known structure")
     note!(f, "Crystals: Crystallography Open Database (published structures).\n" *
              "Molecules: experimental geometries from NIST CCCBDB.")
     menu_row(label, options) = (r = nextrow!(f);
@@ -734,8 +795,7 @@ function library_dialog(v::Viewer; show::Bool=true)
     label(e) = "$(e.name)  ($(e.formula))"
     structure = menu_row("Structure", label.(entries[]))
     info = Makie.Observable("")
-    Makie.Label(f.g[nextrow!(f), 1:2], info; halign=:left, fontsize=13, color=:gray25, justification=:left,
-                word_wrap=true, width=width - 40)
+    Makie.Label(f.g[nextrow!(f), 1:2], info; halign=:left, fontsize=13, color=:gray25, justification=:left)
     r = nextrow!(f)
     boxed = Makie.Toggle(f.g[r, 1]; active=false, halign=:left)
     Makie.Label(f.g[r, 2], "Molecules: in a periodic cubic box (for CASTEP, VASP, QE)"; halign=:left,
@@ -822,7 +882,7 @@ function cell_dialog(v::Viewer; show::Bool=true)
     d === nothing && return nothing
     fig, f = d
     small_label(obs) = Makie.Label(f.g[nextrow!(f), 1:2], obs; halign=:left, fontsize=13, color=:gray25,
-                                   justification=:left, word_wrap=true, width=width - 40)
+                                   justification=:left)
     heading!(f, "Cell")
     info = Makie.Observable("")
     small_label(info)
@@ -994,8 +1054,7 @@ function bridge_dialog(v::Viewer; show::Bool=true)
     flip = Makie.Toggle(f.g[r, 1]; active=false, halign=:left)
     Makie.Label(f.g[r, 2], "Other side of the bond (−v)"; halign=:left, fontsize=PANEL_FONTSIZE)
     preview = Makie.Observable("")
-    Makie.Label(f.g[nextrow!(f), 1:2], preview; halign=:left, fontsize=13, color=:gray25, justification=:left,
-                word_wrap=true, width=width - 40)
+    Makie.Label(f.g[nextrow!(f), 1:2], preview; halign=:left, fontsize=13, color=:gray25, justification=:left)
     bg = Makie.GridLayout(f.g[nextrow!(f), 1:2])
     mk(i, label) = with_click_feedback!(Makie.Button(bg[1, i]; label, width=Makie.Relative(1), fontsize=PANEL_FONTSIZE,
                                                      padding=(6, 6, 5, 5)))
