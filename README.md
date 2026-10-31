@@ -80,6 +80,9 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 # supercells / primitive / conventional cells and saves PNGs
 julia --project=. scripts/run_atombond.jl examples/structures/TiO2_rutile.cif
 
+# or start without a file, from an empty cell with the New structure tool
+julia --project=. scripts/run_atombond.jl
+
 # run the tests
 julia --project=. -e 'using Pkg; Pkg.test()'
 ```
