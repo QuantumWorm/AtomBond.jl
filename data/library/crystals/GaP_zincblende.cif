@@ -1,4 +1,4 @@
-# GaP, written by scripts/build_library.py
+# GaP, written by scripts/build_library.jl
 # I. Vurgaftman, J. R. Meyer, L. R. Ram-Mohan, "Band parameters for III-V compound semiconductors and their alloys", J. Appl. Phys. 89, 5815 (2001)
 data_GaP
 _space_group_IT_number           216

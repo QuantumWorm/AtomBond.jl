@@ -1,7 +1,7 @@
 # Element data, read from data/elements.csv (one row per element, Z 1–103).
 #
 # The table holds the published values with their sources (see its header and
-# scripts/build_element_table.py):
+# scripts/build_element_table.jl):
 #   mass                 NIST / IUPAC standard atomic weights
 #   covalent_radius      Cordero et al. 2008      → bonds, ball size
 #   vdw_radius_bondi     Bondi 1964 (+ Mantina)   → space-filling (CPK) size

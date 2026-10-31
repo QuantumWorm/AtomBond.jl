@@ -4,7 +4,7 @@
 # [[structure]] entry per structure (name, kind, category, formula, file,
 # description, source, url, reference, doi, note), and the files it names
 # (crystals: CIFs from the Crystallography Open Database; molecules: XYZ
-# files of NIST CCCBDB experimental geometries). scripts/build_library.py
+# files of NIST CCCBDB experimental geometries). scripts/build_library.jl
 # rebuilds it from those sources.
 #
 # Your own structures: a library.toml in ~/.atombond/library/ (or
