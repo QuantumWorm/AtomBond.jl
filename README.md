@@ -44,13 +44,20 @@ using Pkg
 Pkg.add(url="https://github.com/QuantumWorm/AtomBond.jl")
 ```
 
-Then open a structure:
+Then open a structure, or start a new one:
 
 ```julia
 using AtomBond
 visualize("structure.cif")           # a file in any supported format
-visualize(load_library("GaN"))       # or a structure from the built-in library
+visualize(load_library("GaN"))       # a structure from the built-in library
+visualize()                          # nothing yet: build a new structure
 ```
+
+`visualize()` opens an empty cell together with the *New structure* window.
+There you pick a prototype (diamond, zincblende, rocksalt, wurtzite,
+perovskite, …) and type your elements and lattice constants, or keep the
+empty cell and add atoms one by one with *Add*. *File → Structure library…*
+and *File → Open…* are in the menu bar as well.
 
 Left-drag rotates, the scroll wheel zooms and right-drag pans. From a script
 (`julia script.jl`) keep the window open with `v = visualize(...); wait(v.screen)`.

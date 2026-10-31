@@ -151,6 +151,19 @@ end
 visualize(path::AbstractString; kwargs...) =
     visualize(load_structure(path); folder=dirname(abspath(path)), path, kwargs...)
 
+"""
+    visualize(; kwargs...) -> Viewer
+
+Start without a structure: an empty 5 Å cubic cell, with the New structure
+window open (a prototype such as diamond or wurtzite with your elements, or
+an empty cell to fill with Add). File → Open… and the library work as usual.
+"""
+function visualize(; show::Bool=true, kwargs...)
+    v = visualize(prototype_crystal("Empty cell", String[], (5.0, 5.0, 5.0)); show, kwargs...)
+    show && new_structure_dialog(v)
+    return v
+end
+
 """Render the whole figure to an image, using the open window or an offscreen screen."""
 function render_image(v::Viewer)
     v.screen === nothing || return Makie.colorbuffer(v.screen)

@@ -988,6 +988,9 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         AtomBond.settext!(d.abc, "4 4 6"); AtomBond.settext!(d.angles, "90 90 120")
         d.create.clicks[] = 1
         @test natoms(v.crystal) == 0 && startswith(v.header[], "No atoms")
+        # visualize() with no structure: an empty cell to build in.
+        e = visualize(; show=false, panel=false)
+        @test natoms(e.crystal) == 0 && e.path === nothing && lattice_parameters(e.crystal.lattice)[1:3] == (5.0, 5.0, 5.0)
         AtomBond.settext!(d.elements, "Si")
         d.create.clicks[] = 1
         @test startswith(v.status[], "Enter no elements")
