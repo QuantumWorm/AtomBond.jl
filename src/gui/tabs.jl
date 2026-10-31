@@ -39,8 +39,9 @@ const STRUCTURE_TOOLS = Dict(:surface => surface_dialog, :export => export_dialo
                              :supercell => supercell_dialog, :shift => shift_dialog, :rotate => rotate_dialog,
                              :cell => cell_dialog, :bridge_window => bridge_dialog)
 
-"""Number of open tabs, and which one is shown."""
+"""Number of open tabs."""
 ntabs(v::Viewer) = length(v.tabs)
+"""Number of the tab shown."""
 active_tab(v::Viewer) = v.active
 
 """Save the active tab's state (kept in the viewer) into its Document."""

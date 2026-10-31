@@ -16,7 +16,7 @@ end
 
 Atoms i and j are bonded when `min_length < d ≤ max(tolerance * (r_i + r_j), r_i + r_j + 0.15 Å)`,
 with r the covalent radius. `cutoffs` can raise that limit for given element
-pairs, e.g. `Dict((:C, :Ga) => 2.77)` (keys in [`pairkey`](@ref) order). Bonds
+pairs, e.g. `Dict((:C, :Ga) => 2.77)` (keys in alphabetical order, as `pairkey` makes them). Bonds
 across periodic boundaries are included; each bond is listed once.
 
 Covalent radii of metals are large enough that cation–cation pairs in oxides

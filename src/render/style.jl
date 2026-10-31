@@ -13,6 +13,18 @@ const DISPLAY_STYLES = (:ball_and_stick, :cpk, :stick, :line)
 const STYLE_LABELS = Dict(:ball_and_stick => "Ball and stick", :cpk => "CPK (space filling)",
                           :stick => "Stick", :line => "Line")
 
+"""
+    ViewSettings(; kwargs...)
+
+Display settings of a viewer (`v.settings`), set by keyword, e.g.
+`ViewSettings(style=:cpk, show_bonds=false)`. Change a field of an open
+viewer and call [`redraw!`](@ref). Main fields: `style` (see
+`DISPLAY_STYLES`), `ball_scale`, `bond_radius`, `show_bonds`, `bond_stubs`,
+`show_cell`, `show_boundary_atoms`, `wrap_atoms`, `show_labels`,
+`show_triad`, `orthographic`, `bond_lengths` (`:selected` or `:all`),
+`show_bond_angles`, `show_dihedrals`, `show_coordinates`, `show_charges`,
+`show_magmoms` and `bond_cutoffs` (per element pair).
+"""
 Base.@kwdef mutable struct ViewSettings
     style::Symbol = :ball_and_stick
 

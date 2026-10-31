@@ -16,6 +16,11 @@
 # columns `color` (hex) and `vdw_radius` take precedence over the defaults.
 # `use_vesta_colors!` takes colors from a VESTA elements.ini.
 
+"""
+Data of one element, from `element(:Si)`: `symbol`, `Z`, `name`, `mass` (u),
+`covalent_radius` and `vdw_radius` (Å) and `color`. Other columns of the
+element table are read with [`element_property`](@ref).
+"""
 struct Element
     symbol::Symbol
     Z::Int
@@ -173,6 +178,7 @@ end
 const NONMETALS = Set([:H, :He, :B, :C, :N, :O, :F, :Ne, :Si, :P, :S, :Cl, :Ar,
                        :Ge, :As, :Se, :Br, :Kr, :Sb, :Te, :I, :Xe])
 
+"""Whether element `s` is a metal (for leaving out metal–metal bonds in compounds)."""
 ismetal(s::Symbol) = s ∉ NONMETALS && s !== :X
 
 """

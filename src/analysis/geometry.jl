@@ -1,5 +1,6 @@
 # Distances, angles and dihedrals between Cartesian points (Å, degrees).
 
+"""Distance between Cartesian points `p` and `q` (no periodic images; see [`min_image_distance`](@ref))."""
 distance(p, q) = norm(q - p)
 
 """Angle p–q–r at the middle point q, in degrees."""

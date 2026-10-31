@@ -1,0 +1,9 @@
+[deps]
+AtomBond = "f967c4c4-4f02-4d5a-ae15-528dcbcbb432"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+
+[sources]
+AtomBond = {path = ".."}
+
+[compat]
+Documenter = "1"

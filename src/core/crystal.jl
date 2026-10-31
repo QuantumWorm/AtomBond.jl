@@ -20,6 +20,17 @@
 const FREE_CELL = (1, 2, 3, 4, 5, 6)
 const FREE_ATOM = (false, false, false)
 
+"""
+    Crystal(lattice, species, frac; pbc=(true, true, true), title="", fixed, cell_constraints, charges, magmoms)
+
+A structure: a [`Lattice`](@ref), element symbols `species` and fractional
+coordinates `frac` (one per atom). `pbc` marks the periodic directions (a
+molecule has none). Optional per-atom data: `fixed` (which fractional x, y,
+z are fixed in a geometry optimization), `charges` (e) and `magmoms` (μB),
+with `NaN` for unknown; `cell_constraints` follows CASTEP's
+CELL_CONSTRAINTS for a b c α β γ. Crystals are immutable: editing functions
+return new ones.
+"""
 struct Crystal
     lattice::Lattice
     species::Vector{Symbol}
@@ -104,9 +115,11 @@ function crystal_from_cartesian(lattice::Lattice, species, positions; kwargs...)
     Crystal(lattice, species, [cart_to_frac(lattice, r) for r in positions]; kwargs...)
 end
 
+"""Number of atoms."""
 natoms(c::Crystal) = length(c.species)
 Base.length(c::Crystal) = natoms(c)
 
+"""Cartesian positions of all atoms, in Å."""
 cartesian_positions(c::Crystal) = [frac_to_cart(c.lattice, f) for f in c.frac]
 
 """Unique species in order of first appearance."""

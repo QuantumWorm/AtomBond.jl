@@ -54,6 +54,7 @@ function edit!(f, v::Viewer, what::AbstractString; reframe::Bool=false, keep_sel
     return true
 end
 
+"""Undo the last edit of the tab shown (Ctrl+Z). Returns whether there was one."""
 function undo!(v::Viewer)
     isempty(v.history) && (v.status[] = "Nothing to undo"; return false)
     c, what, reframe, path = pop!(v.history)
@@ -64,6 +65,7 @@ function undo!(v::Viewer)
     return true
 end
 
+"""Redo the last undone edit (Ctrl+Y). Returns whether there was one."""
 function redo!(v::Viewer)
     isempty(v.future) && (v.status[] = "Nothing to redo"; return false)
     c, what, reframe, path = pop!(v.future)

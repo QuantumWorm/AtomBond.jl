@@ -117,6 +117,7 @@ function save!(v::Viewer; show::Bool=true)
     return save_dialog(v; show)
 end
 
+"""Select every atom of the structure (Ctrl+A)."""
 function select_all!(v::Viewer)
     v.selection = [(i, Shift(0, 0, 0)) for i in 1:natoms(v.crystal)]
     update_selection!(v)

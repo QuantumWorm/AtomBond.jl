@@ -83,6 +83,7 @@ function select!(v::Viewer, index::Integer, image=Shift(0, 0, 0); add::Bool=fals
     update_selection!(v)
 end
 
+"""Deselect all atoms."""
 function clear_selection!(v::Viewer)
     empty!(v.selection)
     update_selection!(v)

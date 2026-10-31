@@ -9,5 +9,8 @@ handoff_notes.md
 # Local scratch and download caches of scripts/
 scratch/
 *.png
-!docs/images/*.png
+!docs/src/assets/*.png
 .DS_Store
+
+# Built documentation
+docs/build/

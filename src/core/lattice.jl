@@ -39,7 +39,9 @@ end
 """Cubic lattice with edge `a`."""
 cubic(a::Real) = Lattice(a, a, a, 90, 90, 90)
 
+"""The lattice vectors a, b, c (Å)."""
 cell_vectors(L::Lattice) = (L.matrix[:, 1], L.matrix[:, 2], L.matrix[:, 3])
+"""Cell volume in Å³ (negative for a left-handed cell)."""
 cell_volume(L::Lattice) = det(L.matrix)
 
 """
@@ -54,7 +56,9 @@ function lattice_parameters(L::Lattice)
     return (la, lb, lc, angle(b, c), angle(a, c), angle(a, b))
 end
 
+"""Cartesian position (Å) of fractional coordinates `f`."""
 frac_to_cart(L::Lattice, f::AbstractVector) = L.matrix * Vec3(f)
+"""Fractional coordinates of a Cartesian position `r` (Å)."""
 cart_to_frac(L::Lattice, r::AbstractVector) = L.matrix \ Vec3(r)
 
 function Base.show(io::IO, L::Lattice)
