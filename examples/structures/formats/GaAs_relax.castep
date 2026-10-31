@@ -1,0 +1,69 @@
+ +-------------------------------------------------+
+ |                                                 |
+ |      CCC   AA    SSS  TTTTT  EEEEE  PPPP        |
+ |     C     A  A  S       T    E      P   P       |
+ |     C     AAAA   SS     T    EEE    PPPP        |
+ |     C     A  A     S    T    E      P           |
+ |      CCC  A  A  SSS     T    EEEEE  P           |
+ |                                                 |
+ +-------------------------------------------------+
+  Hand-made example in the layout of a CASTEP geometry optimisation output
+  (GaAs, primitive cell); the population values are illustrative only.
+
+                           -------------------------------
+                                      Unit Cell
+                           -------------------------------
+        Real Lattice(A)              Reciprocal Lattice(1/A)
+   0.0000000   2.8300000   2.8300000       -1.1101034   1.1101034   1.1101034
+   2.8300000   0.0000000   2.8300000        1.1101034  -1.1101034   1.1101034
+   2.8300000   2.8300000   0.0000000        1.1101034   1.1101034  -1.1101034
+
+                           -------------------------------
+                                     Cell Contents
+                           -------------------------------
+                         Total number of ions in cell =    2
+                      Total number of species in cell =    2
+
+            xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+            x  Element    Atom        Fractional coordinates of atoms  x
+            x            Number           u          v          w      x
+            x----------------------------------------------------------x
+            x  Ga           1         0.000000   0.000000   0.000000   x
+            x  As           1         0.260000   0.260000   0.260000   x
+            xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+ BFGS: finished iteration     1 with enthalpy= -4.26201000E+003 eV
+
+                           -------------------------------
+                                      Unit Cell
+                           -------------------------------
+        Real Lattice(A)              Reciprocal Lattice(1/A)
+   0.0000000   2.8266250   2.8266250       -1.1114289   1.1114289   1.1114289
+   2.8266250   0.0000000   2.8266250        1.1114289  -1.1114289   1.1114289
+   2.8266250   2.8266250   0.0000000        1.1114289   1.1114289  -1.1114289
+
+            xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+            x  Element    Atom        Fractional coordinates of atoms  x
+            x            Number           u          v          w      x
+            x----------------------------------------------------------x
+            x  Ga           1         0.000000   0.000000   0.000000   x
+            x  As           1         0.250000   0.250000   0.250000   x
+            xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+ BFGS: Geometry optimization completed successfully.
+
+     Atomic Populations (Mulliken)
+     -----------------------------
+Species          Ion     s       p       d       f      Total   Charge (e)
+=====================================================================
+  Ga              1     1.30    1.24   10.00    0.00   12.54     0.46
+  As              1     1.66    3.80    0.00    0.00    5.46    -0.46
+=====================================================================
+
+     Hirshfeld Analysis
+     ------------------
+Species   Ion     Hirshfeld Charge (e)
+======================================
+  Ga       1                 0.12
+  As       1                -0.12
+======================================

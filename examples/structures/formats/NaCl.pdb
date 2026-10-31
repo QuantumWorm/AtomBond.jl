@@ -1,0 +1,11 @@
+TITLE     Rocksalt NaCl conventional cell
+CRYST1    5.640    5.640    5.640  90.00  90.00  90.00 P 1           1
+HETATM    1 Na1  MOL A   1       0.000   0.000   0.000  1.00  0.00          NA
+HETATM    2 Na2  MOL A   1       0.000   2.820   2.820  1.00  0.00          NA
+HETATM    3 Na3  MOL A   1       2.820   0.000   2.820  1.00  0.00          NA
+HETATM    4 Na4  MOL A   1       2.820   2.820   0.000  1.00  0.00          NA
+HETATM    5 Cl1  MOL A   1       2.820   0.000   0.000  1.00  0.00          CL
+HETATM    6 Cl2  MOL A   1       2.820   2.820   2.820  1.00  0.00          CL
+HETATM    7 Cl3  MOL A   1       0.000   0.000   2.820  1.00  0.00          CL
+HETATM    8 Cl4  MOL A   1       0.000   2.820   0.000  1.00  0.00          CL
+END

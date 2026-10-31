@@ -1,0 +1,12 @@
+# GaAs zincblende, ABINIT
+acell 3*10.6829
+rprim  0.0 0.5 0.5
+       0.5 0.0 0.5
+       0.5 0.5 0.0
+ntypat 2
+znucl 31 33
+natom 2
+typat 1 2
+xred  0.0  0.0  0.0
+      1/4  1/4  1/4
+ecut 20

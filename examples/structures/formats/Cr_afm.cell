@@ -1,0 +1,16 @@
+! bcc Cr, antiferromagnetic (CsCl-type ordering in the conventional cell):
+! initial magnetic moments (μB) with SPIN= on each position line.
+! Hand-made example; a = 2.884 Å.
+%BLOCK LATTICE_CART
+ang
+   2.884000   0.000000   0.000000
+   0.000000   2.884000   0.000000
+   0.000000   0.000000   2.884000
+%ENDBLOCK LATTICE_CART
+
+%BLOCK POSITIONS_FRAC
+  Cr   0.000000   0.000000   0.000000   SPIN=1.0
+  Cr   0.500000   0.500000   0.500000   SPIN=-1.0
+%ENDBLOCK POSITIONS_FRAC
+
+KPOINTS_MP_GRID 12 12 12

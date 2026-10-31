@@ -1,0 +1,19 @@
+# InN, written by scripts/build_library.py
+# I. Vurgaftman, J. R. Meyer, L. R. Ram-Mohan, "Band parameters for III-V compound semiconductors and their alloys", J. Appl. Phys. 89, 5815 (2001); u: W. Paszkowicz, R. Cerny, S. Krukowski, "Rietveld refinement for indium nitride in the 105-295 K range", Powder Diffraction 18, 114 (2003)
+data_InN
+_space_group_IT_number           186
+_symmetry_space_group_name_H-M   'P 63 m c'
+_cell_length_a                   3.545
+_cell_length_b                   3.545
+_cell_length_c                   5.703
+_cell_angle_alpha                90
+_cell_angle_beta                 90
+_cell_angle_gamma                120
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+In1 In 0.3333333333 0.6666666667 0
+N1 N 0.3333333333 0.6666666667 0.3769

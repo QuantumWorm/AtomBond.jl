@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="latin1"?>
+<!DOCTYPE XSD []>
+<XSD Version="20.1" WrittenBy="Materials Studio 20.1">
+	<AtomisticTreeRoot ID="1">
+		<SymmetrySystem ID="2" Mapping="3" Children="ci(2):5-6" Normalized="1" Name="SymmetrySystem" UserID="1" XYZ="0,0,0">
+			<MappingSet ID="8" SymmetryDefinition="4" ActiveSystem="2" NumFamilies="1" OwnsTotalConstraintMapping="1" TotalConstraintMapping="3">
+				<MappingFamily ID="9" NumImageMappings="0">
+					<IdentityMapping ID="10" Element="1,0,0,0,0,1,0,0,0,0,1,0" Constraint="1,0,0,0,0,1,0,0,0,0,1,0">
+						<Atom3d ID="5" Mapping="10" Parent="2" Name="Si1" UserID="1" DisplayStyle="Ball and Stick" XYZ="0,0,0" Components="Si"/>
+						<Atom3d ID="6" Mapping="10" Parent="2" Name="Si2" UserID="2" DisplayStyle="Ball and Stick" XYZ="0.25,0.25,0.25" Components="Si"/>
+					</IdentityMapping>
+				</MappingFamily>
+			</MappingSet>
+			<SpaceGroup ID="4" Parent="2" Children="ci(1):11" AVector="0,2.7155,2.7155" BVector="2.7155,0,2.7155" CVector="2.7155,2.7155,0" OrientationBase="C along Z, B in YZ plane" Centering="3D Primitive-Centered" Lattice="3D Triclinic" GroupName="P1" Operators="1,0,0,0,0,1,0,0,0,0,1,0" DisplayRange="0,1,0,1,0,1" LineThickness="2" CylinderRadius="0.2" LabelAxes="1" ActiveSystem="2" ITNumber="1" LongName="P 1" Qualifier="Origin-1" SchoenfliesName="C1-1" System="Triclinic" Class="1"/>
+		</SymmetrySystem>
+	</AtomisticTreeRoot>
+</XSD>

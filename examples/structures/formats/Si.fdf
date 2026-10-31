@@ -1,0 +1,18 @@
+SystemName    Bulk silicon
+SystemLabel   si
+NumberOfAtoms 2
+NumberOfSpecies 1
+%block ChemicalSpeciesLabel
+ 1  14  Si
+%endblock ChemicalSpeciesLabel
+LatticeConstant  5.431 Ang
+%block LatticeVectors
+  0.000  0.500  0.500
+  0.500  0.000  0.500
+  0.500  0.500  0.000
+%endblock LatticeVectors
+AtomicCoordinatesFormat  ScaledCartesian
+%block AtomicCoordinatesAndAtomicSpecies
+  0.00  0.00  0.00  1
+  0.25  0.25  0.25  1
+%endblock AtomicCoordinatesAndAtomicSpecies

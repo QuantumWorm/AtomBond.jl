@@ -1,0 +1,116 @@
+"""
+AtomBond — build, edit and view crystal structures (ball-and-stick, GLMakie).
+
+Layers:
+- `core/`     Element data, Lattice, Crystal (no graphics)
+- `io/`       File formats
+- `render/`   Draw a Crystal into a Makie scene
+- `gui/`      Windows and interaction
+"""
+module AtomBond
+
+using LinearAlgebra
+import Dates
+import TOML
+using Printf
+using StaticArrays
+using GeometryBasics: Point3f, Vec2f, Vec3f, Sphere, Cylinder
+using NearestNeighbors: KDTree, inrange
+import Spglib
+import AtomsBase
+using Unitful: @u_str, ustrip
+import GLMakie
+import GLMakie: Makie
+using GLMakie.Makie: RGBf, RGBAf
+
+include("core/elements.jl")
+include("core/lattice.jl")
+include("core/crystal.jl")
+
+include("io/poscar.jl")
+include("io/xyz.jl")
+include("io/cif.jl")
+include("io/castep.jl")
+include("io/xsf.jl")
+include("io/qe.jl")
+include("io/codes.jl")
+include("io/vasp_out.jl")
+include("io/molecular.jl")
+include("io/msi.jl")
+include("io/export.jl")
+include("io/atomsbase.jl")
+include("io/load.jl")
+include("io/library.jl")
+
+include("analysis/neighbors.jl")
+include("analysis/bonds.jl")
+include("analysis/symmetry.jl")
+include("analysis/geometry.jl")
+
+include("build/supercell.jl")
+include("build/edit.jl")
+include("build/surface.jl")
+include("build/bridge.jl")
+include("build/prototypes.jl")
+include("build/constraints.jl")
+
+include("render/style.jl")
+include("render/display.jl")
+include("render/atoms.jl")
+include("render/bonds.jl")
+include("render/overlay.jl")
+include("render/cell.jl")
+include("render/camera.jl")
+include("render/triad.jl")
+include("render/scene.jl")
+
+include("gui/app.jl")
+include("gui/panel.jl")
+include("gui/picking.jl")
+include("gui/feedback.jl")
+include("gui/contextmenu.jl")
+include("gui/menubar.jl")
+include("gui/history.jl")
+include("gui/dialogs.jl")
+include("gui/filebrowser.jl")
+
+# core
+export Element, element, element_property, vdw_radius, ismetal, atomic_mass, override_elements!, use_vesta_colors!, Lattice, Crystal, crystal_from_cartesian, cubic
+export cell_vectors, cell_volume, lattice_parameters, frac_to_cart, cart_to_frac
+export natoms, cartesian_positions, species_list, formula, wrap, atoms_outside_cell
+export with_positions, with_constraints, has_constraints, fix_atoms, free_atoms, periodic_box, as_molecule
+export CELL_CONSTRAINT_PRESETS, describe_cell_constraints, cell_constraints_vasp, cell_constraints_qe
+# io
+export read_poscar, write_poscar, read_xyz, write_xyz, read_cif, load_structure, save_structure
+export read_castep_cell, read_castep_geom, read_castep_geom_frames, read_castep_output, structure_format
+export with_charges, has_charges, with_magmoms, has_magmoms
+export read_xsf, write_xsf, read_cube, read_qe, read_qe_output, read_aims, write_aims, read_siesta, read_abinit
+export read_xdatcar, read_vasprun, read_pdb, write_pdb, read_lammps_data, write_lammps_data
+export read_car, write_car, read_xsd, read_res, write_res
+export kpoint_grid, write_kpoints, write_vasp_inputs, write_qe, write_castep, write_cif, export_inputs
+export to_atomsbase, from_atomsbase
+# analysis
+export Bond, find_bonds, coordination, neighbor_pairs, bond_cutoff, inherit_bond_cutoffs!
+export spacegroup, symmetry_dataset, primitive_cell, conventional_cell
+export distance, bond_angle, dihedral, measure, min_image_distance
+# build
+export supercell, delete_atoms, substitute, add_atom, move_atoms, translate_atoms, rotate_atoms, rotation_matrix, closest_contact, set_position, replace_species
+export surface_cell, slab, best_termination, add_vacuum, stack_cells, superlattice
+export prototype_crystal
+export bridge_position, bridge_offset_direction, bridge_max_offset, add_bridge
+# render / gui
+export ViewSettings, DISPLAY_STYLES, build_display, draw_structure!, draw_crystal!
+export view_direction, view_along!, reset_camera!
+export Viewer, visualize, redraw!, set_crystal!, save_view, snapshot
+export select!, clear_selection!, edit!, undo!, redo!, surface_dialog, export_dialog, open_dialog, open_structure!, atoms_dialog
+export open_context_menu!, close_context_menu!, select_species!, select_all!
+export supercell_dialog, shift_dialog, shift_atoms!, wrap_atoms!, rotate_dialog, rotate_atoms!, click_feedback!
+export bridge_dialog, add_bridge!, flip_bridge!
+export set_bond_lengths!, set_bond_angles!, set_dihedrals!, set_coordinates!, set_charge_labels!, set_magmom_labels!, set_bond_length_labels!, cell_dialog, fix_selected!, free_selected!, free_all_atoms!, set_cell_constraints!, periodic_box!, make_molecule!
+export LibraryEntry, structure_library, library_entry, load_library, library_dialog, open_library!
+export save!, save_to!, save_dialog, new_structure_dialog, create_structure!, recent_files, exit!
+
+# User overrides of element colors/radii (~/.atombond/elements.csv), read at load time.
+__init__() = load_user_elements!()
+
+end # module

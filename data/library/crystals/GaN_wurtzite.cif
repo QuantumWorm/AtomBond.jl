@@ -1,0 +1,19 @@
+# GaN, written by scripts/build_library.py
+# I. Vurgaftman, J. R. Meyer, L. R. Ram-Mohan, "Band parameters for III-V compound semiconductors and their alloys", J. Appl. Phys. 89, 5815 (2001); u: W. Paszkowicz, S. Podsiadlo, R. Minikayev, "Rietveld-refinement study of aluminium and gallium nitrides", J. Alloys Compd. 382, 100 (2004)
+data_GaN
+_space_group_IT_number           186
+_symmetry_space_group_name_H-M   'P 63 m c'
+_cell_length_a                   3.189
+_cell_length_b                   3.189
+_cell_length_c                   5.185
+_cell_angle_alpha                90
+_cell_angle_beta                 90
+_cell_angle_gamma                120
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Ga1 Ga 0.3333333333 0.6666666667 0
+N1 N 0.3333333333 0.6666666667 0.3789

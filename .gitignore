@@ -1,0 +1,12 @@
+# Package manifests are not committed for Julia packages
+Manifest.toml
+Manifest-v*.toml
+
+# Local working notes (not part of the package)
+CLAUDE.md
+handoff_notes.md
+
+# Local scratch and download caches of scripts/
+scratch/
+*.png
+.DS_Store

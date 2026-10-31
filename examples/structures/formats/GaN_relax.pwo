@@ -1,0 +1,39 @@
+
+     Program PWSCF v.7.2 starts on 30Oct2026 at 10: 0: 0
+
+     bravais-lattice index     =            0
+     lattice parameter (alat)  =       6.0263  a.u.
+     unit-cell volume          =     309.0000 (a.u.)^3
+     number of atoms/cell      =            4
+
+     crystal axes: (cart. coord. in units of alat)
+               a(1) = (   1.000000   0.000000   0.000000 )  
+               a(2) = (  -0.500000   0.866025   0.000000 )  
+               a(3) = (   0.000000   0.000000   1.626000 )  
+
+     site n.     atom                  positions (alat units)
+         1           Ga  tau(   1) = (   0.0000000   0.5773503   0.0000000  )
+         2           Ga  tau(   2) = (   0.5000000   0.2886751   0.8130000  )
+         3           N   tau(   3) = (   0.0000000   0.5773503   0.6097500  )
+         4           N   tau(   4) = (   0.5000000   0.2886751   1.4227500  )
+
+     BFGS Geometry Optimization
+
+ATOMIC_POSITIONS (crystal)
+Ga            0.3333333333        0.6666666667        0.0000000000
+Ga            0.6666666667        0.3333333333        0.5000000000
+N             0.3333333333        0.6666666667        0.3780000000
+N             0.6666666667        0.3333333333        0.8780000000
+
+     End of BFGS Geometry Optimization
+
+Begin final coordinates
+
+ATOMIC_POSITIONS (crystal)
+Ga            0.3333333333        0.6666666667        0.0000000000
+Ga            0.6666666667        0.3333333333        0.5000000000
+N             0.3333333333        0.6666666667        0.3770000000
+N             0.6666666667        0.3333333333        0.8770000000
+End final coordinates
+
+     JOB DONE.

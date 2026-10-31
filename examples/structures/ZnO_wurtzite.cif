@@ -1,0 +1,32 @@
+# Wurtzite ZnO -- explicit, unquoted operations in the modern
+# _space_group_symop_operation_xyz form.
+data_ZnO
+_chemical_formula_sum                  'O Zn'
+_cell_length_a                         3.2496
+_cell_length_b                         3.2496
+_cell_length_c                         5.2042
+_cell_angle_alpha                      90
+_cell_angle_beta                       90
+_cell_angle_gamma                      120
+loop_
+_space_group_symop_operation_xyz
+x,y,z
+-y,x-y,z
+-x+y,-x,z
+-x,-y,z+1/2
+y,-x+y,z+1/2
+x-y,x,z+1/2
+-y,-x,z
+-x+y,y,z
+x,x-y,z
+y,x,z+1/2
+x-y,-y,z+1/2
+-x,-x+y,z+1/2
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Zn1 Zn 0.33333 0.66667 0.0
+O1  O  0.33333 0.66667 0.3819

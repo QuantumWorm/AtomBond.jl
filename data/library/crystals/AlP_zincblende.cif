@@ -1,0 +1,19 @@
+# AlP, written by scripts/build_library.py
+# I. Vurgaftman, J. R. Meyer, L. R. Ram-Mohan, "Band parameters for III-V compound semiconductors and their alloys", J. Appl. Phys. 89, 5815 (2001)
+data_AlP
+_space_group_IT_number           216
+_symmetry_space_group_name_H-M   'F -4 3 m'
+_cell_length_a                   5.4672
+_cell_length_b                   5.4672
+_cell_length_c                   5.4672
+_cell_angle_alpha                90
+_cell_angle_beta                 90
+_cell_angle_gamma                90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Al1 Al 0 0 0
+P1 P 0.25 0.25 0.25

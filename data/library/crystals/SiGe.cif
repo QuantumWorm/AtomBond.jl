@@ -1,0 +1,21 @@
+# Ordered model of the random Si0.5Ge0.5 alloy, written by scripts/build_library.py.
+# Si on 4a, Ge on 4c of F-43m (zincblende arrangement of the diamond lattice).
+# Lattice constant: COD 1537802, Dismukes, J.P., Ekstrom, L., Paff, R.J., "Lattice parameter and density in germanium-silicon alloys", Journal of Physical Chemistry 68, 3021 (1964)
+data_SiGe_ordered
+_chemical_formula_sum            'Ge Si'
+_space_group_IT_number           216
+_symmetry_space_group_name_H-M   'F -4 3 m'
+_cell_length_a                   5.5373
+_cell_length_b                   5.5373
+_cell_length_c                   5.5373
+_cell_angle_alpha                90
+_cell_angle_beta                 90
+_cell_angle_gamma                90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Si1 Si 0 0 0
+Ge1 Ge 0.25 0.25 0.25

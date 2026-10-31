@@ -1,0 +1,14 @@
+! GaAs zinc blende, primitive cell given by lengths and angles
+%BLOCK LATTICE_ABC
+ang
+  3.997 3.997 3.997
+  60 60 60
+%ENDBLOCK LATTICE_ABC
+
+%block positions_frac
+  Ga  0.00 0.00 0.00
+  As:1  0.25 0.25 0.25   # labelled species
+%endblock positions_frac
+
+KPOINTS_MP_GRID 8 8 8
+SYMMETRY_GENERATE
