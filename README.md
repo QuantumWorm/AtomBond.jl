@@ -7,12 +7,13 @@
 AtomBond is a crystal-structure builder and interactive ball-and-stick viewer
 written in Julia (GLMakie). It is meant for preparing ab-initio (DFT)
 calculations: open or build a structure, edit it, set relaxation constraints,
-and export inputs for VASP, Quantum ESPRESSO or CASTEP.
+and export inputs for open-source codes such as Quantum ESPRESSO, ABINIT and
+SIESTA.
 
 ![AtomBond window showing a GaN wurtzite supercell](docs/src/assets/window.png)
 
-- Reads and writes the common structure formats (CIF, POSCAR, CASTEP,
-  Quantum ESPRESSO, XYZ, …), with a built-in library of crystals (from the
+- Reads and writes the common structure formats (CIF, XYZ, Quantum
+  ESPRESSO, ABINIT, SIESTA, LAMMPS, XSF, PDB, …), with a built-in library of crystals (from the
   Crystallography Open Database) and molecules (experimental geometries
   from the literature).
 - Builds supercells, slabs, superlattices and molecules in a box; edits

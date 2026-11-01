@@ -3,8 +3,8 @@
 AtomBond is a crystal-structure builder and interactive ball-and-stick viewer
 written in Julia with [GLMakie](https://docs.makie.org). It is meant for
 preparing ab-initio (DFT) calculations: open or build a structure, edit it,
-set relaxation constraints, and export input files for VASP, Quantum
-ESPRESSO or CASTEP.
+set relaxation constraints, and export input files for open-source codes such
+as Quantum ESPRESSO, ABINIT and SIESTA.
 
 ![AtomBond window showing a GaN wurtzite supercell](assets/window.png)
 
@@ -13,10 +13,9 @@ ESPRESSO or CASTEP.
 - **Viewer:** ball and stick, CPK, stick and line styles; bonds across
   periodic boundaries; views along lattice and reciprocal axes or any [uvw];
   orthographic camera; PNG export; several structures in tabs.
-- **Formats:** reads and writes CIF, VASP POSCAR, Quantum ESPRESSO, CASTEP,
-  FHI-aims, XSF, XYZ, PDB, LAMMPS, Materials Studio `.car` and SHELX `.res`;
-  also reads SIESTA, ABINIT, vasprun.xml, XDATCAR, cube and `.xsd`
-  ([File formats](formats.md)).
+- **Formats:** reads and writes CIF, XYZ, Quantum ESPRESSO, ABINIT, SIESTA,
+  LAMMPS, XSF, PDB, SHELX `.res` and the input formats of several other
+  codes; also reads cube files and DFT outputs ([File formats](formats.md)).
 - **Building:** supercells (including general matrices), primitive and
   conventional cells, surfaces and slabs, superlattices, molecules in a
   periodic box, shifting, rotating and wrapping atoms, bridging atoms

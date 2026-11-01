@@ -4,20 +4,31 @@
 
 File → *Export DFT inputs…* writes:
 
+- **Quantum ESPRESSO:** a pw.x input, with `ecutwfc` and a pseudopotential
+  file pattern such as `{El}.UPF` (`{El}` becomes each element symbol).
+- **ABINIT:** an `.abi` input (ABINIT 9 or newer) with `ngkpt`, `ecut` (the
+  cutoff in Ha, half the Ry value entered) and `pseudos` from the pattern
+  (`{El}.psp8` by default); magnetic moments give `nsppol 2` and `spinat`.
+- **SIESTA:** an `.fdf` input with the k-grid, a DZP basis, PBE and
+  `MeshCutoff 300 Ry` to adjust; pseudopotentials are read from
+  `<Element>.psf` or `.psml`; magnetic moments give `DM.InitSpin`.
 - **VASP:** POSCAR and KPOINTS in a folder, plus `POTCAR.order` (the
   species order; POTCARs are licensed, so AtomBond does not write them).
   A structure with constraints also gets `INCAR.relax` (ISIF), and one with
   magnetic moments `INCAR.spin` (ISPIN, MAGMOM).
-- **Quantum ESPRESSO:** a pw.x input, with `ecutwfc` and a pseudopotential
-  file pattern such as `{El}.UPF` (`{El}` becomes each element symbol).
 - **CASTEP:** a `.cell` file.
 - **CIF** (P1) or **extended XYZ**.
 
-The k-point mesh comes from a spacing in Å⁻¹ (the VASP KSPACING convention,
-2π included); the tool shows the resulting mesh, and vacuum directions of
+The written files have not been run through ABINIT or SIESTA by the tests
+(they are read back by AtomBond's own readers); check them with your version
+of the code.
+
+The k-point mesh comes from a spacing in Å⁻¹ (2π included, n = ⌈|b|/Δk⌉);
+the tool shows the resulting mesh, and vacuum directions of
 slabs and molecules get one k-point. In code: [`kpoint_grid`](@ref),
-[`write_vasp_inputs`](@ref), [`write_qe`](@ref), [`write_castep`](@ref),
-[`write_cif`](@ref), [`export_inputs`](@ref).
+[`write_qe`](@ref), [`write_abinit`](@ref), [`write_siesta`](@ref),
+[`write_vasp_inputs`](@ref), [`write_castep`](@ref), [`write_cif`](@ref),
+[`export_inputs`](@ref).
 
 ## Cell and constraints
 
@@ -30,15 +41,17 @@ codes; *Make it a molecule* goes back. In code: [`periodic_box`](@ref),
 [`as_molecule`](@ref).
 
 **Lattice constraints:** presets (all free, fixed cell, angles fixed, only c,
-a = b and c, volume only) or numbers for a b c and α β γ in CASTEP's
-convention (0 = fixed, equal numbers = vary together). Not every code can
+a = b and c, volume only) or numbers for a b c and α β γ (0 = fixed, equal
+numbers = vary together). Not every code can
 express every combination:
 
 | Code | How |
 |------|-----|
-| CASTEP | `CELL_CONSTRAINTS`, exact |
 | Quantum ESPRESSO | `calculation = 'relax'`, or `'vc-relax'` with `cell_dofree` (`all`, `volume`, `xyz`, `z`) |
+| ABINIT | `ionmov 2` with `optcell` 0 (fixed), 1 (volume), 2 (all) or 6 (only c); other combinations are written as 2 with a note |
+| SIESTA | `MD.TypeOfRun CG`, with `MD.VariableCell T` when the cell may change (the whole cell relaxes; other constraints are noted) |
 | VASP | `ISIF` 2 / 3 / 7 in `INCAR.relax`; other combinations need a patched VASP |
+| CASTEP | `CELL_CONSTRAINTS`, exact |
 
 **Atom constraints:** fix the fractional x, y and/or z of the selected atoms
 (also *Fix atoms* / *Free atoms* in the right-click menu). Fixed atoms are
@@ -46,9 +59,11 @@ marked × (+ when only some coordinates are fixed).
 
 | Code | How |
 |------|-----|
+| Quantum ESPRESSO | `if_pos` flags. pw.x applies them to Cartesian force components, which is exact unless a partly fixed axis is oblique; the file then says so |
+| ABINIT | `iatfix` for fully fixed atoms; `iatfixx/y/z` for a fixed coordinate along a Cartesian axis (others are noted) |
+| SIESTA | `Geometry.Constraints` for fully fixed atoms (partly fixed ones are noted) |
 | VASP | POSCAR *Selective dynamics* |
 | CASTEP | `IONIC_CONSTRAINTS` along the reciprocal directions |
-| Quantum ESPRESSO | `if_pos` flags. pw.x applies them to Cartesian force components, which is exact unless a partly fixed axis is oblique; the file then says so |
 
 POSCAR, CASTEP `.cell` and pw.x input read the constraints back. Constraints
 stay through undo, shifts, rotations, wrapping and deletion, and supercells

@@ -121,7 +121,7 @@ c_along_z(L::Lattice) = (M = L.matrix; abs(M[1, 3]) < 1e-8 && abs(M[2, 3]) < 1e-
     periodic_box(c; vacuum=10.0, cubic=false) -> Crystal
 
 Put a molecule (a structure that is not periodic) into a periodic box for
-plane-wave codes (CASTEP, VASP, QE): an orthorhombic cell `vacuum` Å larger
+plane-wave codes (Quantum ESPRESSO, ABINIT, ...): an orthorhombic cell `vacuum` Å larger
 than the molecule along x, y and z (`cubic`: all three equal), with the
 molecule in the middle. The result is periodic, so its cell is shown and
 exported; k-points along the vacuum directions are 1 (Γ).

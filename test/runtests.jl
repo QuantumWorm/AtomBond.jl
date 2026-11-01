@@ -627,11 +627,40 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
             @test read_poscar(p[1]).species == gan.species
             @test strip(readlines(p[2])[4]) == join(kpoint_grid(gan), " ")
             @test strip(read(p[3], String)) == "Ga N"
-            for (fmt, ext) in [(:qe, ".in"), (:castep, ".cell"), (:cif, ".cif"), (:xyz, ".xyz")]
+            for (fmt, ext) in [(:qe, ".in"), (:abinit, ".abi"), (:siesta, ".fdf"), (:castep, ".cell"), (:cif, ".cif"),
+                               (:xyz, ".xyz")]
                 @test isfile(only(export_inputs(gan, fmt, dir, "GaN")))
                 @test endswith(only(export_inputs(gan, fmt, dir, "GaN")), ext)
             end
-            @test_throws ArgumentError export_inputs(gan, :abinit, dir, "GaN")
+            @test occursin("pseudos \"Ga.psp8, N.psp8\"", read(joinpath(dir, "GaN.abi"), String))   # ABINIT default
+            @test_throws ArgumentError export_inputs(gan, :wien2k, dir, "GaN")
+            # ABINIT and SIESTA inputs read back as the same structure
+            for (ext, writer) in ((".abi", write_abinit), (".fdf", write_siesta))
+                for x in (gan, rut, si)
+                    writer(joinpath(dir, "rt" * ext), x)
+                    back = load_structure(joinpath(dir, "rt" * ext))
+                    @test (ext, back.species) == (ext, x.species)
+                    @test back.lattice.matrix ≈ x.lattice.matrix atol=1e-8
+                    @test all(isapprox.(back.frac, x.frac; atol=1e-8))
+                end
+            end
+            ab = sprint(io -> write_abinit(io, gan; kspacing=0.5, ecutwfc=50))
+            @test occursin("ngkpt " * join(kpoint_grid(gan; kspacing=0.5), " "), ab) && occursin("ecut 25.00", ab) &&
+                  occursin("znucl 31 7", ab) && occursin("typat 1 1 2 2", ab) && !occursin("ionmov", ab)
+            fd = sprint(io -> write_siesta(io, gan))
+            @test occursin("  1 31 Ga\n  2 7 N", fd) && occursin("%block kgrid_Monkhorst_Pack", fd) && !occursin("MD.TypeOfRun", fd)
+            # constraints and spin
+            gc = with_constraints(fix_atoms(gan, [1, 2]); cell=(1, 1, 1, 0, 0, 0))
+            ab = sprint(io -> write_abinit(io, gc))
+            @test occursin("ionmov 2", ab) && occursin("optcell 1", ab) && occursin("natfix 2\niatfix 1 2", ab)
+            fd = sprint(io -> write_siesta(io, gc))
+            @test occursin("MD.TypeOfRun CG", fd) && occursin("MD.VariableCell T", fd) &&
+                  occursin("atom 1 2", fd) && occursin("cell constraints are not applied", fd)
+            mag = with_magmoms(si, fill(1.0, natoms(si)))
+            @test occursin("nsppol 2\nspinat", sprint(io -> write_abinit(io, mag)))
+            @test occursin("Spin polarized\n%block DM.InitSpin\n  1 1.0000", sprint(io -> write_siesta(io, mag)))
+            @test natoms(load_structure(save_structure(joinpath(dir, "s.fdf"), si))) == natoms(si)
+            @test natoms(load_structure(save_structure(joinpath(dir, "s.abi"), si))) == natoms(si)
             @test natoms(load_structure(save_structure(joinpath(dir, "rt.cif"), rut))) == 6
             @test isfile(save_structure(joinpath(dir, "x.in"), si; kspacing=0.4))
         end
@@ -659,7 +688,13 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         mktempdir() do dir
             d.folder.stored_string[] = dir
             d.name.stored_string[] = "gan"
-            d.format.i_selected[] = 2                     # Quantum ESPRESSO
+            @test d.format.selection[] === :qe                 # open-source codes first
+            d.format.i_selected[] = 2                         # ABINIT: the pseudopotential pattern follows
+            @test AtomBond.shown_text(d.pseudo) == "{El}.psp8"
+            d.go.clicks[] += 1
+            @test isfile(joinpath(dir, "gan.abi")) && occursin("ngkpt 5 5 3", read(joinpath(dir, "gan.abi"), String))
+            d.format.i_selected[] = 1                         # Quantum ESPRESSO
+            @test AtomBond.shown_text(d.pseudo) == "{El}.UPF"
             d.go.clicks[] += 1
             @test isfile(joinpath(dir, "gan.in"))
             @test occursin("K_POINTS automatic\n  5 5 3 0 0 0", read(joinpath(dir, "gan.in"), String))

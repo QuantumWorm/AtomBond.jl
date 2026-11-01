@@ -89,7 +89,7 @@ export with_charges, has_charges, with_magmoms, has_magmoms
 export read_xsf, write_xsf, read_cube, read_qe, read_qe_output, read_aims, write_aims, read_siesta, read_abinit
 export read_xdatcar, read_vasprun, read_pdb, write_pdb, read_lammps_data, write_lammps_data
 export read_car, write_car, read_xsd, read_res, write_res
-export kpoint_grid, write_kpoints, write_vasp_inputs, write_qe, write_castep, write_cif, export_inputs
+export kpoint_grid, write_kpoints, write_vasp_inputs, write_qe, write_abinit, write_siesta, write_castep, write_cif, export_inputs
 export to_atomsbase, from_atomsbase
 # analysis
 export Bond, find_bonds, coordination, neighbor_pairs, bond_cutoff

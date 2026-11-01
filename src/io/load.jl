@@ -79,12 +79,13 @@ end
 """
     save_structure(path, crystal; kwargs...)
 
-Writer chosen by the file name: `.cif` (P1), POSCAR/CONTCAR/`.vasp`,
-`.xyz`/`.extxyz`, `.in`/`.pwi` (Quantum ESPRESSO, see [`write_qe`](@ref)),
-`.cell` (CASTEP, see [`write_castep`](@ref)), `geometry.in` (FHI-aims),
-`.xsf`, `.pdb`, `.lmp`/`.data`/`.lammps` (LAMMPS data), `.car` (Materials
-Studio), `.res` (SHELX/AIRSS). Keyword arguments (e.g. `kspacing`) go to the
-QE / CASTEP writers.
+Writer chosen by the file name: `.cif` (P1), `.xyz`/`.extxyz`, `.in`/`.pwi`
+(Quantum ESPRESSO, see [`write_qe`](@ref)), `.abi`/`.abinit` (ABINIT, see
+[`write_abinit`](@ref)), `.fdf` (SIESTA, see [`write_siesta`](@ref)),
+`.xsf`, `.pdb`, `.lmp`/`.data`/`.lammps` (LAMMPS data), `geometry.in`
+(FHI-aims), POSCAR/CONTCAR/`.vasp`, `.cell` (CASTEP, see
+[`write_castep`](@ref)), `.car` (Materials Studio), `.res` (SHELX/AIRSS).
+Keyword arguments (e.g. `kspacing`) go to the DFT input writers.
 """
 function save_structure(path::AbstractString, c::Crystal; kwargs...)
     base = lowercase(basename(path))
@@ -97,6 +98,10 @@ function save_structure(path::AbstractString, c::Crystal; kwargs...)
         write_qe(path, c; kwargs...)
     elseif ext == ".cell"
         write_castep(path, c; kwargs...)
+    elseif ext in (".abi", ".abinit")
+        write_abinit(path, c; kwargs...)
+    elseif ext == ".fdf"
+        write_siesta(path, c; kwargs...)
     elseif ext in (".xyz", ".extxyz")
         write_xyz(path, c)
     elseif ext in (".vasp", ".poscar") || startswith(base, "poscar") || startswith(base, "contcar")

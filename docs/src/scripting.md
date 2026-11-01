@@ -109,14 +109,14 @@ kpoint_grid(si; kspacing=0.25)
 ```@example main
 dir = mktempdir()
 write_qe(joinpath(dir, "si.in"), si; ecutwfc=40, pseudo="{El}.UPF")
-write_castep(joinpath(dir, "si.cell"), si)
-write_vasp_inputs(joinpath(dir, "vasp"), si)
-readdir(joinpath(dir, "vasp"))
+write_abinit(joinpath(dir, "si.abi"), si; ecutwfc=40, pseudo="{El}.psp8")
+write_siesta(joinpath(dir, "si.fdf"), si)
+readdir(dir)
 ```
 
 ```@example main
-save_structure(joinpath(dir, "SiGe.vasp"), sige)
-formula(load_structure(joinpath(dir, "SiGe.vasp")))
+save_structure(joinpath(dir, "SiGe.cif"), sige)
+formula(load_structure(joinpath(dir, "SiGe.cif")))
 ```
 
 ```@example main

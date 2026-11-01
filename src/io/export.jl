@@ -1,4 +1,5 @@
-# Input files for ab-initio codes, plus a P1 CIF writer.
+# Input files for ab-initio codes (Quantum ESPRESSO, ABINIT, SIESTA, VASP,
+# CASTEP), plus a P1 CIF writer.
 #
 # k-point meshes come from a spacing in Å⁻¹ using the VASP KSPACING
 # convention (reciprocal vectors include 2π): n_i = max(1, ceil(|b_i| / Δk)).
@@ -25,7 +26,7 @@ end
     kpoint_grid(c; kspacing=0.25, min_gap=5.0) -> (n1, n2, n3)
 
 Monkhorst–Pack / Γ-centred mesh for a k-point spacing in Å⁻¹ (2π included,
-as VASP's KSPACING; 0.25 is a reasonable default for semiconductors).
+n = ⌈|b|/Δk⌉; 0.25 is a reasonable default for semiconductors).
 Directions that are not periodic or that contain more than `min_gap` Å of
 vacuum get one k-point.
 """
@@ -164,6 +165,161 @@ function write_qe(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
 end
 
 # ---------------------------------------------------------------------------
+# ABINIT
+
+"""Whether fixing fractional coordinate `k` equals fixing Cartesian component `k` in this cell."""
+fixed_axis_is_cartesian(c::Crystal, k) = (n = normalize(Vec3(inv(c.lattice.matrix)[k, :])); abs(abs(n[k]) - 1) < 1e-8)
+
+"""
+    abinit_optcell(c) -> (optcell, note)
+
+ABINIT `optcell` for the cell constraints: 0 cell fixed, 1 volume only,
+2 everything, 6 only the length of c (acell(3)); others are written as 2.
+"""
+function abinit_optcell(c::Crystal)
+    cc = c.cell_constraints
+    cc == (0, 0, 0, 0, 0, 0) && return 0, "optcell 0: cell fixed"
+    cc == FREE_CELL && return 2, "optcell 2: cell and atoms relax"
+    cc == (1, 1, 1, 0, 0, 0) && return 1, "optcell 1: volume only"
+    cc == (0, 0, 1, 0, 0, 0) && return 6, "optcell 6: only the length of c"
+    return 2, "ABINIT has no optcell for these constraints; written as 2 (everything relaxes, edit by hand)"
+end
+
+"""
+    write_abinit(path, c; kspacing=0.25, ecutwfc=40, pseudo="{El}.psp8")
+
+ABINIT input (`.abi`, ABINIT 9 or newer): the cell (`acell` 1 Å with `rprim`
+rows as the lattice vectors), `natom`, `ntypat`, `znucl`, `typat`, reduced
+coordinates `xred`, a Γ-centred `ngkpt` mesh, `ecut` in Ha (= `ecutwfc`/2,
+as `ecutwfc` is in Ry like Quantum ESPRESSO's) and `pseudos` from the
+pattern (`{El}` becomes the element symbol). Initial magnetic moments give
+`nsppol 2` and `spinat`.
+
+Constraints: a relaxation (`ionmov 2`) with `optcell` for the cell (see
+`abinit_optcell`); fully fixed atoms are listed in `iatfix`, and a fixed
+fractional coordinate along a Cartesian axis in `iatfixx`/`iatfixy`/`iatfixz`
+(other partly fixed atoms are noted in a comment).
+"""
+write_abinit(path::AbstractString, c::Crystal; kw...) = open(io -> write_abinit(io, c; kw...), path, "w")
+
+function write_abinit(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40, pseudo::AbstractString="{El}.psp8")
+    spc = species_list(c)
+    title = isempty(c.title) ? formula(c) : c.title
+    println(io, "# ", title, " — written by AtomBond")
+    println(io, "\n# Cell (lattice vectors as the rows of rprim, in Å)\nacell 3*1.0 angstrom\nrprim")
+    for v in cell_vectors(c.lattice)
+        @printf(io, "  %16.10f %16.10f %16.10f\n", v...)
+    end
+    println(io, "\n# Atoms\nnatom ", natoms(c), "\nntypat ", length(spc))
+    println(io, "znucl ", join((element(s).Z for s in spc), " "))
+    println(io, "typat ", join((findfirst(==(s), spc) for s in c.species), " "))
+    println(io, "xred")
+    for f in c.frac
+        @printf(io, "  %16.10f %16.10f %16.10f\n", f...)
+    end
+    if any(!isnan, c.magmoms)
+        println(io, "\n# Initial magnetic moments (μB, along z)\nnsppol 2\nspinat")
+        foreach(m -> @printf(io, "  0.0 0.0 %.4f\n", isnan(m) ? 0.0 : m), c.magmoms)
+    end
+    n = kpoint_grid(c; kspacing)
+    println(io, "\n# k-points: Γ-centred mesh for a spacing of $(kspacing) 1/Å")
+    println(io, "kptopt 1\nngkpt ", join(n, " "), "\nnshiftk 1\nshiftk 0.0 0.0 0.0")
+    println(io, "\n# Basis and pseudopotentials (check ecut against your pseudopotentials)")
+    @printf(io, "ecut %.2f   # Ha (= %.2f Ry)\n", ecutwfc / 2, ecutwfc)
+    println(io, "pp_dirpath \"./\"\npseudos \"", join((replace(pseudo, "{El}" => string(s)) for s in spc), ", "), "\"")
+    println(io, "\n# SCF\nnstep 100\ntoldfe 1.0d-10")
+    has_constraints(c) || return
+    optcell, note = abinit_optcell(c)
+    println(io, "\n# Relaxation: ", describe_cell_constraints(c.cell_constraints), "; ", note)
+    println(io, "ionmov 2\nntime 100\ntolmxf 5.0d-5")
+    optcell == 0 || println(io, "optcell ", optcell, "\ndilatmx 1.05\necutsm 0.5")
+    full = [i for i in eachindex(c.fixed) if all(c.fixed[i])]
+    isempty(full) || println(io, "natfix ", length(full), "\niatfix ", join(full, " "))
+    approx = false
+    for (k, x) in enumerate(("x", "y", "z"))
+        ids = [i for i in eachindex(c.fixed) if c.fixed[i][k] && !all(c.fixed[i])]
+        isempty(ids) && continue
+        if fixed_axis_is_cartesian(c, k)
+            println(io, "natfix$x ", length(ids), "\niatfix$x ", join(ids, " "))
+        else
+            approx = true
+        end
+    end
+    approx && println(io, "# Note: some partly fixed atoms are not written (their fixed fractional directions " *
+                          "are not along x, y or z in this cell)")
+end
+
+# ---------------------------------------------------------------------------
+# SIESTA
+
+"""
+    write_siesta(path, c; kspacing=0.25)
+
+SIESTA `.fdf` input: the species (pseudopotentials are read from
+`<Label>.psf` or `.psml`), the lattice vectors in Å, fractional coordinates,
+a Monkhorst–Pack k-grid, a DZP basis, PBE and `MeshCutoff 300 Ry` (adjust
+it). Initial magnetic moments give `Spin polarized` and `DM.InitSpin`.
+
+Constraints: a conjugate-gradient relaxation (`MD.TypeOfRun CG`) with
+`MD.VariableCell` when the cell may change (SIESTA relaxes the whole cell;
+other cell constraints are noted in a comment), and fully fixed atoms in
+`Geometry.Constraints` (partly fixed atoms are noted in a comment).
+"""
+write_siesta(path::AbstractString, c::Crystal; kw...) = open(io -> write_siesta(io, c; kw...), path, "w")
+
+function write_siesta(io::IO, c::Crystal; kspacing::Real=0.25)
+    spc = species_list(c)
+    title = isempty(c.title) ? formula(c) : c.title
+    println(io, "# ", title, " — written by AtomBond")
+    println(io, "SystemName ", title)
+    println(io, "SystemLabel ", formula(c))
+    println(io, "NumberOfAtoms ", natoms(c), "\nNumberOfSpecies ", length(spc))
+    println(io, "%block ChemicalSpeciesLabel")
+    for (k, s) in enumerate(spc)
+        @printf(io, "  %d %d %s\n", k, element(s).Z, s)
+    end
+    println(io, "%endblock ChemicalSpeciesLabel")
+    println(io, "\nLatticeConstant 1.0 Ang\n%block LatticeVectors")
+    for v in cell_vectors(c.lattice)
+        @printf(io, "  %16.10f %16.10f %16.10f\n", v...)
+    end
+    println(io, "%endblock LatticeVectors")
+    println(io, "\nAtomicCoordinatesFormat Fractional\n%block AtomicCoordinatesAndAtomicSpecies")
+    for (f, s) in zip(c.frac, c.species)
+        @printf(io, "  %16.10f %16.10f %16.10f %d\n", f..., findfirst(==(s), spc))
+    end
+    println(io, "%endblock AtomicCoordinatesAndAtomicSpecies")
+    n = kpoint_grid(c; kspacing)
+    println(io, "\n# k-points: mesh for a spacing of $(kspacing) 1/Å\n%block kgrid_Monkhorst_Pack")
+    for k in 1:3
+        println(io, "  ", join((j == k ? n[k] : 0 for j in 1:3), " "), " 0.0")
+    end
+    println(io, "%endblock kgrid_Monkhorst_Pack")
+    println(io, "\nPAO.BasisSize DZP\nXC.functional GGA\nXC.authors PBE\nMeshCutoff 300 Ry\nDM.Tolerance 1.0d-5")
+    if any(!isnan, c.magmoms)
+        println(io, "\nSpin polarized\n%block DM.InitSpin")
+        for (i, m) in enumerate(c.magmoms)
+            isnan(m) || m == 0 || @printf(io, "  %d %.4f\n", i, m)
+        end
+        println(io, "%endblock DM.InitSpin")
+    end
+    has_constraints(c) || return
+    cc = c.cell_constraints
+    println(io, "\n# Relaxation: ", describe_cell_constraints(cc))
+    println(io, "MD.TypeOfRun CG\nMD.NumCGsteps 200\nMD.MaxForceTol 0.02 eV/Ang")
+    if cc != (0, 0, 0, 0, 0, 0)
+        println(io, "MD.VariableCell T\nMD.MaxStressTol 0.1 GPa")
+        cc == FREE_CELL || println(io, "# Note: SIESTA relaxes the whole cell; these cell constraints are not applied")
+    end
+    full = [i for i in eachindex(c.fixed) if all(c.fixed[i])]
+    if !isempty(full)
+        println(io, "%block Geometry.Constraints\n  atom ", join(full, " "), "\n%endblock Geometry.Constraints")
+    end
+    any(f -> any(f) && !all(f), c.fixed) &&
+        println(io, "# Note: partly fixed atoms are not written (only fully fixed atoms are constrained)")
+end
+
+# ---------------------------------------------------------------------------
 # CASTEP
 
 """
@@ -254,8 +410,10 @@ end
 # One entry point for the GUI
 
 const EXPORT_FORMATS = [
-    ("VASP (POSCAR + KPOINTS)", :vasp),
     ("Quantum ESPRESSO (.in)", :qe),
+    ("ABINIT (.abi)", :abinit),
+    ("SIESTA (.fdf)", :siesta),
+    ("VASP (POSCAR + KPOINTS)", :vasp),
     ("CASTEP (.cell)", :castep),
     ("CIF (P1)", :cif),
     ("Extended XYZ", :xyz),
@@ -264,18 +422,24 @@ const EXPORT_FORMATS = [
 """
     export_inputs(c, format, dir, name; kspacing=0.25, ecutwfc=40, pseudo="{El}.UPF") -> paths
 
-Write `c` for `format` ∈ (:vasp, :qe, :castep, :cif, :xyz) into `dir`. VASP
-files go into a sub-folder `name`; the others are `dir/name.<ext>`.
+Write `c` for `format` ∈ (:qe, :abinit, :siesta, :vasp, :castep, :cif, :xyz)
+into `dir`. VASP files go into a sub-folder `name`; the others are
+`dir/name.<ext>`. `pseudo` is the pseudopotential file pattern for Quantum
+ESPRESSO and ABINIT (`{El}` becomes the element; ABINIT gets `.psp8` when
+the pattern is the default `.UPF` one).
 """
 function export_inputs(c::Crystal, format::Symbol, dir::AbstractString, name::AbstractString;
                        kspacing::Real=0.25, ecutwfc::Real=40, pseudo::AbstractString="{El}.UPF")
     isempty(strip(name)) && throw(ArgumentError("empty file name"))
     mkpath(dir)
     format === :vasp && return write_vasp_inputs(joinpath(dir, name), c; kspacing)
-    ext = Dict(:qe => ".in", :castep => ".cell", :cif => ".cif", :xyz => ".xyz")
+    ext = Dict(:qe => ".in", :abinit => ".abi", :siesta => ".fdf", :castep => ".cell", :cif => ".cif", :xyz => ".xyz")
     haskey(ext, format) || throw(ArgumentError("unknown export format $format"))
     path = joinpath(dir, name * ext[format])
     format === :qe ? write_qe(path, c; kspacing, ecutwfc, pseudo) :
+    format === :abinit ? write_abinit(path, c; kspacing, ecutwfc,
+                                      pseudo=pseudo == "{El}.UPF" ? "{El}.psp8" : pseudo) :
+    format === :siesta ? write_siesta(path, c; kspacing) :
     format === :castep ? write_castep(path, c; kspacing) :
     format === :cif ? write_cif(path, c) : write_xyz(path, c)
     return [path]

@@ -199,7 +199,7 @@ function export_dialog(v::Viewer)
                         width=Makie.Relative(1))
     folder = field!(f, "Folder", pwd(), s -> !isempty(strip(s)))
     name = field!(f, "Name", formula(v.crystal), s -> occursin(r"^[\w.+-]+$", strip(s)))
-    note!(f, "VASP: POSCAR, KPOINTS and POTCAR.order go into Folder/Name/.")
+    note!(f, "Files are Folder/Name.<ext>; VASP writes a folder Folder/Name/.")
 
     heading!(f, "k-points")
     kspacing = field!(f, "Spacing (1/Å, incl. 2π)", "0.25", s -> isnum(s) && parse(Float64, s) > 0)
@@ -215,10 +215,16 @@ function export_dialog(v::Viewer)
     update_mesh()
     Makie.Label(f.g[nextrow!(f), 1:2], mesh; halign=:left, fontsize=PANEL_FONTSIZE)
 
-    heading!(f, "Quantum ESPRESSO")
-    ecut = field!(f, "ecutwfc (Ry)", "40", s -> isnum(s) && parse(Float64, s) > 0)
+    heading!(f, "Plane waves (Quantum ESPRESSO, ABINIT)")
+    ecut = field!(f, "Cutoff (Ry)", "40", s -> isnum(s) && parse(Float64, s) > 0)
     pseudo = field!(f, "Pseudopotential file", "{El}.UPF", s -> occursin("{El}", s))
-    note!(f, "{El} is replaced by each element symbol.")
+    note!(f, "{El} is replaced by each element symbol.\nABINIT gets ecut in Ha (half the Ry value).")
+    # The usual pseudopotential file type follows the code.
+    Makie.on(format.selection) do fmt
+        t = shown_text(pseudo)
+        fmt === :abinit && t == "{El}.UPF" && settext!(pseudo, "{El}.psp8")
+        fmt === :qe && t == "{El}.psp8" && settext!(pseudo, "{El}.UPF")
+    end
 
     go = button!(f, "Export")
     Makie.on(go.clicks) do _
@@ -876,7 +882,7 @@ function library_dialog(v::Viewer)
     Makie.Label(f.g[nextrow!(f), 1:2], info; halign=:left, fontsize=13, color=:gray25, justification=:left)
     r = nextrow!(f)
     boxed = Makie.Toggle(f.g[r, 1]; active=false, halign=:left)
-    Makie.Label(f.g[r, 2], "Molecules: in a periodic cubic box (for CASTEP, VASP, QE)"; halign=:left,
+    Makie.Label(f.g[r, 2], "Molecules: in a periodic cubic box (for plane-wave codes)"; halign=:left,
                 fontsize=PANEL_FONTSIZE)
     vacuum = field!(f, "Vacuum (Å)", "10", s -> isnum(s) && parse(Float64, s) > 0)
     open = button!(f, "Open")
@@ -938,8 +944,11 @@ function cell_constraints_preview(c::Crystal, cc)
     t = with_constraints(c; cell=cc)
     _, _, qe = cell_constraints_qe(t)
     _, vasp = cell_constraints_vasp(t)
-    return describe_cell_constraints(cc) * "\nCASTEP: CELL_CONSTRAINTS " * join(cc[1:3], " ") * " / " * join(cc[4:6], " ") *
-           "\nQE: " * qe * "\nVASP: " * vasp
+    _, abinit = abinit_optcell(t)
+    siesta = cc == (0, 0, 0, 0, 0, 0) ? "cell fixed" : cc == FREE_CELL ? "MD.VariableCell T" :
+             "MD.VariableCell T relaxes the whole cell (constraints not applied)"
+    return describe_cell_constraints(cc) * "\nQE: " * qe * "\nABINIT: " * abinit * "\nSIESTA: " * siesta *
+           "\nVASP: " * vasp * "\nCASTEP: CELL_CONSTRAINTS " * join(cc[1:3], " ") * " / " * join(cc[4:6], " ")
 end
 
 """Atom constraint summary: how many atoms are fixed, and the selection's state."""
@@ -961,8 +970,9 @@ Cell and constraints tool:
 - Cell: periodicity, lattice parameters, volume, density and vectors.
 - Periodic box: put a molecule in a box with a given vacuum (for plane-wave
   codes), or treat a structure as a molecule.
-- Lattice constraints for geometry optimization: presets or CASTEP-style
-  numbers (0 fixed, equal numbers tied) with how VASP, QE and CASTEP get them.
+- Lattice constraints for geometry optimization: presets or numbers for
+  a b c α β γ (0 fixed, equal numbers tied) with how each code gets them
+  (Quantum ESPRESSO, ABINIT, SIESTA, VASP, CASTEP).
 - Atom constraints: fix the fractional x, y, z of the selected atoms.
 All changes are undoable and are written by the exporters.
 """

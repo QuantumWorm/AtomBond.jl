@@ -5,12 +5,12 @@ from the file name.
 
 | Code / program | Read | Write |
 |---|---|---|
+| Quantum ESPRESSO | pw.x input `.in`/`.pwi` (ibrav 0–12, -3, -12, 14; celldm or A…; `if_pos`); pw.x output `.out`/`.pwo` (last step) | pw.x input |
+| ABINIT | `.abi`/`.abinit` (acell, rprim/angdeg, xred/xcart/xangst) | `.abi` input |
+| SIESTA | `.fdf` | `.fdf` input |
+| FHI-aims | `geometry.in` (`atom`, `atom_frac`) | `geometry.in` |
 | VASP | POSCAR, CONTCAR, `*.vasp` (selective dynamics); XDATCAR (last frame); vasprun.xml (final structure) | POSCAR |
 | CASTEP | `.cell` (with `SPIN=` and constraints); `.geom` (last frame); `.castep` output (final structure, charges, spins) | `.cell` |
-| Quantum ESPRESSO | pw.x input `.in`/`.pwi` (ibrav 0–12, -3, -12, 14; celldm or A…; `if_pos`); pw.x output `.out`/`.pwo` (last step) | pw.x input |
-| FHI-aims | `geometry.in` (`atom`, `atom_frac`) | `geometry.in` |
-| SIESTA | `.fdf` | – |
-| ABINIT | `.abi`/`.abinit` (acell, rprim/angdeg, xred/xcart/xangst) | – |
 | XCrySDen / VESTA | XSF (crystal, slab, polymer, molecule) | XSF |
 | Gaussian and others | cube (atoms and cell; the grid is skipped) | – |
 | Materials Studio | `.car`, `.xsd` | `.car` |

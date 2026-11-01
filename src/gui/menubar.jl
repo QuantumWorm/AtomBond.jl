@@ -250,7 +250,7 @@ function menubar_items(v::Viewer, name::AbstractString)
               MenuItem("Save", () -> save!(v); shortcut="Ctrl+S"),
               MenuItem("Save as…", () -> save_dialog(v); shortcut="Ctrl+Shift+S"),
               SEPARATOR,
-              MenuItem("Export DFT inputs…", () -> export_dialog(v); shortcut="VASP, QE, CASTEP"),
+              MenuItem("Export DFT inputs…", () -> export_dialog(v); shortcut="QE, ABINIT, SIESTA, …"),
               MenuItem("Save image…", () -> save_dialog(v; format=".png"); shortcut="PNG"),
               SEPARATOR,
               MenuItem("Exit", () -> exit!(v); shortcut="Ctrl+Q"))
