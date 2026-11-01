@@ -88,6 +88,24 @@ function xy2z2(x, y, z, rxy, θy, rxz, θz)
     return [x, y, y, z, z], [[0.0, 0, 0], ys..., zs...]
 end
 
+"""Trigonal planar XY3 (D3h) with bond length r, in the xy plane."""
+planar_xy3(x, y, r) = ([x; fill(y, 3)], [[0.0, 0, 0], [[r * cos(2π * k / 3), r * sin(2π * k / 3), 0.0] for k in 0:2]...])
+
+"""C3v XY3Z (methyl fluoride type): pyramidal XY3 (bond r_xy, Y–X–Y angle θ) and Z on the axis at r_xz."""
+function xy3z(x, y, z, rxy, θ, rxz)
+    syms, pos = pyramid(x, y, rxy, θ)
+    return [syms; z], [pos; [[0.0, 0, rxz]]]
+end
+
+"""Trigonal bipyramidal XY5 (D3h) with axial and equatorial bond lengths."""
+function bipyramid(x, y, rax, req)
+    eq = [[req * cos(2π * k / 3), req * sin(2π * k / 3), 0.0] for k in 0:2]
+    return [x; fill(y, 5)], [[0.0, 0, 0], eq..., [0.0, 0, rax], [0.0, 0, -rax]]
+end
+
+"""Octahedral XY6 (Oh) with bond length r."""
+octahedron(x, y, r) = ([x; fill(y, 6)], [[0.0, 0, 0], ([s * r * (1:3 .== k) for k in 1:3 for s in (1, -1)])...])
+
 # --- references --------------------------------------------------------------------------
 
 const HUBER_HERZBERG = ("K. P. Huber, G. Herzberg, Molecular Spectra and Molecular Structure IV. Constants of " *
@@ -121,6 +139,24 @@ const MOLECULES = [
             "application to HF and DF, J. Mol. Spectrosc. 194, 189 (1999)", "10.1006/jmsp.1998.7786")]),
     (name="Hydrogen chloride", formula="HCl", category="Diatomic molecules", pg="C∞v",
      geometry=linear(("H", "Cl"), (1.2746,)), refs=[HUBER_HERZBERG]),
+    (name="Fluorine", formula="F2", category="Diatomic molecules", pg="D∞h",
+     geometry=linear(("F", "F"), (1.41426,)),
+     refs=[("T. R. Gilson, M. R. Purnell, Improved rotational constants for fluorine 19F2 using coherent anti-Stokes " *
+            "Raman spectroscopy of the vibrational Q branch, J. Raman Spectrosc. 12, 222 (1982)", "10.1002/jrs.1250120304")]),
+    (name="Chlorine", formula="Cl2", category="Diatomic molecules", pg="D∞h",
+     geometry=linear(("Cl", "Cl"), (1.9882,)),
+     refs=[("H. G. M. Edwards, E. A. M. Good, D. A. Long, Pure rotational Raman spectra of the chlorine species, 35Cl2 " *
+            "and 35Cl37Cl, J. Chem. Soc., Faraday Trans. 2 72, 927 (1976)", "10.1039/F29767200927")],
+     note="r_e of 35Cl2."),
+    (name="Bromine", formula="Br2", category="Diatomic molecules", pg="D∞h",
+     geometry=linear(("Br", "Br"), (2.28102,)),
+     refs=[("C. Focsa, H. Li, P. F. Bernath, Characterization of the ground state of Br2 by laser-induced fluorescence " *
+            "Fourier transform spectroscopy of the B3Π0+u–X1Σ+g system, J. Mol. Spectrosc. 200, 104 (2000)",
+            "10.1006/jmsp.1999.8039")]),
+    (name="Hydrogen bromide", formula="HBr", category="Diatomic molecules", pg="C∞v",
+     geometry=linear(("H", "Br"), (1.4146,)),
+     refs=[("G. Jones, W. Gordy, Submillimeter-wave spectra of HCl and HBr, Phys. Rev. 136, A1229 (1964)",
+            "10.1103/PhysRev.136.A1229")]),
     # Small molecules
     (name="Water", formula="H2O", category="Small molecules", pg="C2v",
      geometry=zmatrix([("O",), ("H", 1, 0.9578), ("H", 1, 0.9578, 2, 104.48)]),
@@ -147,6 +183,10 @@ const MOLECULES = [
             "the internal rotation problem, J. Chem. Phys. 36, 1311 (1962)", "10.1063/1.1732733")]),
     (name="Hydrogen cyanide", formula="HCN", category="Small molecules", pg="C∞v",
      geometry=linear(("H", "C", "N"), (1.064, 1.156)), refs=[HERZBERG_1966]),
+    (name="Carbonyl sulfide", formula="OCS", category="Small molecules", pg="C∞v",
+     geometry=linear(("O", "C", "S"), (1.155386, 1.562021)),
+     refs=[("A. Foord, J. G. Smith, D. H. Whiffen, An anharmonic force field for carbonyl sulphide, Mol. Phys. 29, " *
+            "1685 (1975)", "10.1080/00268977500101491")]),
     # Organic molecules
     (name="Methane", formula="CH4", category="Organic molecules", pg="Td",
      geometry=tetrahedron("C", "H", 1.087),
@@ -227,6 +267,67 @@ const MOLECULES = [
      refs=[("Y. Morino, H. Uehara, Vibronic interactions in vanadium tetrachloride by gas electron diffraction, " *
             "J. Chem. Phys. 45, 4543 (1966)", "10.1063/1.1727535")],
      note="The cited electron-diffraction study is of VCl4; check that it reports this TiCl4 bond length."),
+    # Etch and dopant gases
+    (name="Boron trifluoride", formula="BF3", category="Process gases and precursors", pg="D3h",
+     geometry=planar_xy3("B", "F", 1.30731),
+     refs=[("A. G. Maki, T. Masiello, T. A. Blake, The high-resolution infrared spectrum of 10BF3 from 400 to " *
+            "4600 cm-1, J. Mol. Struct. 742, 3 (2005)", "10.1016/j.molstruc.2004.11.089")]),
+    (name="Boron trichloride", formula="BCl3", category="Process gases and precursors", pg="D3h",
+     geometry=planar_xy3("B", "Cl", 1.7421),
+     refs=[("S. Konaka, Y. Murata, K. Kuchitsu, Y. Morino, The molecular structure and force constants of boron " *
+            "trifluoride and boron trichloride, Bull. Chem. Soc. Jpn. 39, 1134 (1966)", "10.1246/bcsj.39.1134")],
+     note="Electron-diffraction r_g (thermal average), not an equilibrium r_e."),
+    (name="Boron tribromide", formula="BBr3", category="Process gases and precursors", pg="D3h",
+     geometry=planar_xy3("B", "Br", 1.896),
+     refs=[("K.-G. Martinsen, N. Vogt, H. V. Volden, V. S. Lyutsarev, J. Vogt, Molecular structure and force field " *
+            "of boron tribromide as determined from combined analysis of gas electron diffraction and spectroscopic " *
+            "data and supported by quantum-chemical density-functional calculations, J. Mol. Struct. 385, 159 (1996)",
+            "10.1016/S0022-2860(96)09435-5")],
+     note="Equilibrium estimate r_he from electron diffraction and spectroscopy (r_g = 1.900 Å)."),
+    (name="Sulfur hexafluoride", formula="SF6", category="Process gases and precursors", pg="Oh",
+     geometry=octahedron("S", "F", 1.5560),
+     refs=[("V. Boudon, J. L. Doménech, D. Bermejo, H. Willner, High-resolution Raman spectroscopy of the ν1 region " *
+            "and Raman-Raman double resonance spectroscopy of the 2ν1-ν1 band of 32SF6 and 34SF6. Determination of " *
+            "the equilibrium bond length of sulfur hexafluoride, J. Mol. Spectrosc. 228, 392 (2004)",
+            "10.1016/j.jms.2004.04.006")]),
+    (name="Fluoromethane", formula="CH3F", category="Process gases and precursors", pg="C3v",
+     geometry=xy3z("C", "H", "F", 1.087, 110.2, 1.383),
+     refs=[("J. Demaison, J. Breidung, W. Thiel, D. Papoušek, The equilibrium structure of methyl fluoride, " *
+            "Struct. Chem. 10, 129 (1999)", "10.1023/A:1022085314343")],
+     note="Semi-experimental r_e: experimental rotational constants combined with CCSD(T) values by least squares."),
+    (name="Hexafluoroethane", formula="C2F6", category="Process gases and precursors", pg="D3d",
+     geometry=staggered("C", "F", 1.56, 1.32, 109.5),
+     refs=[("D. A. Swick, I. L. Karle, Structure and internal motion of C2F6 and Si2Cl6 vapors, J. Chem. Phys. 23, " *
+            "1499 (1955)", "10.1063/1.1742337")],
+     note="Early electron-diffraction structure of low precision (C–C ± 0.03 Å, C–C–F ± 1.5°): relax before use."),
+    (name="Chlorine trifluoride", formula="ClF3", category="Process gases and precursors", pg="C2v",
+     geometry=zmatrix([("Cl",), ("F", 1, 1.598), ("F", 1, 1.698, 2, 87.483), ("F", 1, 1.698, 2, 87.483, 3, 180.0)]),
+     refs=[("D. F. Smith, The microwave spectrum and structure of chlorine trifluoride, J. Chem. Phys. 21, 609 (1953)",
+            "10.1063/1.1698976")],
+     note="Planar T shape; effective ground-state structure from the moments of inertia."),
+    (name="Xenon difluoride", formula="XeF2", category="Process gases and precursors", pg="D∞h",
+     geometry=linear(("F", "Xe", "F"), (1.9791, 1.9791)),
+     refs=[("N. J. Brassington, H. G. M. Edwards, D. A. Long, Pure rotational Raman spectrum of XeF2, J. Chem. " *
+            "Soc., Faraday Trans. 2 74, 1208 (1978)", "10.1039/F29787401208")],
+     note="Ground-state r_0, not an equilibrium r_e."),
+    (name="Germane", formula="GeH4", category="Process gases and precursors", pg="Td",
+     geometry=tetrahedron("Ge", "H", 1.51714),
+     refs=[("C. Richard, V. Boudon, A. Rizopoulos, J. Vander Auwera, F. Kwabia Tchana, Line positions and intensities " *
+            "for the ν2/ν4 bands of 5 isotopologues of germane near 11.5 µm, J. Quant. Spectrosc. Radiat. Transfer " *
+            "260, 107474 (2021)", "10.1016/j.jqsrt.2020.107474")]),
+    (name="Phosphorus trifluoride", formula="PF3", category="Process gases and precursors", pg="C3v",
+     geometry=pyramid("P", "F", 1.56099, 97.567),
+     refs=[("H. Najib, Experimental rovibrational constants and equilibrium structure of phosphorus trifluoride, " *
+            "J. Mol. Spectrosc. 305, 17 (2014)", "10.1016/j.jms.2014.09.008")]),
+    (name="Phosphorus pentafluoride", formula="PF5", category="Process gases and precursors", pg="D3h",
+     geometry=bipyramid("P", "F", 1.580, 1.532),
+     refs=[("H. Kurimura, S. Yamamoto, T. Egawa, K. Kuchitsu, Geometrical structure of PF5 as studied by gas " *
+            "electron diffraction and spectroscopic data, J. Mol. Struct. 140, 79 (1986)", "10.1016/0022-2860(86)80149-1")],
+     note="Electron-diffraction r_g; the authors estimate r_e = 1.576 Å (axial) and 1.529 Å (equatorial)."),
+    (name="Arsenic trifluoride", formula="AsF3", category="Process gases and precursors", pg="C3v",
+     geometry=pyramid("As", "F", 1.7041, 95.767),
+     refs=[("J. G. Smith, The anharmonic force field of arsenic trifluoride from the millimetre wave spectra of " *
+            "vibrationally excited states, Mol. Phys. 35, 461 (1978)", "10.1080/00268977800100341")]),
 ]
 
 """

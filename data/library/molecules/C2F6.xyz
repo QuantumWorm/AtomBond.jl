@@ -1,0 +1,10 @@
+8
+Hexafluoroethane C2F6, experimental geometry (D. A. Swick, I. L. Karle, Structure and internal motion of C2F6 and Si2Cl6 vapors, J. Chem. Phys. 23, 1499 (1955))
+C      0.7800     0.0000    -0.0000
+C     -0.7800     0.0000    -0.0000
+F      1.2206     0.5331    -1.1243
+F      1.2206     0.7071     1.0238
+F      1.2206    -1.2402     0.1004
+F     -1.2206     1.2402    -0.1004
+F     -1.2206    -0.5331     1.1243
+F     -1.2206    -0.7071    -1.0238

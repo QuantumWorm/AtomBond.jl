@@ -14,7 +14,7 @@ end
 """
     find_bonds(c; tolerance=1.15, min_length=0.4, metal_metal=:auto, cutoffs=Dict()) -> Vector{Bond}
 
-Atoms i and j are bonded when `min_length < d ≤ max(tolerance * (r_i + r_j), r_i + r_j + 0.15 Å)`,
+Atoms i and j are bonded when `min_length < d ≤ max(tolerance * (r_i + r_j), r_i + r_j + 0.3 Å)`,
 with r the covalent radius. `cutoffs` can raise that limit for given element
 pairs, e.g. `Dict((:C, :Ga) => 2.77)` (keys in alphabetical order, as `pairkey` makes them). Bonds
 across periodic boundaries are included; each bond is listed once.
@@ -46,15 +46,16 @@ pairkey(a::Symbol, b::Symbol) = a <= b ? (a, b) : (b, a)
 
 """
 Longest distance at which elements `a` and `b` count as bonded: `tolerance`
-times the sum of covalent radii, but at least the sum + 0.15 Å (which only
-matters for very small atoms: H–H in H2 is 0.741 Å, 1.15 × 0.62 = 0.713 Å).
+times the sum of covalent radii, but at least the sum + 0.3 Å (which only
+matters for light atoms: H–H in H2 is 0.741 Å, 1.15 × 0.62 = 0.713 Å; F–F in F2
+is 1.414 Å, 1.15 × 1.14 = 1.311 Å).
 """
 function bond_cutoff(a::Symbol, b::Symbol; tolerance::Real=1.15, cutoffs::AbstractDict=Dict())
     r = element(a).covalent_radius + element(b).covalent_radius
     return max(tolerance * r, r + MIN_BOND_SLACK, get(cutoffs, pairkey(a, b), 0.0))
 end
 
-const MIN_BOND_SLACK = 0.15     # Å
+const MIN_BOND_SLACK = 0.3      # Å
 
 """
     inherit_bond_cutoffs!(cutoffs, old, new; tolerance=1.15) -> pairs added

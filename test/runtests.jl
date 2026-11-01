@@ -1268,11 +1268,11 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
     @testset "structure library" begin
         lib = structure_library()
-        @test length(lib) == 61 && [e.category for e in lib] == [fill("Group IV", 3); fill("III-V", 12); fill("Oxides", 10);
-                fill("Diatomic molecules", 7); fill("Small molecules", 9); fill("Organic molecules", 9);
-                fill("Process gases and precursors", 11)]
+        @test length(lib) == 78 && [e.category for e in lib] == [fill("Group IV", 3); fill("III-V", 12); fill("Oxides", 10);
+                fill("Diatomic molecules", 11); fill("Small molecules", 10); fill("Organic molecules", 9);
+                fill("Process gases and precursors", 23)]
         @test [e.name for e in lib[[1, 2, 3, 26, end]]] == ["Silicon", "Diamond", "Silicon-germanium Si0.5Ge0.5",
-                                                             "Hydrogen", "Titanium tetrachloride"]
+                                                             "Hydrogen", "Arsenic trifluoride"]
         # every molecule: the atoms of its formula, all connected by bonds, point group given
         natoms_of(f) = sum((isempty(m[1]) ? 1 : parse(Int, m[1]) for m in eachmatch(r"[A-Z][a-z]?(\d*)", f)); init=0)
         for e in structure_library(; kind=:molecule)
@@ -1302,7 +1302,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test lattice_parameters(load_library("GaAs").lattice)[1] == 5.65325
         @test lattice_parameters(load_library("InSb").lattice)[1] == 6.4794
         @test all(e -> isfile(e.file) && !isempty(e.source) && !isempty(e.reference), lib)
-        @test length(structure_library(; kind=:molecule)) == 36
+        @test length(structure_library(; kind=:molecule)) == 53
         # crystals: published lattice constants and symmetry
         si = load_library("Silicon")
         @test si.title == "Silicon" && formula(si) == "Si8" && spacegroup(si)[1] == 227
@@ -1324,6 +1324,17 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test isapprox(bond(load_library("NH3"), 1, 2), 1.012; atol=1e-3)
         m = load_library("Methanol")
         @test formula(m) == "C1O1H4" && isapprox(bond(m, 1, 2), 1.427; atol=1e-3)
+        # etch and dopant gases: shapes from the builders
+        sf6 = load_library("SF6")
+        @test natoms(sf6) == 7 && all(isapprox(bond(sf6, 1, k), 1.556; atol=1e-3) for k in 2:7)
+        bf3 = cartesian_positions(load_library("BF3"))
+        @test all(isapprox(AtomBond.bond_angle(bf3[i], bf3[1], bf3[j]), 120; atol=0.01) for (i, j) in ((2, 3), (3, 4), (2, 4)))
+        pf5 = load_library("PF5")
+        @test sort(round.([bond(pf5, 1, k) for k in 2:6]; digits=3)) == [1.532, 1.532, 1.532, 1.58, 1.58]
+        clf3 = cartesian_positions(load_library("ClF3"))
+        @test isapprox(AtomBond.bond_angle(clf3[2], clf3[1], clf3[3]), 87.483; atol=0.01) &&
+              maximum(abs(p[3] - clf3[1][3]) for p in clf3) < 1e-6            # planar T shape
+        @test occursin("r_g", library_entry("BCl3").note) && occursin("CCSD(T)", library_entry("CH3F").note)
         @test_throws ArgumentError load_library("Unobtainium")
         # your own library is added after the built-in one
         withenv("ATOMBOND_HOME" => mktempdir()) do
@@ -1333,7 +1344,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
                                                  "formula = \"NaCl\"\nfile = \"NaCl.vasp\"\nsource = \"my file\"\n")
             @test structure_library()[end].name == "Rock salt" && formula(load_library("Rock salt")) == "Na4Cl4"
         end
-        @test length(structure_library()) == 61
+        @test length(structure_library()) == 78
 
         # Window
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
@@ -1342,7 +1353,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         d = AtomBond.library_dialog(v)
         @test startswith(d.info[], "Si, 8 atoms in the cell, Fd-3m (227)") && occursin("COD 9011998", d.info[])
         d.kind.i_selected[] = 3                                       # molecules
-        @test length(d.entries[]) == 36 && startswith(d.info[], "H2, 2 atoms")
+        @test length(d.entries[]) == 53 && startswith(d.info[], "H2, 2 atoms")
         d.structure.i_selected[] = findfirst(e -> e.name == "Methanol", d.entries[])
         @test occursin("Venkateswarlu", d.info[])
         d.open.clicks[] = 1

@@ -55,7 +55,7 @@ on coordinates: [`distance`](@ref), [`bond_angle`](@ref),
 ## Bonds
 
 Two atoms are bonded when their distance is at most 1.15 × the sum of their
-covalent radii (at least the sum plus 0.15 Å, so H₂ is bonded). Metal–metal
+covalent radii (at least the sum plus 0.3 Å, so H₂ and F₂ are bonded). Metal–metal
 bonds are left out when the structure also contains non-metals (otherwise
 Ti–Ti in TiO₂ would show as bonds); pure metals and alloys keep them. The
 limit can be set per element pair with `ViewSettings.bond_cutoffs`, or
