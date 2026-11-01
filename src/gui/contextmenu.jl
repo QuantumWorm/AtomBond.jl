@@ -104,6 +104,21 @@ function menu_scene(v::Viewer)
                     Makie.Observable(Makie.Rect2f(0, 0, 1, 1)), Makie.Observable([P(0, 0), P(0, 0)]),
                     Makie.Observable([("", P(0, 0), :item)]), Makie.Observable([("", P(0, 0))]),
                     Makie.Observable(false), 0)
+    draw_menu!(m)
+    v.dialogs[:menu] = m
+    return m
+end
+
+const MENU_Z = 100       # z offset of menu plots (pixel camera; within its ±10000 clip range)
+
+"""
+The menu's plots. GLMakie draws plots sorted by their z offset and, at equal
+z, in the order they were added, so plots added later (the 3D view on every
+redraw, a rebuilt tab bar) would cover a menu made earlier. The menu's plots
+are therefore lifted to z = $(MENU_Z), above everything else in the window.
+"""
+function draw_menu!(m::ContextMenu)
+    scene = m.scene
     # GLMakie draws lines and text in a later pass than meshes, for all scenes,
     # so the menu's background must be in that pass too (fxaa=false), and
     # overdraw ignores the depth of the 3D view.
@@ -127,9 +142,10 @@ function menu_scene(v::Viewer)
     end
     Makie.text!(scene, Makie.lift(t -> last.(t), m.shortcuts); text=Makie.lift(t -> first.(t), m.shortcuts),
                 fontsize=12, align=(:right, :center), color=:gray45, top...)
-    v.dialogs[:menu] = m
+    foreach(p -> Makie.translate!(p, 0, 0, MENU_Z), scene.plots)
     return m
 end
+
 
 # Top and bottom (pixels from the menu's top edge) of each row.
 function row_extents(items)

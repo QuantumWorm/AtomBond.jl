@@ -1960,6 +1960,16 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         AtomBond.open_menubar_menu!(v, 4)
         @test !m.flash[] && m.scene.visible[]
         AtomBond.close_context_menu!(v)
+        # The menu stays on top of plots added after it (redraws of the 3D view, a rebuilt tab bar):
+        # GLMakie draws plots by z offset, so every menu plot must be above every other plot.
+        redraw!(v); open_in_tab!(v, load_library("Water")); close_tab!(v)
+        AtomBond.open_menubar_menu!(v, 4)
+        zof(p) = AtomBond.Makie.transformationmatrix(p)[][3, 4]
+        # plots that are drawn (visible, in visible scenes); Makie's hidden helpers may sit higher
+        shown(s) = s.visible[] ? [filter(p -> p.visible[], s.plots); reduce(vcat, (shown(c) for c in s.children); init=Any[])] : Any[]
+        others = filter(p -> !(p in m.scene.plots), shown(v.figure.scene))
+        @test !isempty(m.scene.plots) && minimum(zof, m.scene.plots) > maximum(zof, others)
+        AtomBond.close_context_menu!(v)
         # Ripple in the 3D view, cleared after RIPPLE_TIME.
         AtomBond.click_ripple!(v, (300.0, 300.0), :atom)
         r = v.dialogs[:ripple]
