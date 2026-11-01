@@ -702,6 +702,15 @@ end
 
 const LIBRARY_KINDS = [("All structures", nothing), ("Crystals", :crystal), ("Molecules", :molecule)]
 
+"""Group menu of the library tool: "All groups", then the groups of `entries` in library order."""
+library_group_options(entries) = ["All groups"; unique(e.category for e in entries if !isempty(e.category))]
+
+"""Whether a library entry matches the search text (name, formula, group or use; any case; all words)."""
+function library_matches(e::LibraryEntry, query::AbstractString)
+    text = lowercase(join((e.name, e.formula, e.category, e.use), " "))
+    return all(w -> occursin(w, text), split(lowercase(query)))
+end
+
 """Text about a library entry: what it is, its size or symmetry, and where it comes from."""
 function library_info(e::LibraryEntry)
     c = try
@@ -721,7 +730,8 @@ function library_info(e::LibraryEntry)
     else
         "$(e.formula), $(plural(natoms(c), "atom")) (shown in a box with 5 Å around it)"
     end
-    lines = [shape, e.description, "Source: " * e.source, e.reference]
+    lines = [shape, isempty(e.category) ? "" : "Group: " * e.category, isempty(e.use) ? "" : "Used as: " * e.use,
+             e.description, "Source: " * e.source, e.reference]
     isempty(e.doi) || push!(lines, "DOI: " * e.doi)
     isempty(e.note) || push!(lines, "Note: " * e.note)
     return join(filter(!isempty, lines), "\n")
@@ -755,9 +765,11 @@ end
 """
     library_dialog(viewer) -> NamedTuple of the tool's controls
 
-Structure library tool: choose crystals, molecules or all, pick a
-structure and see its formula, symmetry, cell and source (paper, database
-entry), then Open it in the main window.
+Structure library tool: choose crystals, molecules or all, narrow the list
+by group (e.g. "Organic: hydrocarbons", "Inorganic: hydrides") or by a
+search (name, formula or use such as "etch"), pick a structure and see
+its formula, symmetry, cell and source (paper, database entry), then Open
+it in the main window.
 """
 function library_dialog(v::Viewer)
     width = 560
@@ -770,6 +782,12 @@ function library_dialog(v::Viewer)
         Makie.Label(f.g[r, 1], label; halign=:left, fontsize=PANEL_FONTSIZE);
         Makie.Menu(f.g[r, 2]; options, i_selected=1, fontsize=PANEL_FONTSIZE, width=Makie.Relative(1)))
     kind = menu_row("Show", first.(LIBRARY_KINDS))
+    group = menu_row("Group", library_group_options(structure_library()))
+    r = nextrow!(f)
+    Makie.Label(f.g[r, 1], "Search"; halign=:left, fontsize=PANEL_FONTSIZE)
+    search = sync_display!(Makie.Textbox(f.g[r, 2]; placeholder="name, formula or use (e.g. etch)",
+                                         width=Makie.Relative(1), fontsize=PANEL_FONTSIZE, textpadding=(8, 8, 5, 5)))
+    push!(f.boxes, search)
     entries = Makie.Observable(structure_library())
     label(e) = "$(e.name)  ($(e.formula))"
     structure = menu_row("Structure", label.(entries[]))
@@ -783,13 +801,25 @@ function library_dialog(v::Viewer)
     open = button!(f, "Open")
 
     current() = (i = structure.i_selected[]; i === nothing || !(1 <= i <= length(entries[])) ? nothing : entries[][i])
-    update(_...) = (e = current(); info[] = e === nothing ? "No structures of this kind" : library_info(e))
-    Makie.on(kind.i_selected) do i
-        entries[] = structure_library(; kind=LIBRARY_KINDS[i][2])
+    update(_...) = (e = current(); info[] = e === nothing ? "No structure matches" : library_info(e))
+    query() = search.focused[] ? search.displayed_string[] : something(search.stored_string[], "")
+    of_kind() = structure_library(; kind=LIBRARY_KINDS[something(kind.i_selected[], 1)][2])
+    function refilter(_...)
+        groups = group.options[]
+        g = something(group.i_selected[], 1)
+        chosen = 1 < g <= length(groups) ? groups[g] : nothing
+        entries[] = filter(e -> (chosen === nothing || e.category == chosen) && library_matches(e, query()), of_kind())
         structure.options[] = isempty(entries[]) ? ["(none)"] : label.(entries[])
         structure.i_selected[] = 1
         update()
     end
+    Makie.on(kind.i_selected) do _
+        group.options[] = library_group_options(of_kind())
+        group.i_selected[] = 1                                    # also refilters
+    end
+    Makie.on(refilter, group.i_selected)
+    Makie.on(refilter, search.stored_string)
+    Makie.on(s -> search.focused[] && refilter(), search.displayed_string)    # filter while typing
     Makie.on(update, structure.i_selected)
     update()
     Makie.on(open.clicks) do _
@@ -800,7 +830,7 @@ function library_dialog(v::Viewer)
         open_library!(v, e; box)
     end
     finish_dialog!(v, :library, "Structure library", f; labelwidth=0.22)
-    return (; kind, structure, entries, info, boxed, vacuum, open)
+    return (; kind, group, search, structure, entries, info, boxed, vacuum, open)
 end
 
 # ---------------------------------------------------------------------------

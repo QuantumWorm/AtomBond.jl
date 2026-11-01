@@ -2,7 +2,8 @@
 #
 # The built-in library is data/library/: an index, library.toml, with one
 # [[structure]] entry per structure (name, kind, category, formula, file,
-# description, source, url, reference, doi, note), and the files it names
+# description, source, url, reference, doi, note, and for molecules the
+# optional use: what it is used for in processing), and the files it names
 # (crystals: CIFs from the Crystallography Open Database; molecules: XYZ
 # files of experimental gas-phase geometries from the cited literature).
 # scripts/build_library.jl rebuilds it from those sources.
@@ -26,6 +27,7 @@ struct LibraryEntry
     reference::String
     doi::String
     note::String
+    use::String             # process use (molecules), e.g. "etch gas"; may be empty
 end
 
 Base.show(io::IO, e::LibraryEntry) = print(io, "LibraryEntry(\"", e.name, "\", ", e.kind, ")")
@@ -40,7 +42,8 @@ function read_library_index(path::AbstractString)
         kind = Symbol(get(d, "kind", "crystal"))
         kind in (:crystal, :molecule) || throw(ArgumentError("$path: kind of '$(d["name"])' must be \"crystal\" or \"molecule\""))
         LibraryEntry(field("name"), kind, field("category"), field("formula"), normpath(joinpath(dir, d["file"])),
-                     field("description"), field("source"), field("url"), field("reference"), field("doi"), field("note"))
+                     field("description"), field("source"), field("url"), field("reference"), field("doi"), field("note"),
+                     field("use"))
     end
 end
 

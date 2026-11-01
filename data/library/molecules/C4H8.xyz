@@ -1,0 +1,14 @@
+12
+Cyclobutane C4H8, experimental geometry (T. Egawa, T. Fukuyama, S. Yamamoto, F. Takabayashi, H. Kambara, T. Ueda, K. Kuchitsu, Molecular structure and puckering potential function of cyclobutane studied by gas electron diffraction and infrared spectroscopy, J. Chem. Phys. 86, 6018 (1987))
+C      0.7643     0.7643    -0.1342
+C     -0.7643     0.7643     0.1342
+C     -0.7643    -0.7643    -0.1342
+C      0.7643    -0.7643     0.1342
+H      0.9857     0.9857    -1.1814
+H      1.4121     1.4121     0.4618
+H     -0.9857     0.9857     1.1814
+H     -1.4121     1.4121    -0.4618
+H     -0.9857    -0.9857    -1.1814
+H     -1.4121    -1.4121     0.4618
+H      0.9857    -0.9857     1.1814
+H      1.4121    -1.4121    -0.4618

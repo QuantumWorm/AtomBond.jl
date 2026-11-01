@@ -21,11 +21,11 @@ include("molecules.jl")
 
 # name, file, COD id, category, description; optional formula, note, ordered_sige
 const CRYSTALS = [
-    (name="Silicon", file="Si.cif", cod=9011998, category="Group IV",
+    (name="Silicon", file="Si.cif", cod=9011998, category="Semiconductors: group IV",
      description="Diamond structure (Fd-3m), a = 5.430941 Å at 25 °C; precision lattice constant"),
-    (name="Diamond", file="C_diamond.cif", cod=9011997, category="Group IV",
+    (name="Diamond", file="C_diamond.cif", cod=9011997, category="Semiconductors: group IV",
      description="Diamond structure (Fd-3m), a = 3.566986 Å at 25 °C; precision lattice constant"),
-    (name="Silicon-germanium Si0.5Ge0.5", file="SiGe.cif", cod=1537802, category="Group IV", ordered_sige=true,
+    (name="Silicon-germanium Si0.5Ge0.5", file="SiGe.cif", cod=1537802, category="Semiconductors: group IV", ordered_sige=true,
      formula="SiGe",
      description="Ordered model of the random Si0.5Ge0.5 alloy: Si and Ge on the two diamond sublattices " *
                  "(zincblende type, F-43m), measured alloy lattice constant a = 5.5373 Å",
@@ -94,7 +94,7 @@ function iii_v_entries()
     out = []
     for (f, name, a, table) in ZINCBLENDE
         cat, an = split_formula(f)
-        push!(out, (name="$name ($f)", file="$(f)_zincblende.cif", formula=f, category="III-V",
+        push!(out, (name="$name ($f)", file="$(f)_zincblende.cif", formula=f, category="Semiconductors: III-V",
                     cif=prototype_cif(f, "F -4 3 m", 216, (a, a, a, 90, 90, 90),
                                       [(cat, 0, 0, 0), (an, 0.25, 0.25, 0.25)], VURGAFTMAN[1]),
                     description="Zincblende, F-43m, a = $a Å at 300 K",
@@ -103,7 +103,7 @@ function iii_v_entries()
     end
     for (f, name, a, c, u, (uref, udoi), note) in WURTZITE
         cat, an = split_formula(f)
-        push!(out, (name="$name ($f, wurtzite)", file="$(f)_wurtzite.cif", formula=f, category="III-V",
+        push!(out, (name="$name ($f, wurtzite)", file="$(f)_wurtzite.cif", formula=f, category="Semiconductors: III-V",
                     cif=prototype_cif(f, "P 63 m c", 186, (a, a, c, 90, 90, 120),
                                       [(cat, 0.3333333333, 0.6666666667, 0), (an, 0.3333333333, 0.6666666667, u)],
                                       "$(VURGAFTMAN[1]); u: $uref"),
@@ -179,6 +179,19 @@ ordered_sige(a, source_ref) = """
     Ge1 Ge 0.25 0.25 0.25
     """
 
+const CRYSTAL_GROUPS = ["Semiconductors: group IV", "Semiconductors: III-V", "Oxides"]
+
+# Molecules: the usual chemical classification (organic, organometallic,
+# inorganic) with groups by functional group or compound type, so a molecule
+# is found where a chemistry textbook would put it. `use` (process use) is
+# extra information, shown and searchable in the library tool.
+const MOLECULE_GROUPS = ["Organic: hydrocarbons", "Organic: halocarbons", "Organic: alcohols and ethers",
+                         "Organic: carbonyl compounds", "Organic: nitrogen and sulfur compounds",
+                         "Organic: heterocycles",
+                         "Organometallic: metal alkyls", "Organometallic: metal carbonyls",
+                         "Inorganic: elements", "Inorganic: hydrides", "Inorganic: oxides",
+                         "Inorganic: nonmetal halides", "Inorganic: metal halides"]
+
 toml_string(s) = "\"" * replace(s, "\\" => "\\\\", "\"" => "\\\"") * "\""
 
 function main(args=ARGS)
@@ -211,7 +224,7 @@ function main(args=ARGS)
 
     for m in MOLECULES
         syms, pos = m.geometry
-        file = replace(m.formula, r"[()]" => "_") * ".xyz"          # Al(CH3)3 -> Al_CH3_3.xyz
+        file = strip(replace(m.formula, r"[()]" => "_"), '_') * ".xyz"   # Al(CH3)3 -> Al_CH3_3.xyz
         open(joinpath(root, "molecules", file), "w") do f
             println(f, length(syms))
             println(f, "$(m.name) $(m.formula), experimental geometry ($(m.refs[1][1]))")
@@ -219,23 +232,27 @@ function main(args=ARGS)
                 @printf(f, "%-2s %10.4f %10.4f %10.4f\n", s, p...)
             end
         end
+        m.category in MOLECULE_GROUPS || error("$(m.name): unknown group $(m.category)")
         dois = filter(!isempty, last.(m.refs))
         push!(entries, (name=m.name, kind="molecule", category=m.category, formula=m.formula,
                         file="molecules/" * file, description="Experimental geometry, point group $(m.pg)",
                         source="Experimental gas-phase structure from the literature",
                         url=isempty(dois) ? "" : "https://doi.org/" * first(dois),
-                        reference=join(first.(m.refs), "; "), doi=join(dois, ", "), note=get(m, :note, "")))
+                        reference=join(first.(m.refs), "; "), doi=join(dois, ", "), note=get(m, :note, ""),
+                        use=get(m, :use, "")))
     end
 
-    order = ["Group IV", "III-V", "Oxides", "Diatomic molecules", "Small molecules", "Organic molecules",
-             "Process gases and precursors", "ALD/CVD precursors"]
-    sort!(entries; by=e -> something(findfirst(==(e.category), order), length(order) + 1), alg=MergeSort)
+    # Crystals keep their order within a group; molecules are sorted by name.
+    order = [CRYSTAL_GROUPS; MOLECULE_GROUPS]
+    rank(e) = something(findfirst(==(e.category), order), length(order) + 1)
+    sort!(entries; by=e -> (rank(e), e.kind == "molecule" ? lowercase(e.name) : ""), alg=MergeSort)
     open(joinpath(root, "library.toml"), "w") do f
         println(f, "# AtomBond structure library (generated by scripts/build_library.jl; add structures there).")
         println(f, "# One [[structure]] per entry; `file` is relative to this folder.")
         for e in entries
             print(f, "\n[[structure]]\n")
             for (k, val) in pairs(e)
+                k === :use && isempty(val) && continue
                 println(f, "$k = $(toml_string(val))")
             end
         end

@@ -9,12 +9,32 @@ Untitled until saved, so Save never writes into the library. In code:
 [`structure_library`](@ref), [`load_library`](@ref) (by name or formula),
 [`open_library!`](@ref).
 
+**Finding a structure:** *Show* picks crystals, molecules or both; *Group*
+narrows the list to one group; *Search* keeps the structures whose name,
+formula, group or use contain all the words typed (`ethane`, `WF6`,
+`halide`, `etch`, `precursor`).
+
 | Group | Structures | Source |
 |-------|------------|--------|
-| Group IV | Si, diamond, Si0.5Ge0.5 (ordered model) | COD (Hom et al. 1975 precision lattice constants; Dismukes 1964 for SiGe) |
-| III–V | GaAs, AlAs, InAs, GaP, AlP, InP, GaSb, AlSb, InSb (zincblende); GaN, AlN, InN (wurtzite) | 300 K lattice constants from Vurgaftman, Meyer, Ram-Mohan, *J. Appl. Phys.* 89, 5815 (2001); wurtzite u from Paszkowicz et al. (2003, 2004) |
+| Semiconductors: group IV | Si, diamond, Si0.5Ge0.5 (ordered model) | COD (Hom et al. 1975 precision lattice constants; Dismukes 1964 for SiGe) |
+| Semiconductors: III–V | GaAs, AlAs, InAs, GaP, AlP, InP, GaSb, AlSb, InSb (zincblende); GaN, AlN, InN (wurtzite) | 300 K lattice constants from Vurgaftman, Meyer, Ram-Mohan, *J. Appl. Phys.* 89, 5815 (2001); wurtzite u from Paszkowicz et al. (2003, 2004) |
 | Oxides | α-quartz SiO₂, corundum Al₂O₃, monoclinic HfO₂ and ZrO₂, rutile and anatase TiO₂, ZnO, MgO, β-Ga₂O₃, SrTiO₃ | COD (published refinements, listed per entry) |
-| Molecules | 69 diatomic, small, organic and process-gas molecules, etch and dopant gases and ALD/CVD precursors (H₂O, CH₄, SiH₄, SF₆, BCl₃, GeH₄, TMA, WF₆, TiCl₄, …) | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
+| Molecules | 86 molecules in the groups below | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
+
+Molecules are grouped the way chemistry textbooks classify them: first
+organic (carbon compounds), organometallic (metal–carbon bonds) or inorganic,
+then by functional group or type of compound. Within a group they are in
+alphabetical order.
+
+| Class | Groups (examples) |
+|-------|-------------------|
+| Organic | hydrocarbons (CH₄, C₂H₂, propyne, cyclopropane, C₆H₆); halocarbons (CF₄, CH₂Cl₂, CHCl₃); alcohols and ethers (CH₃OH, oxirane); carbonyl compounds: aldehydes, ketones, acids, esters, amides (H₂CO, HCOOH, ketene, methyl formate, formamide); nitrogen and sulfur compounds (HCN, CH₃CN, DMSO); heterocycles (pyridine, furan, thiophene) |
+| Organometallic | metal alkyls (Al(CH₃)₃ and its dimer, Zn(CH₃)₂, In(CH₃)₃); metal carbonyls (Ni(CO)₄, W(CO)₆) |
+| Inorganic | elements (H₂, O₂, O₃, Cl₂); hydrides (H₂O, NH₃, SiH₄, B₂H₆, HF); oxides (CO, CO₂, SO₂); nonmetal halides (BCl₃, SiCl₄, NF₃, SF₆); metal halides (TiCl₄, WF₆, Al₂Cl₆) |
+
+Molecules used in semiconductor processing also say what for (*Used as*):
+etch gas, dopant source, deposition precursor, ALD/CVD co-reactant
+(oxidant, nitrogen source) or solvent. Search finds them by that too.
 
 - **Crystals** are CIFs from the
   [Crystallography Open Database](https://www.crystallography.net), stored as
@@ -22,7 +42,8 @@ Untitled until saved, so Save never writes into the library. In code:
 - **III–V semiconductors** come from one review at 300 K instead, because
   COD's III–V entries are mostly old tables and some are off.
 - **Molecules** are experimental gas-phase geometries: the bond lengths and
-  angles of the cited papers and books, from which `scripts/molecules.jl`
+  angles of the cited papers and books (each value read in the authors' own
+  text, never taken from a data compilation), from which `scripts/molecules.jl`
   computes the coordinates. Each entry gives its point group and references;
   a few carry a note where the structure is approximate. They open in a
   non-periodic box with 5 Å of space; the
@@ -36,7 +57,8 @@ The library is `data/library/library.toml` with `crystals/` and `molecules/`
 beside it; `scripts/build_library.jl` downloads the COD files and rebuilds
 it, with the molecules from `scripts/molecules.jl`.
 Your own structures go into `~/.atombond/library/library.toml` (or
-`$ATOMBOND_HOME/library/`), in the same format with the files next to it.
+`$ATOMBOND_HOME/library/`), in the same format with the files next to it (`category` sets the group;
+an optional `use` is shown and searched).
 
 ## Element data
 

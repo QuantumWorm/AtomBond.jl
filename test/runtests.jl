@@ -1268,11 +1268,20 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
     @testset "structure library" begin
         lib = structure_library()
-        @test length(lib) == 94 && [e.category for e in lib] == [fill("Group IV", 3); fill("III-V", 12); fill("Oxides", 10);
-                fill("Diatomic molecules", 11); fill("Small molecules", 10); fill("Organic molecules", 9);
-                fill("Process gases and precursors", 22); fill("ALD/CVD precursors", 17)]
+        groups = ["Semiconductors: group IV" => 3, "Semiconductors: III-V" => 12, "Oxides" => 10,
+                  "Organic: hydrocarbons" => 9, "Organic: halocarbons" => 7, "Organic: alcohols and ethers" => 3,
+                  "Organic: carbonyl compounds" => 5, "Organic: nitrogen and sulfur compounds" => 3,
+                  "Organic: heterocycles" => 3,
+                  "Organometallic: metal alkyls" => 5, "Organometallic: metal carbonyls" => 3,
+                  "Inorganic: elements" => 7, "Inorganic: hydrides" => 13, "Inorganic: oxides" => 6,
+                  "Inorganic: nonmetal halides" => 15, "Inorganic: metal halides" => 7]
+        @test length(lib) == 111 && [e.category for e in lib] == reduce(vcat, [fill(g, n) for (g, n) in groups])
         @test [e.name for e in lib[[1, 2, 3, 26, end]]] == ["Silicon", "Diamond", "Silicon-germanium Si0.5Ge0.5",
-                                                             "Hydrogen", "Hexachlorodisilane"]
+                                                             "Acetylene", "Zirconium tetrachloride"]
+        mols = structure_library(; kind=:molecule)                    # sorted by name within each group
+        @test all(issorted(lowercase.([e.name for e in mols if e.category == g])) for (g, _) in groups[4:end])
+        @test library_entry("SF6").use == "etch gas" && library_entry("Diborane").use == "dopant source" &&
+              occursin("deposition precursor", library_entry("WF6").use) && library_entry("Benzene").use == ""
         # every molecule: the atoms of its formula, all connected by bonds, point group given
         count_atoms(f) = sum((isempty(m[1]) ? 1 : parse(Int, m[1]) for m in eachmatch(r"[A-Z][a-z]?(\d*)", f)); init=0)
         natoms_of(f) = count_atoms(replace(f, r"\(([^()]*)\)(\d*)" =>                 # Al(CH3)3 = Al C3 H9
@@ -1304,7 +1313,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test lattice_parameters(load_library("GaAs").lattice)[1] == 5.65325
         @test lattice_parameters(load_library("InSb").lattice)[1] == 6.4794
         @test all(e -> isfile(e.file) && !isempty(e.source) && !isempty(e.reference), lib)
-        @test length(structure_library(; kind=:molecule)) == 69
+        @test length(structure_library(; kind=:molecule)) == 86
         # crystals: published lattice constants and symmetry
         si = load_library("Silicon")
         @test si.title == "Silicon" && formula(si) == "Si8" && spacegroup(si)[1] == 227
@@ -1350,6 +1359,19 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         sihcl3 = load_library("SiHCl3")
         @test isapprox(bond(sihcl3, 1, 2), 2.0118; atol=1e-3) && isapprox(bond(sihcl3, 1, 5), 1.4655; atol=1e-3)
         @test isapprox(bond(load_library("TiCl4"), 1, 2), 2.185; atol=1e-3) && occursin("Kimura", library_entry("TiCl4").reference)
+        # organics: rings built from bonds and angles reproduce the papers' other values
+        py = cartesian_positions(load_library("Pyridine"))
+        @test isapprox(norm(py[1] - py[4]), 2.7980; atol=2e-4)                   # N1···C4, Table 4
+        fu = cartesian_positions(load_library("Furan"))
+        @test isapprox(norm(fu[3] - fu[4]), 1.4331; atol=2e-4) &&                # C3–C4
+              isapprox(AtomBond.bond_angle(fu[2], fu[3], fu[4]), 105.992; atol=0.01)
+        @test isapprox(norm(cartesian_positions(load_library("Thiophene"))[3] - cartesian_positions(load_library("Thiophene"))[4]),
+                       1.4224; atol=2e-4)
+        cb = cartesian_positions(load_library("Cyclobutane"))                   # puckered ring, 27.9°
+        n1, n2 = cross(cb[4] - cb[1], cb[2] - cb[1]), cross(cb[4] - cb[3], cb[2] - cb[3])
+        @test isapprox(180 - acosd(dot(n1, n2) / norm(n1) / norm(n2)), 27.9; atol=0.05)
+        dmso = load_library("Dimethyl sulfoxide")
+        @test formula(dmso) == "S1O1C2H6" && isapprox(bond(dmso, 1, 3), 1.799; atol=1e-3)
         @test_throws ArgumentError load_library("Unobtainium")
         # your own library is added after the built-in one
         withenv("ATOMBOND_HOME" => mktempdir()) do
@@ -1359,7 +1381,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
                                                  "formula = \"NaCl\"\nfile = \"NaCl.vasp\"\nsource = \"my file\"\n")
             @test structure_library()[end].name == "Rock salt" && formula(load_library("Rock salt")) == "Na4Cl4"
         end
-        @test length(structure_library()) == 94
+        @test length(structure_library()) == 111
 
         # Window
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
@@ -1368,7 +1390,22 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         d = AtomBond.library_dialog(v)
         @test startswith(d.info[], "Si, 8 atoms in the cell, Fd-3m (227)") && occursin("COD 9011998", d.info[])
         d.kind.i_selected[] = 3                                       # molecules
-        @test length(d.entries[]) == 69 && startswith(d.info[], "H2, 2 atoms")
+        @test length(d.entries[]) == 86 && startswith(d.info[], "C2H2, 4 atoms") && occursin("Group: Organic: hydrocarbons", d.info[])
+        @test d.group.options[][1] == "All groups" && length(d.group.options[]) == 14 &&    # all + 13 molecule groups
+              d.group.options[][2] == "Organic: hydrocarbons"
+        d.group.i_selected[] = findfirst(==("Inorganic: hydrides"), d.group.options[])
+        @test length(d.entries[]) == 13 && all(e -> e.category == "Inorganic: hydrides", d.entries[])
+        d.group.i_selected[] = 1
+        d.search.stored_string[] = "etch"                             # search: name, formula, group or use
+        @test length(d.entries[]) == 13 && occursin("Used as: etch gas", d.info[])
+        d.search.stored_string[] = "tungsten hexa"                    # all words must match
+        @test [e.formula for e in d.entries[]] == ["W(CO)6", "WCl6", "WF6"]
+        d.search.stored_string[] = "unobtainium"
+        @test isempty(d.entries[]) && d.structure.options[] == ["(none)"] && d.info[] == "No structure matches"
+        d.search.stored_string[] = "solvent"
+        @test length(d.entries[]) == 7
+        d.search.stored_string[] = ""
+        @test length(d.entries[]) == 86
         d.structure.i_selected[] = findfirst(e -> e.name == "Methanol", d.entries[])
         @test occursin("Venkateswarlu", d.info[])
         d.open.clicks[] = 1
