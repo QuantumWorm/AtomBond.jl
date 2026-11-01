@@ -84,6 +84,45 @@ stay through undo, shifts, rotations, wrapping and deletion, and supercells
 repeat them. In code: [`fix_atoms`](@ref), [`free_atoms`](@ref),
 [`with_constraints`](@ref), [`describe_cell_constraints`](@ref).
 
+## Running DFTK from AtomBond
+
+File → *Run DFTK…* runs the current structure in
+[DFTK.jl](https://dftk.org): an SCF, or a relaxation when the structure has
+constraints (the same script as the DFTK export). The calculation runs in a
+separate Julia process, so the window stays usable; the tool shows the last
+lines of the log while it runs and, when it is done, a summary:
+
+- whether the SCF (or relaxation) converged, and in how many iterations
+  (steps);
+- the total energy (eV and Ha) and the largest force (eV/Å);
+- the Fermi level and the gap between the levels around it (on the k-point
+  grid, so only an estimate of the true gap).
+
+*Open result structure* opens the final structure (the relaxed one after a
+relaxation) in a new tab. Every run gets its own folder,
+`Folder/dftk_<Name>_<date-time>/`, with the script (`Name.jl`), the log
+(`Name.log`) and the results (`Name.results.toml`: energies, forces,
+eigenvalues and occupations per k-point, the final structure).
+
+DFTK is large and is not a dependency of AtomBond: it is installed once into
+its own Julia environment, by default `~/.julia/environments/atombond-dftk`.
+*Install DFTK* in the tool does this (DFTK, PseudoPotentialData, AtomsBase,
+Unitful, UnitfulAtomic, GeometryOptimization; several minutes, mostly
+compiling). The PseudoDojo pseudopotentials are downloaded by
+PseudoPotentialData on the first run.
+
+From Julia code:
+
+```julia
+using AtomBond
+install_dftk() |> wait                     # once
+job = run_dftk(primitive_cell(load_library("Diamond")); ecutwfc=40)
+job_status(job)                            # :running, then :done (or :failed, :stopped)
+wait(job)
+r = job_results(job)                       # DFTKResults: energy, forces, levels, structure
+r.energy, band_gap(r), r.structure
+```
+
 ## DFTK and AtomsBase
 
 Besides the exported script, DFTK can be used directly from Julia.

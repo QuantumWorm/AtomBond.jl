@@ -33,7 +33,7 @@ using PrecompileTools: @setup_workload, @compile_workload
         # The window (figure only), its panel and tools, and common actions
         v = visualize(gan; show=false)
         for tool in (library_dialog, supercell_dialog, surface_dialog, export_dialog, cell_dialog, atoms_dialog,
-                     shift_dialog, rotate_dialog, bridge_dialog, nanotube_dialog, new_structure_dialog)
+                     shift_dialog, rotate_dialog, bridge_dialog, nanotube_dialog, new_structure_dialog, dftk_dialog)
             tool(v)
         end
         close_tool!(v)

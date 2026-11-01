@@ -719,6 +719,90 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test !has_magmoms(from_atomsbase(sys)) && !has_constraints(from_atomsbase(sys))
     end
 
+    @testset "running DFTK" begin
+        # DFTK itself is not installed in the tests: the script, the results file, the job handling and the tool.
+        h2 = periodic_box(load_library("Hydrogen"); vacuum=5.0, cubic=true)
+        dj = sprint(io -> write_dftk(io, h2; results="H2.results.toml"))
+        @test !any(e -> e isa Expr && e.head in (:error, :incomplete), Meta.parseall(dj).args)
+        @test occursin("TOML.print", dj) && occursin("\"calculation\" => \"scf\"", dj) && occursin("H2.results.toml", dj)
+        dr = sprint(io -> write_dftk(io, fix_atoms(h2, [1]); results="r.toml"))
+        @test occursin("\"calculation\" => \"relax\"", dr) && occursin("results.n_iter", dr)
+        @test !occursin("TOML", sprint(io -> write_dftk(io, h2)))           # plain export: no results section
+        # A results file as the script writes it (H2: one k-point, εF between the levels)
+        pos = cartesian_positions(h2)
+        toml = """
+        program = "DFTK"
+        version = "0.8.1"
+        calculation = "scf"
+        converged = true
+        scf_iterations = 9
+        energy_Ha = -1.144429110516341
+        fermi_level_Ha = -0.19
+        n_spin = 1
+        kpoint_weights = [1.0]
+        eigenvalues_Ha = [[-0.3635426618843136, -0.01722241231680253, 0.03424307647279534]]
+        occupations = [[2.0, 0.0, 0.0]]
+        forces_Ha_per_bohr = [[0.016941562151228766, 0.0, 0.0], [-0.016941562151228766, 0.0, 0.0]]
+        cell_A = $(repr([collect(x) for x in cell_vectors(h2.lattice)]))
+        periodic = [true, true, true]
+        species = ["H", "H"]
+        positions_A = $(repr([collect(x) for x in pos]))
+        [energy_terms_Ha]
+        Kinetic = 1.0051405107152027
+        Hartree = 0.7707197721462506
+        total = -1.144429110516341
+        """
+        mktempdir() do dir
+            path = joinpath(dir, "H2.results.toml")
+            write(path, toml)
+            r = read_dftk_results(path; title="H2")
+            @test r.calculation == "scf" && r.converged && r.iterations == 9 && r.version == "0.8.1"
+            @test r.energy ≈ -1.144429110516341 * AtomBond.HARTREE_EV
+            @test first.(r.terms) == ["Kinetic", "Hartree"]                  # no "total"; DFTK's order
+            @test r.homo ≈ -0.3635426618843136 * AtomBond.HARTREE_EV && r.lumo ≈ -0.01722241231680253 * AtomBond.HARTREE_EV
+            @test band_gap(r) ≈ (0.3635426618843136 - 0.01722241231680253) * AtomBond.HARTREE_EV
+            @test r.forces[1][1] ≈ 0.016941562151228766 * AtomBond.HARTREE_EV / AtomBond.BOHR       # eV/Å
+            @test AtomBond.max_force(r) ≈ norm(r.forces[2])
+            @test r.structure.species == [:H, :H] && cartesian_positions(r.structure) ≈ pos
+            @test occursin("SCF converged (9 iterations)", AtomBond.summarize(r)) && occursin("Gap 9.", AtomBond.summarize(r))
+            @test occursin("DFTK results for H2", sprint(show, MIME"text/plain"(), r))
+
+            # No DFTK environment → refused; an environment without the packages installed → the run fails.
+            @test !dftk_env_ready(joinpath(dir, "none"))
+            @test_throws ArgumentError run_dftk(h2; env=joinpath(dir, "none"), dir=joinpath(dir, "run0"))
+            fake = joinpath(dir, "fakeenv"); mkpath(fake)
+            deps = join(("$p = \"$(string(Base.UUID(k)))\"" for (k, p) in enumerate(AtomBond.DFTK_PACKAGES)), "\n")
+            write(joinpath(fake, "Project.toml"), "[deps]\n" * deps * "\n")
+            @test dftk_env_ready(fake)
+            job = run_dftk(h2; env=fake, dir=joinpath(dir, "run1"), name="H2", ecutwfc=20)
+            @test isfile(job.script) && basename(job.results) == "H2.results.toml"
+            @test wait(job) === :failed && job_results(job) === nothing
+            @test any(l -> occursin("DFTK", l), job_log(job; n=30))           # the load error names the package
+
+            # The tool: plan, environment state, a finished job's results and its structure in a new tab.
+            v = visualize(h2; show=false, panel=false)
+            d = AtomBond.dftk_dialog(v)
+            @test startswith(d.plan[], "SCF") && occursin("2 atoms", d.plan[])
+            AtomBond.settext!(d.env, fake)
+            @test d.envstate[] == "DFTK is installed there"
+            done = AtomBond.DFTKJob(h2, dir, joinpath(dir, "H2.jl"), joinpath(dir, "none.log"), path,
+                                    run(`$(Base.julia_cmd()) --startup-file=no -e 0`; wait=true), time(), false)
+            @test job_status(done) === :done
+            d.state[:job] = done
+            @test AtomBond.show_job!(v, d) === :done
+            @test occursin("done", d.progress[]) && occursin("Total energy", d.summary[])
+            d.open_result.clicks[] += 1
+            @test ntabs(v) == 2 && occursin("(DFTK)", v.crystal.title) && natoms(v.crystal) == 2
+            d.state[:job] = job                                               # a failed job
+            @test AtomBond.show_job!(v, d) === :failed && occursin("failed", d.progress[])
+            AtomBond.settext!(d.name, "x y")                                   # invalid name: not started
+            n = length(readdir(dir))
+            d.run.clicks[] += 1
+            @test length(readdir(dir)) == n
+            @test "Run DFTK…" in [it.label for it in AtomBond.menubar_items(v, "File")]
+        end
+    end
+
     @testset "export dialog" begin
         v = visualize(joinpath(STRUCTS, "GaN_wurtzite.vasp"); show=false, panel=false)
         d = AtomBond.export_dialog(v)

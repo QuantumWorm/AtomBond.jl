@@ -30,7 +30,7 @@ repeats also by x (`2x2x1`).
 
 | Menu | Items |
 |------|-------|
-| File | New structure… (Ctrl+N), Open… (Ctrl+O), Structure library… (Ctrl+L), Close tab (Ctrl+W), recent files, Save (Ctrl+S), Save as… (Ctrl+Shift+S), Export DFT inputs…, Save image…, Exit (Ctrl+Q) |
+| File | New structure… (Ctrl+N), Open… (Ctrl+O), Structure library… (Ctrl+L), Close tab (Ctrl+W), recent files, Save (Ctrl+S), Save as… (Ctrl+Shift+S), Export DFT inputs…, Run DFTK…, Save image…, Exit (Ctrl+Q) |
 | Edit | Undo / Redo (named after the step), Select all (Ctrl+A), Clear selection, Delete selected atoms, Edit atoms… |
 | Build | New structure…, From library…, Cell and constraints…, Supercell…, Surface / superlattice…, Shift atoms…, Rotate atoms…, Oxygen bridge…, Wrap atoms into cell, Primitive / Conventional cell, Original structure |
 | View | Reset view, Turn view 90° counter-clockwise / clockwise, Label all atoms and bonds / selected atoms only, Show / Hide bond lengths, bond angles, dihedral angles, atom charges, magnetic moments, atom coordinates, Coordinates: fractional / Cartesian, view along a, b, c, a*, b*, c* |

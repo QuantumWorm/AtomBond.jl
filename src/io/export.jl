@@ -10,7 +10,8 @@
 
 True along each lattice direction whose largest empty gap between atomic
 planes (measured perpendicular to the planes, across the periodic boundary)
-exceeds `min_gap` Å, e.g. the c axis of a slab.
+is at least `min_gap` Å, e.g. the c axis of a slab or every axis of a
+molecule in a box with 5 Å of vacuum.
 """
 function vacuum_axes(c::Crystal; min_gap::Real=5.0)
     natoms(c) == 0 && return (true, true, true)
@@ -18,7 +19,7 @@ function vacuum_axes(c::Crystal; min_gap::Real=5.0)
     ntuple(3) do k
         z = sort(mod.([f[k] for f in c.frac], 1.0))
         gaps = [diff(z); z[1] + 1 - z[end]]
-        maximum(gaps) * d[k] > min_gap
+        maximum(gaps) * d[k] >= min_gap - 1e-6
     end
 end
 
@@ -345,11 +346,16 @@ in a comment. With clamped atoms the script switches DFTK's symmetries off
 (they no longer hold once the free atoms move). Run with `julia <name>.jl` in an environment that has DFTK,
 PseudoPotentialData, AtomsBase, Unitful and UnitfulAtomic
 (+ GeometryOptimization for a relaxation).
+
+`results`: the name of a TOML file (next to the script) that the script
+writes at the end for [`read_dftk_results`](@ref): energies, forces, the
+final structure and, for an SCF, the eigenvalues and occupations. This is
+what [`run_dftk`](@ref) uses.
 """
 write_dftk(path::AbstractString, c::Crystal; kw...) = open(io -> write_dftk(io, c; kw...), path, "w")
 
 function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
-                    pseudo::AbstractString=DFTK_PSEUDO_FAMILY)
+                    pseudo::AbstractString=DFTK_PSEUDO_FAMILY, results::Union{Nothing,AbstractString}=nothing)
     spc = species_list(c)
     title = isempty(c.title) ? formula(c) : c.title
     relax = has_constraints(c)
@@ -397,6 +403,7 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
         println(io, "display(scfres.energies)")
         println(io, "forces = compute_forces_cart(scfres)  # Ha/bohr")
         println(io, "foreach(((i, f),) -> println(\"atom \", i, \": \", f), enumerate(forces))")
+        results === nothing || write_dftk_results_code(io, results, :scf)
         return
     end
     cc = c.cell_constraints
@@ -417,6 +424,48 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
     println(io, "println(relaxed)")
     println(io, "# To open the relaxed structure in AtomBond:")
     println(io, "#   using AtomBond; save_structure(\"relaxed.xyz\", from_atomsbase(relaxed))")
+    results === nothing || write_dftk_results_code(io, results, :relax)
+end
+
+"""The end of a DFTK script that writes its results for AtomBond (TOML)."""
+function write_dftk_results_code(io::IO, file::AbstractString, kind::Symbol)
+    print(io, """
+
+    # Results for AtomBond: energies in Ha, forces in Ha/bohr, lengths in Å
+    import TOML
+    structure_data(sys) = Dict{String,Any}(
+        "cell_A" => [collect(ustrip.(u"Å", v)) for v in AtomsBase.cell_vectors(sys)],
+        "periodic" => collect(AtomsBase.periodicity(sys)),
+        "species" => [string(atomic_symbol(sys, i)) for i in 1:length(sys)],
+        "positions_A" => [collect(ustrip.(u"Å", position(sys, i))) for i in 1:length(sys)])
+    """)
+    if kind === :scf
+        print(io, """
+        out = merge(structure_data(system), Dict{String,Any}(
+            "program" => "DFTK", "version" => string(pkgversion(DFTK)), "calculation" => "scf",
+            "converged" => scfres.converged, "scf_iterations" => scfres.n_iter,
+            "energy_Ha" => scfres.energies.total,
+            "energy_terms_Ha" => Dict(string(k) => v for (k, v) in scfres.energies),
+            "fermi_level_Ha" => scfres.εF,
+            "n_spin" => scfres.basis.model.n_spin_components,
+            "kpoint_weights" => collect(scfres.basis.kweights),
+            "eigenvalues_Ha" => [collect(e) for e in scfres.eigenvalues],
+            "occupations" => [collect(o) for o in scfres.occupation],
+            "forces_Ha_per_bohr" => [collect(f) for f in forces]))
+        """)
+    else
+        print(io, """
+        out = merge(structure_data(relaxed), Dict{String,Any}(
+            "program" => "DFTK", "version" => string(pkgversion(DFTK)), "calculation" => "relax",
+            "converged" => results.converged, "steps" => results.n_iter,
+            "energy_Ha" => ustrip(u"hartree", results.energy),
+            "forces_Ha_per_bohr" => [collect(ustrip.(u"hartree/bohr", f)) for f in results.forces]))
+        """)
+    end
+    print(io, """
+    open(io -> TOML.print(io, out), joinpath(@__DIR__, $(repr(String(file)))), "w")
+    println("AtomBond results written to ", $(repr(String(file))))
+    """)
 end
 
 # ---------------------------------------------------------------------------

@@ -19,3 +19,11 @@ Modules = [AtomBond]
 Private = false
 Pages = ["io/atomsbase.jl", "io/castep.jl", "io/cif.jl", "io/codes.jl", "io/export.jl", "io/library.jl", "io/load.jl", "io/molecular.jl", "io/msi.jl", "io/poscar.jl", "io/qe.jl", "io/vasp_out.jl", "io/xsf.jl", "io/xyz.jl"]
 ```
+
+## Running DFTK
+
+```@autodocs
+Modules = [AtomBond]
+Private = false
+Pages = ["run/dftk.jl"]
+```
