@@ -41,7 +41,6 @@ shorten(s, n) = length(s) <= n ? s : first(s, n - 1) * "…"
 
 mutable struct FileBrowser
     v::Viewer
-    figure::Makie.Figure
     dir::String
     entries::Vector{Tuple{String,Bool}}
     offset::Int                                   # entries scrolled past
@@ -194,7 +193,7 @@ function row_pixel(b::FileBrowser, k::Integer)
 end
 
 function install_browser_events!(b::FileBrowser)
-    ev = Makie.events(b.figure.scene)
+    ev = Makie.events(b.v.figure.scene)
     Makie.on(ev.mousebutton; priority=100) do e
         (e.button == Makie.Mouse.left && e.action == Makie.Mouse.press) || return Makie.Consume(false)
         k = row_at(b)
@@ -241,25 +240,25 @@ function install_browser_events!(b::FileBrowser)
 end
 
 """
-    open_dialog(viewer; show=true, dir=viewer.folder) -> FileBrowser
+    open_dialog(viewer; dir=viewer.folder) -> FileBrowser
 
 Open tool for loading structures into `viewer`. Lists folders and files
 that [`load_structure`](@ref) reads (CIF, POSCAR/CONTCAR/.vasp, XYZ, CASTEP
 .cell/.geom); "All files" lists everything. Keys: ↑/↓, Page Up/Down, Enter
 opens, Backspace goes to the parent folder.
 """
-open_dialog(v::Viewer; show::Bool=true, dir::AbstractString=v.folder) = file_dialog(v, :open; show, dir)
+open_dialog(v::Viewer; dir::AbstractString=v.folder) = file_dialog(v, :open; dir)
 
 """
-    save_dialog(viewer; show=true, dir, format=nothing) -> FileBrowser
+    save_dialog(viewer; dir, format=nothing) -> FileBrowser
 
 Save as tool: choose a folder, type a file name and pick a format (POSCAR,
 CIF, XYZ, CASTEP .cell, Quantum ESPRESSO .in, or a PNG image of the view).
 Replacing an existing file needs a second click on Save.
 """
-function save_dialog(v::Viewer; show::Bool=true, dir::AbstractString=default_save_folder(v),
+function save_dialog(v::Viewer; dir::AbstractString=default_save_folder(v),
                      format::Union{Nothing,AbstractString}=nothing)
-    b = file_dialog(v, :save; show, dir)
+    b = file_dialog(v, :save; dir)
     b === nothing && return nothing
     ext = format !== nothing ? format : v.path === nothing ? ".vasp" : save_extension(v.path)
     k = something(findfirst(f -> f[2] == ext, SAVE_FORMATS), 1)
@@ -270,12 +269,11 @@ function save_dialog(v::Viewer; show::Bool=true, dir::AbstractString=default_sav
     return b
 end
 
-function file_dialog(v::Viewer, mode::Symbol; show::Bool=true, dir::AbstractString=v.folder)
+function file_dialog(v::Viewer, mode::Symbol; dir::AbstractString=v.folder)
     saving = mode === :save
     title = saving ? "Save as" : "Open structure"
-    d = new_dialog(v, mode, title, saving ? 760 : 690; show, width=BROWSER_WIDTH)
-    d === nothing && return nothing
-    fig, f = d
+    f = new_dialog(v, mode, title; width=BROWSER_WIDTH)
+    f === nothing && return nothing
 
     heading!(f, title)
     folder = field!(f, "Folder", dir, s -> isdir(expanduser(strip(s))))
@@ -319,7 +317,7 @@ function file_dialog(v::Viewer, mode::Symbol; show::Bool=true, dir::AbstractStri
     end
     go = button!(f, saving ? "Save" : "Open")
 
-    b = FileBrowser(v, fig, "", Tuple{String,Bool}[], 0, 0, false, names, kinds, fills, list, folder,
+    b = FileBrowser(v, "", Tuple{String,Bool}[], 0, 0, false, names, kinds, fills, list, folder,
                     position, preview, (0, 0.0), mode, name, format, "")
     if saving
         # The extension follows the format.
@@ -345,6 +343,6 @@ function file_dialog(v::Viewer, mode::Symbol; show::Bool=true, dir::AbstractStri
     install_browser_events!(b)
     navigate!(b, isdir(dir) ? dir : pwd())
 
-    finish_dialog!(v, mode, title, fig, f; show, labelwidth=saving ? 0.2 : 0.15)
+    finish_dialog!(v, mode, title, f; labelwidth=saving ? 0.2 : 0.15)
     return b
 end

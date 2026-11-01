@@ -65,64 +65,91 @@ function box_text(t)
     return s, ok
 end
 
-
 # Compact controls so the whole panel fits a ~960 px tall window.
 const PANEL_FONTSIZE = 14
 
 """Make a structure-changing step from the Cell section; these re-frame the camera."""
 build!(f, v::Viewer, what::AbstractString) = edit!(f, v, what; reframe=true)
 
-function build_panel!(pos, v::Viewer)
-    vs = v.settings
-    g = Makie.GridLayout(pos; width=280, valign=:top, tellheight=false, rowgap=4)
-    row = 0
-    nextrow() = (row += 1)
-    heading(text) = Makie.Label(g[nextrow(), 1:3], text; font=:bold, halign=:left, fontsize=15,
-                                padding=(0, 0, 0, row > 1 ? 6 : 0))
-    button(pos, label) = with_click_feedback!(Makie.Button(pos; label, width=Makie.Relative(1),
-                                                           fontsize=PANEL_FONTSIZE, padding=(6, 6, 5, 5)))
-    function textbox(pos, placeholder, validator)
-        t = Makie.Textbox(pos; placeholder, validator, width=Makie.Relative(1), fontsize=PANEL_FONTSIZE,
-                          textpadding=(8, 8, 5, 5))
-        sync_display!(t)
-        push!(v.textboxes, t)
-        return t
-    end
-    # Run `f(text)` with a text box's accepted value, or ask for one.
-    function with_text(f, t, what)
-        s, ok = box_text(t)
-        isempty(s) ? (v.status[] = "Type $what first") :
-        !ok ? (v.status[] = "Cannot use '$s': type $what") : f(s)
-    end
+"""The view controls being built: their three-column layout, the last row used and the viewer."""
+mutable struct Panel
+    g::Makie.GridLayout
+    row::Int
+    v::Viewer
+end
 
-    # --- Display style -------------------------------------------------------
-    heading("Display style")
-    menu = Makie.Menu(g[nextrow(), 1:3]; options=[(STYLE_LABELS[s], s) for s in DISPLAY_STYLES],
+nextrow!(p::Panel) = (p.row += 1)
+
+heading!(p::Panel, text) = Makie.Label(p.g[nextrow!(p), 1:3], text; font=:bold, halign=:left, fontsize=15,
+                                       padding=(0, 0, 0, p.row > 1 ? 6 : 0))
+
+panel_button(pos, label) = with_click_feedback!(Makie.Button(pos; label, width=Makie.Relative(1),
+                                                             fontsize=PANEL_FONTSIZE, padding=(6, 6, 5, 5)))
+
+function panel_textbox!(p::Panel, pos, placeholder, validator)
+    t = Makie.Textbox(pos; placeholder, validator, width=Makie.Relative(1), fontsize=PANEL_FONTSIZE,
+                      textpadding=(8, 8, 5, 5))
+    sync_display!(t)
+    push!(p.v.textboxes, t)
+    return t
+end
+
+"""Run `f(text)` with a text box's accepted value, or ask for one in the status line."""
+function with_text(f, v::Viewer, t, what)
+    s, ok = box_text(t)
+    isempty(s) ? (v.status[] = "Type $what first") :
+    !ok ? (v.status[] = "Cannot use '$s': type $what") : f(s)
+end
+
+"""The view controls: display style, what is shown, sizes, view direction, cell, editing and file."""
+function build_panel!(pos, v::Viewer)
+    g = Makie.GridLayout(pos; width=280, valign=:top, tellheight=false, rowgap=4)
+    p = Panel(g, 0, v)
+    style_section!(p)
+    show_section!(p)
+    size_section!(p)
+    view_section!(p)
+    cell_section!(p)
+    edit_section!(p)
+    file_section!(p)
+    Makie.colsize!(g, 1, Makie.Relative(1 / 3))
+    return g
+end
+
+function style_section!(p::Panel)
+    v, vs = p.v, p.v.settings
+    heading!(p, "Display style")
+    menu = Makie.Menu(p.g[nextrow!(p), 1:3]; options=[(STYLE_LABELS[s], s) for s in DISPLAY_STYLES],
                       i_selected=findfirst(==(vs.style), DISPLAY_STYLES), fontsize=PANEL_FONTSIZE)
     Makie.on(menu.selection) do s
         vs.style = s
         redraw!(v)
     end
+end
 
-    # --- Show / hide -----------------------------------------------------------
-    heading("Show")
-    # Two columns of (switch, label) pairs.
+"""On/off switches in two columns of (switch, label) pairs."""
+function show_section!(p::Panel)
+    v, vs = p.v, p.v.settings
+    heading!(p, "Show")
     switches = Any[(label, x -> (setfield!(vs, field, x); redraw!(v)), getfield(vs, field))
                    for (label, field) in DISPLAY_TOGGLES]
     if v.triad !== nothing
-        push!(switches, ("Axes", x -> (vs.show_triad = x; foreach(p -> p.visible = x, v.triad.plots)),
+        push!(switches, ("Axes", x -> (vs.show_triad = x; foreach(t -> t.visible = x, v.triad.plots)),
                          vs.show_triad))
     end
-    tg = Makie.GridLayout(g[nextrow(), 1:3]; rowgap=6, colgap=6)
+    tg = Makie.GridLayout(p.g[nextrow!(p), 1:3]; rowgap=6, colgap=6)
     for (k, (label, action, active)) in enumerate(switches)
         r, c = divrem(k - 1, 2) .+ (1, 0)
         t = Makie.Toggle(tg[r, 2c+1]; active)
         Makie.Label(tg[r, 2c+2], label; halign=:left, fontsize=PANEL_FONTSIZE)
         Makie.on(action, t.active)
     end
+end
 
-    # --- Sizes (labelled sliders, no heading) ---------------------------------
-    sliders = Makie.SliderGrid(g[nextrow(), 1:3],
+"""Atom and bond size sliders (no heading)."""
+function size_section!(p::Panel)
+    v, vs = p.v, p.v.settings
+    sliders = Makie.SliderGrid(p.g[nextrow!(p), 1:3],
         (label="Atoms", range=0.2:0.05:1.0, startvalue=vs.ball_scale, format="{:.2f}"),
         (label="Bonds", range=0.04:0.01:0.30, startvalue=vs.bond_radius, format="{:.2f} Å");
         tellheight=true)
@@ -135,19 +162,22 @@ function build_panel!(pos, v::Viewer)
         vs.bond_radius = x
         redraw!(v)
     end
+end
 
-    # --- Camera ------------------------------------------------------------------
-    heading("View along")
-    vg = Makie.GridLayout(g[nextrow(), 1:3]; colgap=4)
+"""View along a lattice or reciprocal axis or [uvw], reset, orthographic."""
+function view_section!(p::Panel)
+    v, vs, g = p.v, p.v.settings, p.g
+    heading!(p, "View along")
+    vg = Makie.GridLayout(g[nextrow!(p), 1:3]; colgap=4)
     for (col, (label, which)) in enumerate(VIEW_BUTTONS)
-        b = button(vg[1, col], label)
+        b = panel_button(vg[1, col], label)
         Makie.on(_ -> view_along!(v, which), b.clicks)
     end
-    r = nextrow()
-    uvw = textbox(g[r, 1:2], "u v w  (e.g. 1 1 0)", is_int3)
-    go = button(g[r, 3], "Go")
+    r = nextrow!(p)
+    uvw = panel_textbox!(p, g[r, 1:2], "u v w  (e.g. 1 1 0)", is_int3)
+    go = panel_button(g[r, 3], "Go")
     Makie.on(go.clicks) do _
-        with_text(uvw, "a direction u v w") do s
+        with_text(v, uvw, "a direction u v w") do s
             dir = parse3(Int, s)
             if iszero(dir)
                 v.status[] = "[0 0 0] is not a direction"
@@ -157,8 +187,8 @@ function build_panel!(pos, v::Viewer)
             end
         end
     end
-    r = nextrow()
-    reset = button(g[r, 1], "Reset")
+    r = nextrow!(p)
+    reset = panel_button(g[r, 1], "Reset")
     Makie.on(_ -> reset_camera!(v), reset.clicks)
     og = Makie.GridLayout(g[r, 2:3]; colgap=6)
     ortho = Makie.Toggle(og[1, 1]; active=vs.orthographic)
@@ -167,16 +197,19 @@ function build_panel!(pos, v::Viewer)
         vs.orthographic = x
         reframe!(v.lscene, v.display, vs)
     end
+end
 
-    # --- Cell ----------------------------------------------------------------------
-    heading("Cell")
-    r = nextrow()
-    sc = textbox(g[r, 1], "n1 n2 n3", is_count3)
-    apply = button(g[r, 2], "Supercell")
-    surf = button(g[r, 3], "Surface…")
+"""Supercell, surface, primitive / conventional / original cell."""
+function cell_section!(p::Panel)
+    v, g = p.v, p.g
+    heading!(p, "Cell")
+    r = nextrow!(p)
+    sc = panel_textbox!(p, g[r, 1], "n1 n2 n3", is_count3)
+    apply = panel_button(g[r, 2], "Supercell")
+    surf = panel_button(g[r, 3], "Surface…")
     Makie.on(_ -> surface_dialog(v), surf.clicks)
     Makie.on(apply.clicks) do _
-        with_text(sc, "the repeats n1 n2 n3") do s
+        with_text(v, sc, "the repeats n1 n2 n3") do s
             n = parse3(Int, s)
             build!(v, "make $(join(n, "×")) supercell") do c
                 any(iszero, n) && throw(ArgumentError("repeats must be ≥ 1"))
@@ -184,60 +217,58 @@ function build_panel!(pos, v::Viewer)
             end
         end
     end
-    r = nextrow()
+    r = nextrow!(p)
     for (col, (label, f)) in enumerate([("Primitive", primitive_cell), ("Conventional", conventional_cell),
                                        ("Original", _ -> v.original)])
-        b = button(g[r, col], label)
+        b = panel_button(g[r, col], label)
         Makie.on(_ -> build!(f, v, "go to $(lowercase(label)) cell"), b.clicks)
     end
+end
 
-    # --- Edit ----------------------------------------------------------------------
-    heading("Edit selected atoms")
-    r = nextrow()
-    el = textbox(g[r, 1], "element", is_element)
-    repl = button(g[r, 2], "Replace")
-    Makie.on(_ -> with_text(s -> substitute_selected!(v, known_element(s)), el, "an element"), repl.clicks)
-    del = button(g[r, 3], "Delete")
+"""Replace, delete, move or add atoms; undo and redo; the Edit atoms tool."""
+function edit_section!(p::Panel)
+    v, g = p.v, p.g
+    heading!(p, "Edit selected atoms")
+    r = nextrow!(p)
+    el = panel_textbox!(p, g[r, 1], "element", is_element)
+    repl = panel_button(g[r, 2], "Replace")
+    Makie.on(_ -> with_text(s -> substitute_selected!(v, known_element(s)), v, el, "an element"), repl.clicks)
+    del = panel_button(g[r, 3], "Delete")
     Makie.on(_ -> delete_selected!(v), del.clicks)
-    r = nextrow()
-    shift = textbox(g[r, 1:2], "move by dx dy dz (Å)", is_real3)
-    move = button(g[r, 3], "Move")
-    Makie.on(_ -> with_text(s -> move_selected!(v, parse3(Float64, s)), shift, "dx dy dz"), move.clicks)
-    r = nextrow()
-    at = textbox(g[r, 1:2], "add at x y z (fractional)", is_real3)
-    add = button(g[r, 3], "Add")
+    r = nextrow!(p)
+    shift = panel_textbox!(p, g[r, 1:2], "move by dx dy dz (Å)", is_real3)
+    move = panel_button(g[r, 3], "Move")
+    Makie.on(_ -> with_text(s -> move_selected!(v, parse3(Float64, s)), v, shift, "dx dy dz"), move.clicks)
+    r = nextrow!(p)
+    at = panel_textbox!(p, g[r, 1:2], "add at x y z (fractional)", is_real3)
+    add = panel_button(g[r, 3], "Add")
     Makie.on(add.clicks) do _
-        with_text(el, "an element (box above)") do e
-            with_text(at, "a position x y z") do s
+        with_text(v, el, "an element (box above)") do e
+            with_text(v, at, "a position x y z") do s
                 sym = known_element(e)
                 edit!(c -> add_atom(c, sym, parse3(Float64, s)), v, "add $sym at ($(join(split(s), ", ")))")
             end
         end
     end
-    r = nextrow()
-    undo = button(g[r, 1], "Undo")
+    r = nextrow!(p)
+    undo = panel_button(g[r, 1], "Undo")
     Makie.on(_ -> undo!(v), undo.clicks)
-    redo = button(g[r, 2], "Redo")
+    redo = panel_button(g[r, 2], "Redo")
     Makie.on(_ -> redo!(v), redo.clicks)
-    atoms_btn = button(g[r, 3], "Atoms…")   # edit element/position, replace a species everywhere
+    atoms_btn = panel_button(g[r, 3], "Atoms…")   # edit element/position, replace a species everywhere
     Makie.on(_ -> atoms_dialog(v), atoms_btn.clicks)
+end
 
-    # --- Save ----------------------------------------------------------------------
-    heading("File")
-    r = nextrow()
-    fg = Makie.GridLayout(g[r, 1:3]; colgap=6)
-    # More in the File menu: recent files, Save as, Save image.
-    newb = button(fg[1, 1], "New…")
-    Makie.on(_ -> new_structure_dialog(v), newb.clicks)
-    openb = button(fg[1, 2], "Open…")
-    Makie.on(_ -> open_dialog(v), openb.clicks)
-    saveb = button(fg[1, 3], "Save")
-    Makie.on(_ -> save!(v), saveb.clicks)
-    export_btn = button(fg[1, 4], "Export…")  # QE, CASTEP, VASP inputs, CIF, XYZ
-    Makie.on(_ -> export_dialog(v), export_btn.clicks)
-
-    Makie.colsize!(g, 1, Makie.Relative(1 / 3))
-    return g
+"""New, Open, Save, Export (more in the File menu: recent files, Save as, Save image)."""
+function file_section!(p::Panel)
+    v = p.v
+    heading!(p, "File")
+    fg = Makie.GridLayout(p.g[nextrow!(p), 1:3]; colgap=6)
+    for (col, (label, action)) in enumerate([("New…", new_structure_dialog), ("Open…", open_dialog),
+                                             ("Save", save!), ("Export…", export_dialog)])
+        b = panel_button(fg[1, col], label)
+        Makie.on(_ -> action(v), b.clicks)
+    end
 end
 
 # --- Docked tools -------------------------------------------------------------------

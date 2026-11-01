@@ -57,24 +57,18 @@ function form_value(v::Viewer, t, what)
 end
 
 """
-Start a tool: with `show`, a Form docked in the main window's right-hand
-column (replacing the view controls or another tool), or `nothing` (with a
-message) if this tool is already open. Without `show` (tests), a Form in a
-figure of its own that is never displayed. Returns the figure and the Form.
+Start a tool: an empty Form docked in the main window's right-hand column
+(replacing the view controls or another tool), or `nothing` (with a
+message) if this tool is already open.
 """
-function new_dialog(v::Viewer, key::Symbol, title::AbstractString, height::Integer; show::Bool,
-                    width::Integer=DIALOG_WIDTH)
-    if !show
-        fig = Makie.Figure(; size=(width, height), backgroundcolor=v.settings.background)
-        return fig, Form(Makie.GridLayout(fig[1, 1]; valign=:top, rowgap=6, width=width - 32), 0)
-    end
+function new_dialog(v::Viewer, key::Symbol, title::AbstractString; width::Integer=DIALOG_WIDTH)
     tool = get(v.dialogs, :tool, nothing)
     if tool !== nothing && tool.key === key
         v.status[] = "$title is already open on the right"
         return nothing
     end
     subject = haskey(STRUCTURE_TOOLS, key) ? tab_label(v, v.active) : nothing   # the tab it works on
-    return v.figure, dock_tool!(v, title, width - 32; subject)
+    return dock_tool!(v, title, width - 32; subject)
 end
 
 """
@@ -118,34 +112,25 @@ function wrap_labels!(f::Form, width::Real, labelwidth::Real)
     end
 end
 
-"""Finish a tool's form; a docked tool becomes the open tool of the viewer."""
-function finish_dialog!(v::Viewer, key::Symbol, title::AbstractString, fig, f::Form; show::Bool,
-                        labelwidth::Real=0.4)
-    # A tool built off-screen keeps a status line of its own.
-    show || Makie.Label(f.g[nextrow!(f), 1:2], v.status; halign=:left, fontsize=12,
-                        color=Makie.lift(status_color, v.status), word_wrap=true,
-                        width=fig.scene.viewport[].widths[1] - 40)
+"""Finish a tool's form; it becomes the open tool of the viewer."""
+function finish_dialog!(v::Viewer, key::Symbol, title::AbstractString, f::Form; labelwidth::Real=0.4)
     Makie.colsize!(f.g, 1, Makie.Relative(labelwidth))
     Makie.colsize!(f.g, 2, Makie.Auto(false))     # take the remaining width, not the widest item
-    if show
-        wrap_labels!(f, f.g.width[], labelwidth)  # long lines wrap instead of widening the column
-        append!(v.textboxes, f.boxes)             # keyboard shortcuts pause while typing in them
-        v.dialogs[:tool] = (; key, title, layout=f.g, boxes=f.boxes)
-    end
+    wrap_labels!(f, f.g.width[], labelwidth)      # long lines wrap instead of widening the column
+    append!(v.textboxes, f.boxes)                 # keyboard shortcuts pause while typing in them
+    v.dialogs[:tool] = (; key, title, layout=f.g, boxes=f.boxes)
 end
 
 # ---------------------------------------------------------------------------
 
 """
-    surface_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    surface_dialog(viewer) -> NamedTuple of the tool's controls
 
-Open the Build surface tool for `viewer`. With `show=false` the figure is
-built but not displayed (for tests).
+Open the Build surface tool for `viewer`.
 """
-function surface_dialog(v::Viewer; show::Bool=true)
-    d = new_dialog(v, :surface, "Build surface", 640; show)
-    d === nothing && return nothing
-    fig, f = d
+function surface_dialog(v::Viewer)
+    f = new_dialog(v, :surface, "Build surface")
+    f === nothing && return nothing
 
     heading!(f, "Cleave surface (current structure)")
     hkl = field!(f, "Plane  h k l", "0 0 1", s -> is_int3(s) && !iszero(parse3(Int, s)))
@@ -190,23 +175,22 @@ function surface_dialog(v::Viewer; show::Bool=true)
         end
     end
 
-    finish_dialog!(v, :surface, "Build surface", fig, f; show)
-    return (; figure=fig, hkl, layers, vacuum, shift, build_slab, bfile, ab, strain, build_sl)
+    finish_dialog!(v, :surface, "Build surface", f)
+    return (; hkl, layers, vacuum, shift, build_slab, bfile, ab, strain, build_sl)
 end
 
 # ---------------------------------------------------------------------------
 
 """
-    export_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    export_dialog(viewer) -> NamedTuple of the tool's controls
 
 Open the Export tool: choose a format, folder and name, k-point spacing
 (the resulting mesh for the current structure is shown) and, for Quantum
 ESPRESSO, the cutoff and pseudopotential file pattern.
 """
-function export_dialog(v::Viewer; show::Bool=true)
-    d = new_dialog(v, :export, "Export", 640; show)
-    d === nothing && return nothing
-    fig, f = d
+function export_dialog(v::Viewer)
+    f = new_dialog(v, :export, "Export")
+    f === nothing && return nothing
 
     heading!(f, "Export current structure")
     r = nextrow!(f)
@@ -253,8 +237,8 @@ function export_dialog(v::Viewer; show::Bool=true)
         end
     end
 
-    finish_dialog!(v, :export, "Export", fig, f; show)
-    return (; figure=fig, format, folder, name, kspacing, mesh, ecut, pseudo, go)
+    finish_dialog!(v, :export, "Export", f)
+    return (; format, folder, name, kspacing, mesh, ecut, pseudo, go)
 end
 
 # ---------------------------------------------------------------------------
@@ -278,17 +262,16 @@ function settext!(t, s::AbstractString)
 end
 
 """
-    atoms_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    atoms_dialog(viewer) -> NamedTuple of the tool's controls
 
 Edit atoms tool. Selected atoms: change the element (all selected atoms)
 and, for a single atom, set its position (fractional or Cartesian Å; for an
 image atom, ′, the position of that copy). Replace species: change every atom
 of one element into another. All changes are undoable.
 """
-function atoms_dialog(v::Viewer; show::Bool=true)
-    d = new_dialog(v, :atoms, "Edit atoms", 560; show)
-    d === nothing && return nothing
-    fig, f = d
+function atoms_dialog(v::Viewer)
+    f = new_dialog(v, :atoms, "Edit atoms")
+    f === nothing && return nothing
 
     heading!(f, "Selected atoms")
     who = Makie.Observable("")
@@ -388,8 +371,8 @@ function atoms_dialog(v::Viewer; show::Bool=true)
               keep_selection=true)
     end
 
-    finish_dialog!(v, :atoms, "Edit atoms", fig, f; show)
-    return (; figure=fig, who, element, mode, coords, apply, from, to, count_text, replace_all)
+    finish_dialog!(v, :atoms, "Edit atoms", f)
+    return (; who, element, mode, coords, apply, from, to, count_text, replace_all)
 end
 
 # ---------------------------------------------------------------------------
@@ -421,17 +404,16 @@ function supercell_preview(c::Crystal, P)
 end
 
 """
-    supercell_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    supercell_dialog(viewer) -> NamedTuple of the tool's controls
 
 Supercell tool: repeat the cell n1 × n2 × n3, or give the new cell vectors
 a′ b′ c′ as integer combinations of a, b, c (e.g. a′ = 1 1 0, b′ = -1 1 0 for
 √2×√2 R45°). Presets fill in common rotated cells. A preview shows the atom
 count and the new cell; Create replaces the structure (undoable).
 """
-function supercell_dialog(v::Viewer; show::Bool=true)
-    d = new_dialog(v, :supercell, "Supercell", 520; show)
-    d === nothing && return nothing
-    fig, f = d
+function supercell_dialog(v::Viewer)
+    f = new_dialog(v, :supercell, "Supercell")
+    f === nothing && return nothing
     heading!(f, "Supercell of the current cell")
     r = nextrow!(f)
     Makie.Label(f.g[r, 1], "Type"; halign=:left, fontsize=PANEL_FONTSIZE)
@@ -470,8 +452,8 @@ function supercell_dialog(v::Viewer; show::Bool=true)
                "make supercell a′ b′ c′ = " * join(("($(join(P[:, k], " ")))" for k in 1:3), " ")
         build!(c -> supercell(c, P), v, what)
     end
-    finish_dialog!(v, :supercell, "Supercell", fig, f; show)
-    return (; figure=fig, preset, repeats, vecs, preview, create)
+    finish_dialog!(v, :supercell, "Supercell", f)
+    return (; preset, repeats, vecs, preview, create)
 end
 
 # ---------------------------------------------------------------------------
@@ -498,7 +480,7 @@ function shift_preview(c::Crystal, x, fractional::Bool, atoms, wrap_after::Bool)
 end
 
 """
-    shift_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    shift_dialog(viewer) -> NamedTuple of the tool's controls
 
 Shift atoms tool: translate all atoms (or the selected ones) by a vector in
 fractional or Cartesian coordinates, optionally wrapping them into the cell
@@ -506,10 +488,9 @@ afterwards; "Selected atom → origin" fills in the shift that puts the selected
 atom at (0, 0, 0). A second section wraps atoms that are outside the cell back
 in by whole lattice vectors. Both are undoable.
 """
-function shift_dialog(v::Viewer; show::Bool=true)
-    d = new_dialog(v, :shift, "Shift atoms", 600; show)
-    d === nothing && return nothing
-    fig, f = d
+function shift_dialog(v::Viewer)
+    f = new_dialog(v, :shift, "Shift atoms")
+    f === nothing && return nothing
     heading!(f, "Shift atoms by a vector")
     menu_row(label, options, i) = (r = nextrow!(f);
         Makie.Label(f.g[r, 1], label; halign=:left, fontsize=PANEL_FONTSIZE);
@@ -573,8 +554,8 @@ function shift_dialog(v::Viewer; show::Bool=true)
         shift_atoms!(v, x; fractional=fractional(), atoms, wrap_after=wrap_toggle.active[])
     end
     Makie.on(_ -> wrap_atoms!(v; atoms=selected()), wrap_button.clicks)
-    finish_dialog!(v, :shift, "Shift atoms", fig, f; show)
-    return (; figure=fig, coords, vector, atoms=atoms_menu, wrap=wrap_toggle, origin, preview, apply,
+    finish_dialog!(v, :shift, "Shift atoms", f)
+    return (; coords, vector, atoms=atoms_menu, wrap=wrap_toggle, origin, preview, apply,
             outside, wrap_button)
 end
 
@@ -664,7 +645,7 @@ function rotate_preview(c::Crystal, r, wrap_after::Bool)
 end
 
 """
-    rotate_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    rotate_dialog(viewer) -> NamedTuple of the tool's controls
 
 Rotate atoms tool: turn all atoms (or the selected ones) by an angle about
 an axis (Cartesian, a lattice direction, the line through two selected atoms,
@@ -672,10 +653,9 @@ or the viewing direction) through a centre (the rotated atoms' centroid, the
 first selected atom, or a point). The cell is not rotated. A preview names
 the closest contact afterwards to catch overlaps. Undoable.
 """
-function rotate_dialog(v::Viewer; show::Bool=true)
-    d = new_dialog(v, :rotate, "Rotate atoms", 660; show)
-    d === nothing && return nothing
-    fig, f = d
+function rotate_dialog(v::Viewer)
+    f = new_dialog(v, :rotate, "Rotate atoms")
+    f === nothing && return nothing
     heading!(f, "Rotate atoms about an axis")
     menu_row(label, options, i) = (r = nextrow!(f);
         Makie.Label(f.g[r, 1], label; halign=:left, fontsize=PANEL_FONTSIZE);
@@ -713,8 +693,8 @@ function rotate_dialog(v::Viewer; show::Bool=true)
         iszero(mod(r.angle, 360)) && (v.status[] = "Enter an angle that is not a multiple of 360°"; return)
         rotate_atoms!(v, r.angle, r.axis; r.center, r.atoms, r.images, r.about, wrap_after=wrap_toggle.active[])
     end
-    finish_dialog!(v, :rotate, "Rotate atoms", fig, f; show)
-    return (; figure=fig, atoms=atoms_menu, axis_menu, axis, centre_menu, centre, angle, wrap=wrap_toggle,
+    finish_dialog!(v, :rotate, "Rotate atoms", f)
+    return (; atoms=atoms_menu, axis_menu, axis, centre_menu, centre, angle, wrap=wrap_toggle,
             preview, apply)
 end
 
@@ -773,17 +753,16 @@ function open_library!(v::Viewer, e::LibraryEntry; box::Union{Nothing,Real}=noth
 end
 
 """
-    library_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    library_dialog(viewer) -> NamedTuple of the tool's controls
 
 Structure library tool: choose crystals, molecules or all, pick a
 structure and see its formula, symmetry, cell and source (paper, database
 entry), then Open it in the main window.
 """
-function library_dialog(v::Viewer; show::Bool=true)
+function library_dialog(v::Viewer)
     width = 560
-    d = new_dialog(v, :library, "Structure library", 640; show, width)
-    d === nothing && return nothing
-    fig, f = d
+    f = new_dialog(v, :library, "Structure library"; width)
+    f === nothing && return nothing
     heading!(f, "Open a known structure")
     note!(f, "Crystals: Crystallography Open Database (published structures).\n" *
              "Molecules: experimental gas-phase geometries from the literature.")
@@ -820,8 +799,8 @@ function library_dialog(v::Viewer; show::Bool=true)
         boxed.active[] && (box === nothing || box <= 0) && (v.status[] = "Enter the vacuum in Å (a positive number)"; return)
         open_library!(v, e; box)
     end
-    finish_dialog!(v, :library, "Structure library", fig, f; show, labelwidth=0.22)
-    return (; figure=fig, kind, structure, entries, info, boxed, vacuum, open)
+    finish_dialog!(v, :library, "Structure library", f; labelwidth=0.22)
+    return (; kind, structure, entries, info, boxed, vacuum, open)
 end
 
 # ---------------------------------------------------------------------------
@@ -865,7 +844,7 @@ function atom_constraints_info(v::Viewer)
 end
 
 """
-    cell_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    cell_dialog(viewer) -> NamedTuple of the tool's controls
 
 Cell and constraints tool:
 - Cell: periodicity, lattice parameters, volume, density and vectors.
@@ -876,11 +855,10 @@ Cell and constraints tool:
 - Atom constraints: fix the fractional x, y, z of the selected atoms.
 All changes are undoable and are written by the exporters.
 """
-function cell_dialog(v::Viewer; show::Bool=true)
+function cell_dialog(v::Viewer)
     width = 560
-    d = new_dialog(v, :cell, "Cell and constraints", 900; show, width)
-    d === nothing && return nothing
-    fig, f = d
+    f = new_dialog(v, :cell, "Cell and constraints"; width)
+    f === nothing && return nothing
     small_label(obs) = Makie.Label(f.g[nextrow!(f), 1:2], obs; halign=:left, fontsize=13, color=:gray25,
                                    justification=:left)
     heading!(f, "Cell")
@@ -970,8 +948,8 @@ function cell_dialog(v::Viewer; show::Bool=true)
     Makie.on(_ -> fix_selected!(v, Tuple(t.active[] for t in axis_toggles)), fix.clicks)
     Makie.on(_ -> free_selected!(v), free.clicks)
     Makie.on(_ -> free_all_atoms!(v), free_all.clicks)
-    finish_dialog!(v, :cell, "Cell and constraints", fig, f; show, labelwidth=0.25)
-    return (; figure=fig, info, vacuum, cubic, box, preset, lengths, angles, cell_preview, apply_cell, atoms_info,
+    finish_dialog!(v, :cell, "Cell and constraints", f; labelwidth=0.25)
+    return (; info, vacuum, cubic, box, preset, lengths, angles, cell_preview, apply_cell, atoms_info,
             axis_toggles, fix, free, free_all)
 end
 
@@ -1031,7 +1009,7 @@ function bridge_preview(v::Viewer, element, offset, flip)
 end
 
 """
-    bridge_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    bridge_dialog(viewer) -> NamedTuple of the tool's controls
 
 Oxygen bridge tool: select three atoms in the main window (the bond's two
 atoms, then a third). The bridging atom (O by default) goes at the bond's
@@ -1039,11 +1017,10 @@ middle plus an offset v perpendicular to the bond, in the plane of the three
 atoms, towards the third (inside the triangle), or with "Other side" at −v.
 "Flip last bridge" moves the bridge just added to the other side. Undoable.
 """
-function bridge_dialog(v::Viewer; show::Bool=true)
+function bridge_dialog(v::Viewer)
     width = 520
-    d = new_dialog(v, :bridge_tool, "Oxygen bridge", 560; show, width)
-    d === nothing && return nothing
-    fig, f = d
+    f = new_dialog(v, :bridge_tool, "Oxygen bridge"; width)
+    f === nothing && return nothing
     heading!(f, "Bridge a bond with oxygen")
     note!(f, "Select three atoms (Shift+click): the first two are the bond, the third\n" *
              "sets the plane and the side. The atom goes to the bond's middle, moved by\n" *
@@ -1081,6 +1058,6 @@ function bridge_dialog(v::Viewer; show::Bool=true)
         add_bridge!(v; element=known_element(el), offset=x, flip=flip.active[])
     end
     Makie.on(_ -> flip_bridge!(v), flip_last.clicks)
-    finish_dialog!(v, :bridge_tool, "Oxygen bridge", fig, f; show, labelwidth=0.42)
-    return (; figure=fig, element, offset, flip, preview, add, flip_last)
+    finish_dialog!(v, :bridge_tool, "Oxygen bridge", f; labelwidth=0.42)
+    return (; element, offset, flip, preview, add, flip_last)
 end

@@ -112,9 +112,9 @@ end
 Save to the current file, or open Save as when there is none (or it should
 not be overwritten).
 """
-function save!(v::Viewer; show::Bool=true)
+function save!(v::Viewer)
     v.path !== nothing && save_in_place(v.path) && return save_to!(v, v.path)
-    return save_dialog(v; show)
+    return save_dialog(v)
 end
 
 """Select every atom of the structure (Ctrl+A)."""
@@ -134,17 +134,16 @@ function parse_abc(s)
 end
 
 """
-    new_structure_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
+    new_structure_dialog(viewer) -> NamedTuple of the tool's controls
 
 New structure tool: an empty cell (a b c, α β γ) to fill with Add, or a
 prototype (diamond, zincblende, rocksalt, wurtzite, perovskite, ...) with
 your elements and lattice constants. The new structure opens in a new tab
 and is not saved until File → Save.
 """
-function new_structure_dialog(v::Viewer; show::Bool=true)
-    d = new_dialog(v, :new, "New structure", 470; show)
-    d === nothing && return nothing
-    fig, f = d
+function new_structure_dialog(v::Viewer)
+    f = new_dialog(v, :new, "New structure")
+    f === nothing && return nothing
     heading!(f, "New structure")
     r = nextrow!(f)
     Makie.Label(f.g[r, 1], "Start from"; halign=:left, fontsize=PANEL_FONTSIZE)
@@ -183,8 +182,8 @@ function new_structure_dialog(v::Viewer; show::Bool=true)
         kind === :general && ang === nothing && (v.status[] = "Enter the angles α β γ in degrees"; return)
         create_structure!(v, name, els, lat, something(ang, [90.0, 90, 90]); title=shown_text(title))
     end
-    finish_dialog!(v, :new, "New structure", fig, f; show, labelwidth=0.3)
-    return (; figure=fig, proto, elements, abc, angles, title, create)
+    finish_dialog!(v, :new, "New structure", f; labelwidth=0.3)
+    return (; proto, elements, abc, angles, title, create)
 end
 
 """A new, unsaved structure in a new tab (or in place of an untouched empty cell)."""
