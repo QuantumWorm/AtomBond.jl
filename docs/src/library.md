@@ -14,7 +14,7 @@ Untitled until saved, so Save never writes into the library. In code:
 | Group IV | Si, diamond, Si0.5Ge0.5 (ordered model) | COD (Hom et al. 1975 precision lattice constants; Dismukes 1964 for SiGe) |
 | III–V | GaAs, AlAs, InAs, GaP, AlP, InP, GaSb, AlSb, InSb (zincblende); GaN, AlN, InN (wurtzite) | 300 K lattice constants from Vurgaftman, Meyer, Ram-Mohan, *J. Appl. Phys.* 89, 5815 (2001); wurtzite u from Paszkowicz et al. (2003, 2004) |
 | Oxides | α-quartz SiO₂, corundum Al₂O₃, monoclinic HfO₂ and ZrO₂, rutile and anatase TiO₂, ZnO, MgO, β-Ga₂O₃, SrTiO₃ | COD (published refinements, listed per entry) |
-| Molecules | 53 diatomic, small, organic and process-gas molecules, including etch and dopant gases (H₂O, CH₄, SiH₄, SF₆, BCl₃, GeH₄, …) | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
+| Molecules | 69 diatomic, small, organic and process-gas molecules, etch and dopant gases and ALD/CVD precursors (H₂O, CH₄, SiH₄, SF₆, BCl₃, GeH₄, TMA, WF₆, TiCl₄, …) | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
 
 - **Crystals** are CIFs from the
   [Crystallography Open Database](https://www.crystallography.net), stored as

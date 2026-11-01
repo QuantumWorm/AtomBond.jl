@@ -1,0 +1,15 @@
+13
+Tungsten hexacarbonyl W(CO)6, experimental geometry (S. P. Arnesen, H. M. Seip, Studies on the failure of the first Born approximation in electron diffraction. V. Molybdenum- and tungsten hexacarbonyl, Acta Chem. Scand. 20, 2711 (1966))
+W      0.0000     0.0000     0.0000
+C      2.0586     0.0000     0.0000
+C     -2.0586     0.0000     0.0000
+C      0.0000     2.0586     0.0000
+C      0.0000    -2.0586     0.0000
+C      0.0000     0.0000     2.0586
+C      0.0000     0.0000    -2.0586
+O      3.2066     0.0000     0.0000
+O     -3.2066     0.0000     0.0000
+O      0.0000     3.2066     0.0000
+O      0.0000    -3.2066     0.0000
+O      0.0000     0.0000     3.2066
+O      0.0000     0.0000    -3.2066

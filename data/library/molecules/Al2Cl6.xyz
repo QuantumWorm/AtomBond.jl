@@ -1,0 +1,10 @@
+8
+Aluminium chloride dimer Al2Cl6, experimental geometry (K. Aarset, Q. Shen, H. Thomassen, A. D. Richardson, K. Hedberg, Molecular structure of the aluminum halides, Al2Cl6, AlCl3, Al2Br6, AlBr3, and AlI3, obtained by gas-phase electron-diffraction and ab initio molecular orbital calculations, J. Phys. Chem. A 103, 1644 (1999))
+Al     1.5910     0.0000    -0.0000
+Al    -1.5910     0.0000     0.0000
+Cl    -0.0000     0.0000    -1.5910
+Cl     0.0000     0.0000     1.5910
+Cl     2.5886     1.8035    -0.0000
+Cl     2.5886    -1.8035    -0.0000
+Cl    -2.5886     1.8035     0.0000
+Cl    -2.5886    -1.8035     0.0000

@@ -1,0 +1,11 @@
+9
+Nickel tetracarbonyl Ni(CO)4, experimental geometry (L. Hedberg, T. Iijima, K. Hedberg, Nickel tetracarbonyl, Ni(CO)4. I. Molecular structure by gaseous electron diffraction. II. Refinement of quadratic force field, J. Chem. Phys. 70, 3224 (1979))
+Ni     0.0000     0.0000     0.0000
+C      0.0000     1.5007     1.0612
+C      1.5007     0.0000    -1.0612
+C     -1.5007    -0.0000    -1.0612
+C     -0.0000    -1.5007     1.0612
+O      0.0000     2.4323     1.7199
+O      2.4323    -0.0000    -1.7199
+O     -2.4323     0.0000    -1.7199
+O     -0.0000    -2.4323     1.7199

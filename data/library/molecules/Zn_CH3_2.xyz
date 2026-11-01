@@ -1,0 +1,11 @@
+9
+Dimethylzinc Zn(CH3)2, experimental geometry (A. Almenningen, T. U. Helgaker, A. Haaland, S. Samdal, The molecular structures of dimethyl-, diethyl- and dipropylzinc determined by gas phase electron diffraction. Normal coordinate analysis and ab initio molecular orbital calculations on dimethylzinc, Acta Chem. Scand. A 36, 159 (1982))
+Zn     0.0000     0.0000     0.0000
+C      1.9300     0.0000     0.0000
+C     -1.9300     0.0000     0.0000
+H      2.3510     0.7915     0.6374
+H      2.3510    -0.9478     0.3667
+H      2.3510     0.1563    -1.0042
+H     -2.3510     0.9478    -0.3667
+H     -2.3510    -0.7915    -0.6374
+H     -2.3510    -0.1563     1.0042

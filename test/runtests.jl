@@ -1268,13 +1268,15 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
     @testset "structure library" begin
         lib = structure_library()
-        @test length(lib) == 78 && [e.category for e in lib] == [fill("Group IV", 3); fill("III-V", 12); fill("Oxides", 10);
+        @test length(lib) == 94 && [e.category for e in lib] == [fill("Group IV", 3); fill("III-V", 12); fill("Oxides", 10);
                 fill("Diatomic molecules", 11); fill("Small molecules", 10); fill("Organic molecules", 9);
-                fill("Process gases and precursors", 23)]
+                fill("Process gases and precursors", 22); fill("ALD/CVD precursors", 17)]
         @test [e.name for e in lib[[1, 2, 3, 26, end]]] == ["Silicon", "Diamond", "Silicon-germanium Si0.5Ge0.5",
-                                                             "Hydrogen", "Arsenic trifluoride"]
+                                                             "Hydrogen", "Hexachlorodisilane"]
         # every molecule: the atoms of its formula, all connected by bonds, point group given
-        natoms_of(f) = sum((isempty(m[1]) ? 1 : parse(Int, m[1]) for m in eachmatch(r"[A-Z][a-z]?(\d*)", f)); init=0)
+        count_atoms(f) = sum((isempty(m[1]) ? 1 : parse(Int, m[1]) for m in eachmatch(r"[A-Z][a-z]?(\d*)", f)); init=0)
+        natoms_of(f) = count_atoms(replace(f, r"\(([^()]*)\)(\d*)" =>                 # Al(CH3)3 = Al C3 H9
+                                           s -> (m = match(r"\(([^()]*)\)(\d*)", s); repeat(m[1], parse(Int, m[2])))))
         for e in structure_library(; kind=:molecule)
             c = load_library(e)
             n = natoms(c)
@@ -1302,7 +1304,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test lattice_parameters(load_library("GaAs").lattice)[1] == 5.65325
         @test lattice_parameters(load_library("InSb").lattice)[1] == 6.4794
         @test all(e -> isfile(e.file) && !isempty(e.source) && !isempty(e.reference), lib)
-        @test length(structure_library(; kind=:molecule)) == 53
+        @test length(structure_library(; kind=:molecule)) == 69
         # crystals: published lattice constants and symmetry
         si = load_library("Silicon")
         @test si.title == "Silicon" && formula(si) == "Si8" && spacegroup(si)[1] == 227
@@ -1335,6 +1337,19 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test isapprox(AtomBond.bond_angle(clf3[2], clf3[1], clf3[3]), 87.483; atol=0.01) &&
               maximum(abs(p[3] - clf3[1][3]) for p in clf3) < 1e-6            # planar T shape
         @test occursin("r_g", library_entry("BCl3").note) && occursin("CCSD(T)", library_entry("CH3F").note)
+        # precursors: metal alkyls and carbonyls
+        tma2 = load_library("Al2(CH3)6")
+        @test formula(tma2) == "Al2C6H18" && isapprox(bond(tma2, 1, 2), 2.619; atol=1e-3) &&
+              isapprox(bond(tma2, 1, 3), 2.140; atol=1e-3)
+        w6 = load_library("W(CO)6")
+        @test natoms(w6) == 13 && all(isapprox(bond(w6, 1, k), 2.0586; atol=1e-3) for k in 2:7)
+        @test isapprox(bond(load_library("Trimethylindium"), 1, 2), 2.161; atol=1e-3)
+        al2cl6 = load_library("Al2Cl6")
+        @test isapprox(bond(al2cl6, 1, 3), 2.250; atol=1e-3) && isapprox(bond(al2cl6, 1, 5), 2.061; atol=1e-3) &&
+              isapprox(bond(al2cl6, 1, 2), 2.250 * sqrt(2); atol=1e-3)            # square Al2Cl2 ring
+        sihcl3 = load_library("SiHCl3")
+        @test isapprox(bond(sihcl3, 1, 2), 2.0118; atol=1e-3) && isapprox(bond(sihcl3, 1, 5), 1.4655; atol=1e-3)
+        @test isapprox(bond(load_library("TiCl4"), 1, 2), 2.185; atol=1e-3) && occursin("Kimura", library_entry("TiCl4").reference)
         @test_throws ArgumentError load_library("Unobtainium")
         # your own library is added after the built-in one
         withenv("ATOMBOND_HOME" => mktempdir()) do
@@ -1344,7 +1359,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
                                                  "formula = \"NaCl\"\nfile = \"NaCl.vasp\"\nsource = \"my file\"\n")
             @test structure_library()[end].name == "Rock salt" && formula(load_library("Rock salt")) == "Na4Cl4"
         end
-        @test length(structure_library()) == 78
+        @test length(structure_library()) == 94
 
         # Window
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
@@ -1353,7 +1368,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         d = AtomBond.library_dialog(v)
         @test startswith(d.info[], "Si, 8 atoms in the cell, Fd-3m (227)") && occursin("COD 9011998", d.info[])
         d.kind.i_selected[] = 3                                       # molecules
-        @test length(d.entries[]) == 53 && startswith(d.info[], "H2, 2 atoms")
+        @test length(d.entries[]) == 69 && startswith(d.info[], "H2, 2 atoms")
         d.structure.i_selected[] = findfirst(e -> e.name == "Methanol", d.entries[])
         @test occursin("Venkateswarlu", d.info[])
         d.open.clicks[] = 1

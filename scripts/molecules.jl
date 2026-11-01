@@ -106,6 +106,71 @@ end
 """Octahedral XY6 (Oh) with bond length r."""
 octahedron(x, y, r) = ([x; fill(y, 6)], [[0.0, 0, 0], ([s * r * (1:3 .== k) for k in 1:3 for s in (1, -1)])...])
 
+"""
+Hydrogens of a C3v methyl group on carbon `c` bonded to `m`: C–H `r`, angle
+m–C–H `β`, and the first H at torsion `τ` (degrees) from the direction `ref`.
+"""
+function methyl_h(m, c, ref, r, β, τ)
+    u = normalize(c - m)
+    e1 = normalize(ref - dot(ref, u) * u)
+    e2 = cross(u, e1)
+    return [c + r * (-cosd(β) * u + sind(β) * (cosd(τ + 120k) * e1 + sind(τ + 120k) * e2)) for k in 0:2]
+end
+
+"""
+Planar M(CH3)3 (C3h): M–C `rmc`, C–H `rch`, angle M–C–H `β`; one C–H of each
+methyl lies in the MC3 plane, pointing away from the next methyl.
+"""
+function trimethyl(x, rmc, rch, β)
+    cs = [rmc * [cos(2π * k / 3), sin(2π * k / 3), 0.0] for k in 0:2]
+    hs = [h for k in 1:3 for h in methyl_h([0.0, 0, 0], cs[k], cs[mod1(k + 1, 3)], rch, β, 180.0)]
+    return [x; fill("C", 3); fill("H", 9)], [[[0.0, 0, 0]]; cs; hs]
+end
+
+"""Linear M(CH3)2 with staggered methyl groups (D3d)."""
+function dimethyl(x, rmc, rch, β)
+    c1, c2 = [0.0, 0, rmc], [0.0, 0, -rmc]
+    hs = [methyl_h([0.0, 0, 0], c1, [1.0, 0, 0], rch, β, 0.0); methyl_h([0.0, 0, 0], c2, [1.0, 0, 0], rch, β, 60.0)]
+    return [x, "C", "C", fill("H", 6)...], [[[0.0, 0, 0], c1, c2]; hs]
+end
+
+"""Metal carbonyl M(CO)n, n = 4 (tetrahedral) or 6 (octahedral), with M–C and C–O."""
+function carbonyl(x, n, rmc, rco)
+    dirs = n == 4 ? normalize.([[1.0, 1, 1], [1.0, -1, -1], [-1.0, 1, -1], [-1.0, -1, 1]]) :
+                    [Float64.(s * (1:3 .== k)) for k in 1:3 for s in (1, -1)]
+    return [x; fill("C", n); fill("O", n)], [[[0.0, 0, 0]]; [rmc * d for d in dirs]; [(rmc + rco) * d for d in dirs]]
+end
+
+"""
+Methyl-bridged M2(CH3)6 (trimethylaluminium dimer): M–M, terminal and bridging
+M–C, terminal C–M–C angle, C–H and M–C–H (also used, as the angle to the
+outward axis, for the bridging methyls). Terminal methyls staggered with
+respect to the other bonds of their metal; bridging methyls with one C–H in
+the plane through both carbons perpendicular to M–M.
+"""
+function bridged_trimethyl_dimer(x, rmm, rt, rb, θt, rch, β)
+    ms = [[rmm / 2, 0, 0], [-rmm / 2, 0, 0]]
+    yb = sqrt(rb^2 - (rmm / 2)^2)
+    cb = [[0.0, yb, 0], [0.0, -yb, 0]]
+    ct = [[sg * (rmm / 2 + rt * cosd(θt / 2)), 0.0, t * rt * sind(θt / 2)] for sg in (1, -1) for t in (1, -1)]
+    other = [ct[2], ct[1], ct[4], ct[3]]                      # the other terminal carbon on the same metal
+    ht = [h for k in 1:4 for h in methyl_h(ms[(k + 1) ÷ 2], ct[k], other[k] - ms[(k + 1) ÷ 2], rch, β, 180.0)]
+    hb = [h for c in cb for h in methyl_h(-c, c, [0.0, 0, 1], rch, β, 0.0)]  # axis outward from the M2 centre
+    return [x, x, fill("C", 6)..., fill("H", 18)...], [ms; cb; ct; ht; hb]
+end
+
+"""
+Halogen-bridged M2X6 (Al2Cl6 type, D2h): bridging and terminal M–X, X(b)–M–X(b)
+and X(t)–M–X(t) angles. The M2X2 ring lies in the xy plane.
+"""
+function bridged_halide_dimer(x, y, rb, φb, rt, θt)
+    a = rb * cosd(φb / 2)
+    ms = [[a, 0.0, 0], [-a, 0.0, 0]]
+    xb = [[0.0, rb * sind(φb / 2), 0], [0.0, -rb * sind(φb / 2), 0]]
+    xt = [[sg * (a + rt * cosd(θt / 2)), 0.0, t * rt * sind(θt / 2)] for sg in (1, -1) for t in (1, -1)]
+    return [x, x, fill(y, 6)...], [ms; xb; xt]
+end
+
 # --- references --------------------------------------------------------------------------
 
 const HUBER_HERZBERG = ("K. P. Huber, G. Herzberg, Molecular Spectra and Molecular Structure IV. Constants of " *
@@ -262,11 +327,6 @@ const MOLECULES = [
             "NF3, J. Mol. Spectrosc. 179, 219 (1996)", "10.1006/jmsp.1996.0199"), KUCHITSU]),
     (name="Carbon tetrafluoride", formula="CF4", category="Process gases and precursors", pg="Td",
      geometry=tetrahedron("C", "F", 1.3151), refs=[KUCHITSU]),
-    (name="Titanium tetrachloride", formula="TiCl4", category="Process gases and precursors", pg="Td",
-     geometry=tetrahedron("Ti", "Cl", 2.1701),
-     refs=[("Y. Morino, H. Uehara, Vibronic interactions in vanadium tetrachloride by gas electron diffraction, " *
-            "J. Chem. Phys. 45, 4543 (1966)", "10.1063/1.1727535")],
-     note="The cited electron-diffraction study is of VCl4; check that it reports this TiCl4 bond length."),
     # Etch and dopant gases
     (name="Boron trifluoride", formula="BF3", category="Process gases and precursors", pg="D3h",
      geometry=planar_xy3("B", "F", 1.30731),
@@ -328,6 +388,106 @@ const MOLECULES = [
      geometry=pyramid("As", "F", 1.7041, 95.767),
      refs=[("J. G. Smith, The anharmonic force field of arsenic trifluoride from the millimetre wave spectra of " *
             "vibrationally excited states, Mol. Phys. 35, 461 (1978)", "10.1080/00268977800100341")]),
+    # ALD/CVD precursors: metal alkyls and carbonyls
+    (name="Trimethylborane", formula="B(CH3)3", category="ALD/CVD precursors", pg="C3h",
+     geometry=trimethyl("B", 1.5783, 1.1138, 111.9),
+     refs=[("L. S. Bartell, B. L. Carroll, Electron-diffraction study of the structure of B(CH3)3, J. Chem. Phys. 42, " *
+            "3076 (1965)", "10.1063/1.1696383")],
+     note="Electron-diffraction mean distances. The methyl groups rotate freely; one orientation is chosen here " *
+          "(one C–H of each methyl in the BC3 plane) with C–B–C = 120°."),
+    (name="Trimethylaluminium", formula="Al(CH3)3", category="ALD/CVD precursors", pg="C3h",
+     geometry=trimethyl("Al", 1.957, 1.113, 111.7),
+     refs=[("A. Almenningen, S. Halvorsen, A. Haaland, A gas phase electron diffraction investigation of the " *
+            "molecular structures of trimethylaluminium monomer and dimer, Acta Chem. Scand. 25, 1937 (1971)",
+            "10.3891/acta.chem.scand.25-1937")],
+     note="The monomer (r_a). The methyl groups rotate freely; one orientation is chosen here (one C–H of each " *
+          "methyl in the AlC3 plane). At room temperature the vapour is mostly the dimer, Al2(CH3)6."),
+    (name="Trimethylaluminium dimer", formula="Al2(CH3)6", category="ALD/CVD precursors", pg="C2v",
+     geometry=bridged_trimethyl_dimer("Al", 2.619, 1.957, 2.140, 117.3, 1.117, 112.1),
+     refs=[("A. Almenningen, S. Halvorsen, A. Haaland, A gas phase electron diffraction investigation of the " *
+            "molecular structures of trimethylaluminium monomer and dimer, Acta Chem. Scand. 25, 1937 (1971)",
+            "10.3891/acta.chem.scand.25-1937")],
+     note="Electron diffraction (r_a): D2h Al2C6 skeleton with a mean C–H. The hydrogens follow the authors' model " *
+          "(terminal methyls staggered); the bridging methyls rotate freely and one orientation is chosen here."),
+    (name="Dimethylzinc", formula="Zn(CH3)2", category="ALD/CVD precursors", pg="D3d",
+     geometry=dimethyl("Zn", 1.930, 1.100, 112.5),
+     refs=[("A. Almenningen, T. U. Helgaker, A. Haaland, S. Samdal, The molecular structures of dimethyl-, diethyl- " *
+            "and dipropylzinc determined by gas phase electron diffraction. Normal coordinate analysis and ab initio " *
+            "molecular orbital calculations on dimethylzinc, Acta Chem. Scand. A 36, 159 (1982)",
+            "10.3891/acta.chem.scand.36a-0159")],
+     note="Electron diffraction (r_a). The methyl groups rotate freely; the staggered form is chosen here."),
+    (name="Trimethylindium", formula="In(CH3)3", category="ALD/CVD precursors", pg="C3h",
+     geometry=trimethyl("In", 2.161, 1.124, 109.8),
+     refs=[("T. Fjeldberg, A. Haaland, R. Seip, Q. Shen, J. Weidlein, The molecular structures of trimethylindium " *
+            "and trimethylthallium determined by gas electron diffraction, Acta Chem. Scand. A 36, 495 (1982)",
+            "10.3891/acta.chem.scand.36a-0495")],
+     note="Electron diffraction (r_a), the authors' model: planar InC3 and one C–H of each methyl in that plane."),
+    (name="Nickel tetracarbonyl", formula="Ni(CO)4", category="ALD/CVD precursors", pg="Td",
+     geometry=carbonyl("Ni", 4, 1.838, 1.141),
+     refs=[("L. Hedberg, T. Iijima, K. Hedberg, Nickel tetracarbonyl, Ni(CO)4. I. Molecular structure by gaseous " *
+            "electron diffraction. II. Refinement of quadratic force field, J. Chem. Phys. 70, 3224 (1979)",
+            "10.1063/1.437911")],
+     note="Electron-diffraction r_g. Highly toxic."),
+    (name="Molybdenum hexacarbonyl", formula="Mo(CO)6", category="ALD/CVD precursors", pg="Oh",
+     geometry=carbonyl("Mo", 6, 2.0632, 1.1450),
+     refs=[("S. P. Arnesen, H. M. Seip, Studies on the failure of the first Born approximation in electron " *
+            "diffraction. V. Molybdenum- and tungsten hexacarbonyl, Acta Chem. Scand. 20, 2711 (1966)",
+            "10.3891/acta.chem.scand.20-2711")],
+     note="Electron-diffraction r_g."),
+    (name="Tungsten hexacarbonyl", formula="W(CO)6", category="ALD/CVD precursors", pg="Oh",
+     geometry=carbonyl("W", 6, 2.0586, 1.1480),
+     refs=[("S. P. Arnesen, H. M. Seip, Studies on the failure of the first Born approximation in electron " *
+            "diffraction. V. Molybdenum- and tungsten hexacarbonyl, Acta Chem. Scand. 20, 2711 (1966)",
+            "10.3891/acta.chem.scand.20-2711")],
+     note="Electron-diffraction r_g."),
+    # ALD/CVD precursors: halides
+    (name="Titanium tetrachloride", formula="TiCl4", category="ALD/CVD precursors", pg="Td",
+     geometry=tetrahedron("Ti", "Cl", 2.185),
+     refs=[("M. Kimura, K. Kimura, M. Aoki, S. Shibata, Investigation on the molecular structures of titanium " *
+            "tetrachloride and zirconium tetrachloride by gas electron diffraction, Bull. Chem. Soc. Jpn. 29, 95 (1956)",
+            "10.1246/bcsj.29.95")],
+     note="Early electron-diffraction value (± 0.01 Å, distance type not stated)."),
+    (name="Zirconium tetrachloride", formula="ZrCl4", category="ALD/CVD precursors", pg="Td",
+     geometry=tetrahedron("Zr", "Cl", 2.32),
+     refs=[("M. Kimura, K. Kimura, M. Aoki, S. Shibata, Investigation on the molecular structures of titanium " *
+            "tetrachloride and zirconium tetrachloride by gas electron diffraction, Bull. Chem. Soc. Jpn. 29, 95 (1956)",
+            "10.1246/bcsj.29.95")],
+     note="Early electron-diffraction value (± 0.01 Å, distance type not stated)."),
+    (name="Tin tetrachloride", formula="SnCl4", category="ALD/CVD precursors", pg="Td",
+     geometry=tetrahedron("Sn", "Cl", 2.2808),
+     refs=[("H. Fujii, M. Kimura, The molecular structure of tin tetrachloride as determined by gas-electron " *
+            "diffraction, Bull. Chem. Soc. Jpn. 43, 1933 (1970)", "10.1246/bcsj.43.1933")],
+     note="Electron-diffraction r_g."),
+    (name="Molybdenum hexafluoride", formula="MoF6", category="ALD/CVD precursors", pg="Oh",
+     geometry=octahedron("Mo", "F", 1.820), refs=[("H. M. Seip, R. Seip, Studies on the failure of the first Born approximation in electron diffraction. " *
+            "IV. Molybdenum- and tungsten hexafluoride, Acta Chem. Scand. 20, 2698 (1966)",
+            "10.3891/acta.chem.scand.20-2698")], note="Electron-diffraction r_g."),
+    (name="Tungsten hexafluoride", formula="WF6", category="ALD/CVD precursors", pg="Oh",
+     geometry=octahedron("W", "F", 1.832), refs=[("H. M. Seip, R. Seip, Studies on the failure of the first Born approximation in electron diffraction. " *
+            "IV. Molybdenum- and tungsten hexafluoride, Acta Chem. Scand. 20, 2698 (1966)",
+            "10.3891/acta.chem.scand.20-2698")], note="Electron-diffraction r_g."),
+    (name="Tungsten hexachloride", formula="WCl6", category="ALD/CVD precursors", pg="Oh",
+     geometry=octahedron("W", "Cl", 2.281),
+     refs=[("A. Haaland, K.-G. Martinsen, S. Shlykov, The molecular structure of tungsten hexachloride by gas " *
+            "electron diffraction, Acta Chem. Scand. 46, 1208 (1992)", "10.3891/acta.chem.scand.46-1208")],
+     note="Electron-diffraction r_a."),
+    (name="Aluminium chloride dimer", formula="Al2Cl6", category="ALD/CVD precursors", pg="D2h",
+     geometry=bridged_halide_dimer("Al", "Cl", 2.250, 90.0, 2.061, 122.1),
+     refs=[("K. Aarset, Q. Shen, H. Thomassen, A. D. Richardson, K. Hedberg, Molecular structure of the aluminum " *
+            "halides, Al2Cl6, AlCl3, Al2Br6, AlBr3, and AlI3, obtained by gas-phase electron-diffraction and ab " *
+            "initio molecular orbital calculations, J. Phys. Chem. A 103, 1644 (1999)", "10.1021/jp9842042")],
+     note="Electron-diffraction r_g, planar Al2Cl2 ring (the thermal average is puckered); Cl(t)–Al–Cl(t) is " *
+          "known only to ± 3°."),
+    (name="Trichlorosilane", formula="SiHCl3", category="ALD/CVD precursors", pg="C3v",
+     geometry=xy3z("Si", "Cl", "H", 2.0118, 110.60, 1.4655),
+     refs=[("M. Mitzlaff, R. Holm, H. Hartmann, Mikrowellenspektrum, Struktur und Dipolmoment von Trichlorsilan " *
+            "und Methyltrichlorsilan, Z. Naturforsch. A 22, 1415 (1967)", "10.1515/zna-1967-0922")],
+     note="Substitution structure r_s from microwave spectra."),
+    (name="Hexachlorodisilane", formula="Si2Cl6", category="ALD/CVD precursors", pg="D3d",
+     geometry=staggered("Si", "Cl", 2.24, 2.01, 109.5),
+     refs=[("D. A. Swick, I. L. Karle, Structure and internal motion of C2F6 and Si2Cl6 vapors, J. Chem. Phys. 23, " *
+            "1499 (1955)", "10.1063/1.1742337")],
+     note="Early electron-diffraction structure of low precision (Si–Si ± 0.06 Å): relax before use."),
 ]
 
 """
