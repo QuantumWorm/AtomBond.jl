@@ -288,6 +288,8 @@ function menubar_items(v::Viewer, name::AbstractString)
     elseif name == "View"
         all_lengths = v.settings.bond_lengths === :all
         return [MenuItem("Reset view", () -> reset_camera!(v));
+                MenuItem("Turn view 90° counter-clockwise", () -> rotate_view!(v, 90); shortcut="↺");
+                MenuItem("Turn view 90° clockwise", () -> rotate_view!(v, -90); shortcut="↻");
                 SEPARATOR;
                 MenuItem(all_lengths ? "Label selected atoms only" : "Label all atoms and bonds",
                          () -> set_bond_lengths!(v, all_lengths ? :selected : :all));

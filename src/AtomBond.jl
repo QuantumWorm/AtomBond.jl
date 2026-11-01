@@ -102,7 +102,7 @@ export prototype_crystal, nanotube
 export bridge_position, add_bridge
 # render / gui
 export ViewSettings, DISPLAY_STYLES, draw_structure!
-export view_direction, view_along!, reset_camera!
+export view_direction, view_along!, rotate_view!, reset_camera!
 export Viewer, visualize, redraw!, set_crystal!, save_view, snapshot
 export select!, select_all!, clear_selection!, edit!, undo!, redo!, open_tool, close_tool!, click_feedback!
 export set_bond_lengths!, set_bond_angles!, set_dihedrals!, set_coordinates!, set_charge_labels!, set_magmom_labels!, set_bond_length_labels!

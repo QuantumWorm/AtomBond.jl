@@ -103,6 +103,30 @@ function view_direction(L::Lattice, which)
     throw(ArgumentError("unknown view preset $which"))
 end
 
+"""
+    rotate_view!(lscene, angle)
+
+Turn the picture by `angle` degrees in the screen plane (counter-clockwise
+for a positive angle) about the line of sight: the viewing direction stays
+the same, only the up direction of the camera changes. Useful after a view
+along an axis, to put another axis horizontal or vertical.
+"""
+function rotate_view!(lscene, angle::Real)
+    cam = camera(lscene)
+    eye, lookat = Vec3(cam.eyeposition[]), Vec3(cam.lookat[])
+    d = normalize(eye - lookat)                         # toward the viewer
+    up = Vec3(cam.upvector[])
+    up = up - dot(up, d) * d                            # the part in the screen plane
+    norm(up) < 1e-9 && (up = abs(d[3]) < 0.9 ? Vec3(0, 0, 1) - d[3] * d : Vec3(0, 1, 0) - d[2] * d)
+    up = normalize(up)
+    # The picture turns counter-clockwise when the camera's up vector turns
+    # clockwise about the line of sight (Rodrigues rotation by -angle about d).
+    θ = -deg2rad(angle)
+    new = up * cos(θ) + cross(d, up) * sin(θ)
+    Makie.update_cam!(lscene.scene, cam, Vec3f(eye), Vec3f(lookat), Vec3f(new))
+    return cam
+end
+
 """Apply a preset from [`view_direction`](@ref)."""
 function view_along!(lscene, dm::DisplayModel, vs::ViewSettings, which)
     dir, up = view_direction(dm.crystal.lattice, which)

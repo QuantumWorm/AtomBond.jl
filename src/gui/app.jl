@@ -93,6 +93,7 @@ function header_text(c::Crystal)
 end
 
 view_along!(v::Viewer, which) = view_along!(v.lscene, v.display, v.settings, which)
+rotate_view!(v::Viewer, angle::Real) = (rotate_view!(v.lscene, angle); v)
 reset_camera!(v::Viewer) = reset_camera!(v.lscene, v.display, v.settings)
 
 """

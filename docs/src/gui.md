@@ -33,7 +33,7 @@ repeats also by x (`2x2x1`).
 | File | New structure… (Ctrl+N), Open… (Ctrl+O), Structure library… (Ctrl+L), Close tab (Ctrl+W), recent files, Save (Ctrl+S), Save as… (Ctrl+Shift+S), Export DFT inputs…, Save image…, Exit (Ctrl+Q) |
 | Edit | Undo / Redo (named after the step), Select all (Ctrl+A), Clear selection, Delete selected atoms, Edit atoms… |
 | Build | New structure…, From library…, Cell and constraints…, Supercell…, Surface / superlattice…, Shift atoms…, Rotate atoms…, Oxygen bridge…, Wrap atoms into cell, Primitive / Conventional cell, Original structure |
-| View | Reset view, Label all atoms and bonds / selected atoms only, Show / Hide bond lengths, bond angles, dihedral angles, atom charges, magnetic moments, atom coordinates, Coordinates: fractional / Cartesian, view along a, b, c, a*, b*, c* |
+| View | Reset view, Turn view 90° counter-clockwise / clockwise, Label all atoms and bonds / selected atoms only, Show / Hide bond lengths, bond angles, dihedral angles, atom charges, magnetic moments, atom coordinates, Coordinates: fractional / Cartesian, view along a, b, c, a*, b*, c* |
 
 The current file is shown at the right of the menu bar, with "modified"
 after unsaved changes.
@@ -44,7 +44,11 @@ The right-hand panel sets the display style (ball and stick, CPK, stick,
 line), switches bonds, bond stubs (half-bonds to atoms outside the cell),
 boundary atoms, the unit cell, atom labels and the axes, and sizes atoms and
 bonds. *View along* aims the camera along a, b, c, a\*, b\*, c\* or any
-[u v w]; *Orthographic* switches the projection. The *Cell* and *Edit selected
+[u v w]. The line of sight alone leaves the picture free to turn about it:
+↺ 90° and ↻ 90° (also in the View menu) turn the view in the screen plane, and
+*Turn* by any angle (positive is counter-clockwise), e.g. to put a chosen axis
+horizontal; the axes in the corner turn with it. In code:
+[`rotate_view!`](@ref)`(viewer, 90)`. *Orthographic* switches the projection. The *Cell* and *Edit selected
 atoms* rows give quick access to supercells, primitive / conventional cells,
 and replacing, deleting, moving or adding atoms.
 

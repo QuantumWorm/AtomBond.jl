@@ -2066,5 +2066,21 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
             view_along!(v, which)
             @test norm(cross(normalize(cam.eyeposition[] - cam.lookat[]), normalize(dir))) < 1e-5
         end
+        # Turning the view in the screen plane keeps the line of sight; +90° is counter-clockwise.
+        view_along!(v, :c)
+        d0 = normalize(cam.eyeposition[] - cam.lookat[])
+        screen(p) = (d = normalize(cam.eyeposition[] - cam.lookat[]); up = normalize(cam.upvector[]);
+                     q = p - cam.lookat[]; (dot(q, cross(up, d)), dot(q, up)))          # (right, up) on screen
+        p = cam.lookat[] + 2 * cross(normalize(cam.upvector[]), d0)                    # 2 Å right of centre
+        x0, y0 = screen(p)
+        rotate_view!(v, 90)
+        @test norm(cross(normalize(cam.eyeposition[] - cam.lookat[]), d0)) < 1e-5     # same direction
+        x1, y1 = screen(p)
+        @test isapprox(x1, 0; atol=1e-4) && isapprox(y1, x0; atol=1e-4) && x0 > 1   # moved from the right to the top
+        rotate_view!(v, -90)
+        @test all(isapprox.(screen(p), (x0, y0); atol=1e-4))
+        rotate_view!(v, 30); rotate_view!(v, 60)
+        @test all(isapprox.(screen(p), (x1, y1); atol=1e-4))                         # angles add up
+        @test "Turn view 90° clockwise" in [it.label for it in AtomBond.menubar_items(v, "View")]
     end
 end

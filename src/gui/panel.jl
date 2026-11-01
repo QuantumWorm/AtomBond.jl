@@ -164,7 +164,7 @@ function size_section!(p::Panel)
     end
 end
 
-"""View along a lattice or reciprocal axis or [uvw], reset, orthographic."""
+"""View along a lattice or reciprocal axis or [uvw], turn the view in the screen plane, reset, orthographic."""
 function view_section!(p::Panel)
     v, vs, g = p.v, p.v.settings, p.g
     heading!(p, "View along")
@@ -185,6 +185,22 @@ function view_section!(p::Panel)
                 view_along!(v, dir)
                 v.status[] = "Viewing along [$(join(dir, " "))]"
             end
+        end
+    end
+    # Turn the picture in the screen plane (the line of sight stays).
+    r = nextrow!(p)
+    ccw = panel_button(g[r, 1], "↺ 90°")
+    cw = panel_button(g[r, 2], "↻ 90°")
+    Makie.on(_ -> (rotate_view!(v, 90); v.status[] = "View turned 90° counter-clockwise"), ccw.clicks)
+    Makie.on(_ -> (rotate_view!(v, -90); v.status[] = "View turned 90° clockwise"), cw.clicks)
+    rg = Makie.GridLayout(g[r, 3]; colgap=4)
+    angle = panel_textbox!(p, rg[1, 1], "°", s -> isnum(s))
+    turn = panel_button(rg[1, 2], "Turn")
+    Makie.on(turn.clicks) do _
+        with_text(v, angle, "an angle in degrees (+ counter-clockwise)") do s
+            x = parse(Float64, strip(s))
+            rotate_view!(v, x)
+            v.status[] = "View turned $(x)° " * (x >= 0 ? "counter-clockwise" : "clockwise")
         end
     end
     r = nextrow!(p)
