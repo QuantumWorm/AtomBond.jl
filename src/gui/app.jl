@@ -24,8 +24,8 @@ mutable struct Viewer
     history::Vector{Tuple{Crystal,String,Bool,Union{Nothing,String}}}   # undo stack: (crystal, what, reframe, file)
     future::Vector{Tuple{Crystal,String,Bool,Union{Nothing,String}}}    # redo stack
     textboxes::Vector{Any}                        # panel text boxes (shortcuts pause while typing)
-    dialogs::Dict{Symbol,Any}                     # open dialog windows (:surface, :export, :open, :atoms) and the right-click :menu
-    folder::String                                # where the Open window starts
+    dialogs::Dict{Symbol,Any}                     # GUI parts and state by name (:tool on the right, :panel, :menu, :tabbar, …)
+    folder::String                                # where the Open tool starts
     path::Union{Nothing,String}                   # file of the structure (Save writes here), if any
     saved::Dict{String,Crystal}                   # file => structure as last opened/saved there, for "modified"
     document::Makie.Observable{String}            # file name + "modified", in the menu bar

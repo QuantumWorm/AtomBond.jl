@@ -1,5 +1,5 @@
 # Menu bar of the main window (File / Edit / Build / View), saving, recent
-# files and the New structure window.
+# files and the New structure tool.
 #
 # The current file is shown at the right of the menu bar, with "modified"
 # after unsaved changes. Save writes back to that file when it is a POSCAR or
@@ -107,7 +107,7 @@ function save_to!(v::Viewer, path::AbstractString)
 end
 
 """
-    save!(viewer) -> Bool or the Save as window
+    save!(viewer) -> Bool or the Save as tool
 
 Save to the current file, or open Save as when there is none (or it should
 not be overwritten).
@@ -209,7 +209,7 @@ is_modified(v::Viewer) = v.path === nothing ? !isempty(v.history) : get(v.saved,
 """
     exit!(viewer; force=false) -> Bool
 
-Close the AtomBond window and its dialog windows (File → Exit, Ctrl+Q). With
+Close the AtomBond window (File → Exit, Ctrl+Q). With
 unsaved changes the first Exit only warns in the status line; a second Exit
 (with no edits in between) closes without saving. Returns whether it closed.
 """

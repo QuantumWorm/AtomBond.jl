@@ -134,19 +134,19 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
     @testset "display model" begin
         si = load_structure(joinpath(STRUCTS, "Si_conv.vasp"))
-        dm = build_display(si, ViewSettings())
+        dm = AtomBond.build_display(si, ViewSettings())
         # 8 corners + 6 face centres + 4 interior atoms.
         @test length(dm.atoms) == 18
         # Every bond of the 4 interior atoms ends on a drawn atom, so those
         # 16 bonds are whole (2 halves each); the remaining halves are stubs.
         full = 2 * 16
         @test length(dm.halfbonds) >= full
-        nostub = build_display(si, ViewSettings(bond_stubs=false))
+        nostub = AtomBond.build_display(si, ViewSettings(bond_stubs=false))
         @test length(nostub.halfbonds) == full
-        @test length(build_display(si, ViewSettings(show_boundary_atoms=false)).atoms) == 8
-        @test isempty(build_display(si, ViewSettings(show_bonds=false)).halfbonds)
+        @test length(AtomBond.build_display(si, ViewSettings(show_boundary_atoms=false)).atoms) == 8
+        @test isempty(AtomBond.build_display(si, ViewSettings(show_bonds=false)).halfbonds)
 
-        w = build_display(load_structure(joinpath(STRUCTS, "water.xyz")), ViewSettings())
+        w = AtomBond.build_display(load_structure(joinpath(STRUCTS, "water.xyz")), ViewSettings())
         @test length(w.atoms) == 3          # no images for a molecule
         @test length(w.halfbonds) == 4
     end
@@ -160,9 +160,9 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test vdw_radius(:Mo) ≈ 2.45                                 # Alvarez where Bondi has none
         @test vdw_radius(:Fm) ≈ element(:Fm).covalent_radius + 0.8   # neither: fallback
         # CPK has no bonds; the other styles do.
-        @test isempty(build_display(si, ViewSettings(style=:cpk)).bonds)
+        @test isempty(AtomBond.build_display(si, ViewSettings(style=:cpk)).bonds)
         for s in (:ball_and_stick, :stick, :line)
-            @test length(build_display(si, ViewSettings(style=s)).bonds) == 16
+            @test length(AtomBond.build_display(si, ViewSettings(style=s)).bonds) == 16
         end
     end
 
@@ -410,7 +410,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
     @testset "surface dialog" begin
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false, panel=false)
-        d = surface_dialog(v; show=false)
+        d = AtomBond.surface_dialog(v; show=false)
         d.hkl.stored_string[] = "1 1 0"
         d.layers.stored_string[] = "2"
         d.vacuum.stored_string[] = "12"
@@ -433,11 +433,11 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
         nblocks, nboxes = length(v.figure.content), length(v.textboxes)
         @test haskey(v.dialogs, :panel) && open_tool(v) === nothing
-        d = supercell_dialog(v)                                     # opens on the right, in the main figure
+        d = AtomBond.supercell_dialog(v)                                     # opens on the right, in the main figure
         @test open_tool(v) === :supercell && d.figure === v.figure && !haskey(v.dialogs, :panel)
         @test any(t -> t === d.repeats, v.textboxes)                # shortcuts pause while typing in it
-        @test supercell_dialog(v) === nothing && occursin("already open", v.status[])
-        shift_dialog(v)                                             # another tool replaces it
+        @test AtomBond.supercell_dialog(v) === nothing && occursin("already open", v.status[])
+        AtomBond.shift_dialog(v)                                             # another tool replaces it
         @test open_tool(v) === :shift && !any(t -> t === d.repeats, v.textboxes)
         @test close_tool!(v) && open_tool(v) === nothing && haskey(v.dialogs, :panel)
         @test length(v.figure.content) == nblocks && length(v.textboxes) == nboxes   # nothing left behind
@@ -445,7 +445,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         # Long lines of a tool wrap at the column width.
         @test AtomBond.wrap_text("aa bb cc dd", 5) == "aa bb\ncc dd"
         @test AtomBond.wrap_text("x\nlongword y", 4) == "x\nlongword\ny"
-        library_dialog(v)
+        AtomBond.library_dialog(v)
         info = only(filter(b -> b isa AtomBond.Makie.Label && occursin("DOI", b.text[]), v.figure.content))
         @test occursin('\n', info.text[]) && all(l -> length(l) < 80, split(info.text[], '\n'))
         close_tool!(v)
@@ -474,7 +474,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         # A file already open (and unchanged) is shown in its tab, not opened twice.
         @test open_structure!(v, si) && ntabs(v) == 2 && active_tab(v) == 1
         # A structure tool follows the tab and names it.
-        supercell_dialog(v)
+        AtomBond.supercell_dialog(v)
         @test open_tool(v) === :supercell
         switch_tab!(v, 2)
         @test open_tool(v) === :supercell && any(b -> b isa AtomBond.Makie.Label && b.text[] == "on Water",
@@ -489,7 +489,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         # new_tab!() starts an empty cell with the New structure tool; Create fills that tab.
         new_tab!(v)
         @test ntabs(v) == 2 && open_tool(v) === :new && AtomBond.is_blank(v)
-        @test create_structure!(v, "Diamond", ["C"], (3.567, 3.567, 3.567)) && ntabs(v) == 2 && formula(v.crystal) == "C8"
+        @test AtomBond.create_structure!(v, "Diamond", ["C"], (3.567, 3.567, 3.567)) && ntabs(v) == 2 && formula(v.crystal) == "C8"
         # Exit warns about unsaved changes in any tab.
         switch_tab!(v, 1); edit!(c -> supercell(c, 1, 1, 2), v, "double c")
         switch_tab!(v, 2)
@@ -515,7 +515,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         p = bridge_position(a, b, V(5, 2, 1); offset=0.3)
         @test abs(dot(p - (a + b) / 2, b - a)) < 1e-12                          # perpendicular to the bond
         @test abs(dot(p - a, cross(b - a, V(5, 2, 1) - a))) < 1e-12              # in the plane of the three atoms
-        @test bridge_max_offset(a, b, c) ≈ 3 && bridge_max_offset(a, b, V(3, 1, 0)) ≈ 1 / 3
+        @test AtomBond.bridge_max_offset(a, b, c) ≈ 3 && AtomBond.bridge_max_offset(a, b, V(3, 1, 0)) ≈ 1 / 3
         @test_throws ArgumentError bridge_position(a, b, V(5, 0, 0))              # third atom on the bond line
         @test_throws ArgumentError bridge_position(a, b, c; offset=-1)
 
@@ -526,7 +526,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         centre = argmax(i -> count(x -> i in (x.i, x.j), bs), 1:natoms(v.crystal))
         nb = [x.i == centre ? x.j : x.i for x in bs if centre in (x.i, x.j)]
         @test "Oxygen bridge…" in [it.label for it in AtomBond.menubar_items(v, "Build")]
-        d = bridge_dialog(v; show=false)
+        d = AtomBond.bridge_dialog(v; show=false)
         @test startswith(d.preview[], "Select three atoms")
         d.add.clicks[] = 1
         @test startswith(v.status[], "Select three atoms") && natoms(v.crystal) == 8
@@ -566,11 +566,11 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         v.selection = copy(three); AtomBond.update_selection!(v)
         # the right-click item uses the window's settings (and defaults without it)
         @test AtomBond.bridge_settings(v) == (; element=:N, offset=0.6, flip=false)
-        @test add_bridge!(v; AtomBond.bridge_settings(v)...) && formula(v.crystal) == "Si8N1"
+        @test AtomBond.add_bridge!(v; AtomBond.bridge_settings(v)...) && formula(v.crystal) == "Si8N1"
         # collinear third atom
         w = visualize(load_library("CO2"); show=false)
         w.selection = [(1, S(0, 0, 0)), (2, S(0, 0, 0)), (3, S(0, 0, 0))]; AtomBond.update_selection!(w)
-        @test !add_bridge!(w) && occursin("on the line of the bond", w.status[])
+        @test !AtomBond.add_bridge!(w) && occursin("on the line of the bond", w.status[])
     end
 
     @testset "export" begin
@@ -652,7 +652,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
     @testset "export dialog" begin
         v = visualize(joinpath(STRUCTS, "GaN_wurtzite.vasp"); show=false, panel=false)
-        d = export_dialog(v; show=false)
+        d = AtomBond.export_dialog(v; show=false)
         @test d.mesh[] == "Mesh for this structure: 10 × 10 × 5"
         d.kspacing.stored_string[] = "0.5"
         @test d.mesh[] == "Mesh for this structure: 5 × 5 × 3"
@@ -742,7 +742,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
         # Window
         v = visualize(joinpath(STRUCTS, "GaAs_conv.vasp"); show=false)
-        d = atoms_dialog(v; show=false)
+        d = AtomBond.atoms_dialog(v; show=false)
         @test startswith(d.who[], "None") && d.from.options[] == ["Ga", "As"] && d.count_text[] == "4 atoms of Ga"
         select!(v, 5)
         @test d.who[] == "As5" && d.element.displayed_string[] == "As" && d.from.selection[] == "As"
@@ -793,11 +793,11 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         gac = replace_species(gaas, :As, :C)
         @test isempty(find_bonds(gac))                    # Ga–C at the GaAs distance (2.45 Å) > 2.28 Å
         cut = Dict{Tuple{Symbol,Symbol},Float64}()
-        @test inherit_bond_cutoffs!(cut, gaas, gac) == [(:C, :Ga)]
+        @test AtomBond.inherit_bond_cutoffs!(cut, gaas, gac) == [(:C, :Ga)]
         @test cut[(:C, :Ga)] ≈ bond_cutoff(:Ga, :As) ≈ 1.15 * (1.22 + 1.19)
         @test length(find_bonds(gac; cutoffs=cut)) == 16
         @test length(find_bonds(supercell(gac, 2, 2, 2); cutoffs=cut)) == 128
-        @test isempty(inherit_bond_cutoffs!(cut, gaas, replace_species(gaas, :As, :Sb)))   # Ga–Sb is long anyway
+        @test isempty(AtomBond.inherit_bond_cutoffs!(cut, gaas, replace_species(gaas, :As, :Sb)))   # Ga–Sb is long anyway
         # The viewer does this on any element-only edit and says so.
         v = visualize(joinpath(STRUCTS, "GaAs_conv.vasp"); show=false)
         edit!(c -> replace_species(c, :As, :C), v, "replace As with C")
@@ -841,7 +841,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         button("Move").clicks[] += 1
         @test startswith(v.status[], "Move 1 atom")
         # dialogs read typed text too
-        d = surface_dialog(v; show=false)
+        d = AtomBond.surface_dialog(v; show=false)
         undo!(v); undo!(v)
         d.hkl.displayed_string[] = "1,1,1"
         d.layers.displayed_string[] = "2"
@@ -863,7 +863,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
         @test v.folder == rstrip(normpath(STRUCTS), '/')
-        b = open_dialog(v; show=false)
+        b = AtomBond.open_dialog(v; show=false)
         @test b.dir == rstrip(normpath(STRUCTS), '/') && length(b.entries) == count(f -> isdir(joinpath(STRUCTS, f)) || structure_format(f) !== nothing, readdir(STRUCTS))
         AtomBond.GLMakie.activate!(ssao=false)
         M.colorbuffer(b.figure)                                  # lay out the window
@@ -939,11 +939,11 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         click(M.Mouse.left)
         @test !AtomBond.menu_isopen(v) && length(v.selection) == 1
         # Esc closes it and keeps the selection.
-        open_context_menu!(v, (300, 500))
+        AtomBond.open_context_menu!(v, (300, 500))
         ev.keyboardbutton[] = M.KeyEvent(M.Keyboard.escape, M.Keyboard.press)
         @test !AtomBond.menu_isopen(v) && length(v.selection) == 1
         # Clicking the title does nothing; clicking an item runs it.
-        open_context_menu!(v, (300, 500))
+        AtomBond.open_context_menu!(v, (300, 500))
         ev.mouseposition[] = AtomBond.menu_row_pixel(v, 1)
         click(M.Mouse.left)
         @test AtomBond.menu_isopen(v)
@@ -951,20 +951,20 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test v.dialogs[:menu].hover[] == 6
         click(M.Mouse.left)
         @test !AtomBond.menu_isopen(v) && length(AtomBond.selected_indices(v)) == count(==(el), v.crystal.species)
-        open_context_menu!(v, (300, 500))
+        AtomBond.open_context_menu!(v, (300, 500))
         @test labels()[1] == "4 atoms: $(el)×4" && "Delete 4 atoms" in labels()
         ev.mouseposition[] = AtomBond.menu_row_pixel(v, 5)          # Change to the other species
         click(M.Mouse.left)
         @test formula(v.crystal) == "$(other)8" && occursin("bonds kept", v.status[])
         undo!(v)
         # A right-click on an atom that is already selected keeps the selection.
-        select_species!(v, el)
+        AtomBond.select_species!(v, el)
         ev.mouseposition[] = Tuple(px(a))
         click(M.Mouse.right)
         @test length(v.selection) == 4 && AtomBond.menu_isopen(v)
         clear_selection!(v)                                         # selection change closes it
         @test !AtomBond.menu_isopen(v)
-        @test open_context_menu!(v, (300, 500)) === nothing         # nothing selected
+        @test AtomBond.open_context_menu!(v, (300, 500)) === nothing         # nothing selected
     end
 
     @testset "prototypes" begin
@@ -1033,10 +1033,10 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         edit!(c -> AtomBond.substitute(c, [1], :In), v, "change Ga1 to In")
         @test save!(v; show=false) === true && v.document[] == "GaAs.vasp"
         @test formula(load_structure(joinpath(dir, "GaAs.vasp"))) == "In1Ga3As4"
-        @test recent_files()[1] == joinpath(dir, "GaAs.vasp")
+        @test AtomBond.recent_files()[1] == joinpath(dir, "GaAs.vasp")
         # A CIF from disk is not overwritten by Save: Save as opens instead.
         @test open_structure!(v, joinpath(dir, "Si.cif")) && v.document[] == "Si.cif"
-        @test recent_files()[1] == joinpath(dir, "Si.cif")
+        @test AtomBond.recent_files()[1] == joinpath(dir, "Si.cif")
         b = save!(v; show=false)
         @test b isa AtomBond.FileBrowser && b.dir == dir && AtomBond.shown_text(b.name) == "Si.cif"
         # Replacing needs a second click; the format menu sets the extension.
@@ -1052,7 +1052,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         b.format.i_selected[] = findfirst(f -> f[2] == ".png", AtomBond.SAVE_FORMATS)
         @test AtomBond.save_from_browser!(b) && isfile(joinpath(dir, "Si.png")) && v.path == joinpath(dir, "Si.xyz")
         # New structure: a new tab, unsaved, Save goes to Save as.
-        d = new_structure_dialog(v; show=false)
+        d = AtomBond.new_structure_dialog(v; show=false)
         d.proto.i_selected[] = findfirst(==("Rocksalt"), AtomBond.prototype_names())
         @test AtomBond.shown_text(d.elements) == "Na Cl"
         AtomBond.settext!(d.elements, "Mg O"); AtomBond.settext!(d.abc, "4.21")
@@ -1080,7 +1080,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
     @testset "supercell dialog" begin
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
         @test "Supercell…" in [it.label for it in AtomBond.menubar_items(v, "Build")]
-        d = supercell_dialog(v; show=false)
+        d = AtomBond.supercell_dialog(v; show=false)
         txt(t) = AtomBond.shown_text(t)
         @test txt.(d.vecs) == ["2 0 0", "0 2 0", "0 0 2"] && startswith(d.preview[], "8× the cell: 64 atoms")
         d.repeats.displayed_string[] = "3x1x2"
@@ -1103,7 +1103,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test startswith(d.preview[], "Enter a′ b′ c′")
         # √3×√3 R30° of a hexagonal cell
         w = visualize(joinpath(STRUCTS, "GaN_wurtzite.vasp"); show=false)
-        dw = supercell_dialog(w; show=false)
+        dw = AtomBond.supercell_dialog(w; show=false)
         dw.repeats.displayed_string[] = "1 1 1"; dw.preset.i_selected[] = 3
         dw.create.clicks[] = 1
         a, b, c, α, β, γ = lattice_parameters(w.crystal.lattice)
@@ -1127,7 +1127,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         # Drawn where they are; wrap_atoms=true draws them in the cell
         v = visualize(joinpath(STRUCTS, "GaAs_conv.vasp"); show=false)
         @test !any(i -> i.label == "Wrap atoms into cell" && i.kind == :item, AtomBond.menubar_items(v, "Build"))
-        @test shift_atoms!(v, [0.3, 0, 0]; fractional=true)
+        @test AtomBond.shift_atoms!(v, [0.3, 0, 0]; fractional=true)
         @test occursin("2 atoms are outside the cell", v.status[])
         xmax = maximum(at.position[1] for at in v.display.atoms)
         @test xmax ≈ 1.05a
@@ -1137,14 +1137,14 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         # a whole lattice vector: same picture, atoms on faces stay on both faces
         si = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
         n0 = length(si.display.atoms)
-        shift_atoms!(si, [0, 0, 1]; fractional=true)
+        AtomBond.shift_atoms!(si, [0, 0, 1]; fractional=true)
         @test count(at -> at.position[3] > 5.431 + 1e-6, si.display.atoms) == 8   # the 6 atoms off the z faces (8 copies)
-        @test wrap_atoms!(si) && length(si.display.atoms) == n0
-        @test !wrap_atoms!(si) && startswith(si.status[], "Nothing to wrap")
+        @test AtomBond.wrap_atoms!(si) && length(si.display.atoms) == n0
+        @test !AtomBond.wrap_atoms!(si) && startswith(si.status[], "Nothing to wrap")
 
         # Dialog
         undo!(v)
-        d = shift_dialog(v; show=false)
+        d = AtomBond.shift_dialog(v; show=false)
         txt(x) = AtomBond.shown_text(x)
         @test txt(d.vector) == "0 0 0" && d.atoms.i_selected[] == 1
         AtomBond.settext!(d.vector, "0.3 0 0")
@@ -1202,7 +1202,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
         # Water: rigid rotation about its centroid
         w = visualize(joinpath(STRUCTS, "water.xyz"); show=false)
-        d = rotate_dialog(w; show=false)
+        d = AtomBond.rotate_dialog(w; show=false)
         txt(x) = AtomBond.shown_text(x)
         @test (txt(d.axis), txt(d.angle), d.atoms.i_selected[]) == ("0 0 1", "90", 1)
         @test startswith(d.preview[], "Turns 3 atoms by 90° about [0 0 1]") && !occursin("cell does not turn", d.preview[])
@@ -1218,7 +1218,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
         v = visualize(joinpath(STRUCTS, "GaAs_conv.vasp"); show=false)
         @test "Rotate atoms…" in [it.label for it in AtomBond.menubar_items(v, "Build")]
-        d = rotate_dialog(v; show=false)
+        d = AtomBond.rotate_dialog(v; show=false)
         @test occursin("The cell does not turn", d.preview[])
         # lattice axis [1 1 1], 120° through Ga1: a symmetry operation of zincblende
         d.axis_menu.i_selected[] = 2; AtomBond.settext!(d.axis, "1 1 1"); AtomBond.settext!(d.angle, "120")
@@ -1339,7 +1339,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
         @test "Structure library…" in [it.label for it in AtomBond.menubar_items(v, "File")]
         @test "From library…" in [it.label for it in AtomBond.menubar_items(v, "Build")]
-        d = library_dialog(v; show=false)
+        d = AtomBond.library_dialog(v; show=false)
         @test startswith(d.info[], "Si, 8 atoms in the cell, Fd-3m (227)") && occursin("COD 9011998", d.info[])
         d.kind.i_selected[] = 3                                       # molecules
         @test length(d.entries[]) == 36 && startswith(d.info[], "H2, 2 atoms")
@@ -1381,10 +1381,10 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test supercell(c, [1 -1 0; 1 1 0; 0 0 1]).cell_constraints == AtomBond.FREE_CELL
         @test !any(any, free_atoms(c).fixed)
         # exporters
-        @test cell_constraints_qe(c)[1:2] == ("vc-relax", "z")
-        @test cell_constraints_qe(with_constraints(c; cell=(0, 0, 0, 0, 0, 0)))[1:2] == ("relax", nothing)
-        @test cell_constraints_vasp(with_constraints(c; cell=(1, 1, 1, 0, 0, 0)))[1] == 7
-        @test cell_constraints_vasp(c)[1] === nothing
+        @test AtomBond.cell_constraints_qe(c)[1:2] == ("vc-relax", "z")
+        @test AtomBond.cell_constraints_qe(with_constraints(c; cell=(0, 0, 0, 0, 0, 0)))[1:2] == ("relax", nothing)
+        @test AtomBond.cell_constraints_vasp(with_constraints(c; cell=(1, 1, 1, 0, 0, 0)))[1] == 7
+        @test AtomBond.cell_constraints_vasp(c)[1] === nothing
         dir = mktempdir()
         for f in ("POSCAR", "x.cell", "x.in")
             r = load_structure(save_structure(joinpath(dir, f), c))
@@ -1414,7 +1414,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         # Window and actions (all undoable)
         v = visualize(joinpath(STRUCTS, "GaN_wurtzite.vasp"); show=false)
         @test "Cell and constraints…" in [it.label for it in AtomBond.menubar_items(v, "Build")]
-        d = cell_dialog(v; show=false)
+        d = AtomBond.cell_dialog(v; show=false)
         @test startswith(d.info[], "Periodic crystal, 4 atoms") && occursin("density 6.", d.info[])
         @test d.preset.i_selected[] == 1 && occursin("QE: calculation = 'vc-relax', cell_dofree = 'all'", d.cell_preview[])
         d.preset.i_selected[] = 4                                     # only c relaxes
@@ -1443,7 +1443,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test !any(v.crystal.pbc) && startswith(d.info[], "Molecule")
         undo!(v)
         w = visualize(joinpath(STRUCTS, "water.xyz"); show=false)
-        dw = cell_dialog(w; show=false)
+        dw = AtomBond.cell_dialog(w; show=false)
         @test dw.box.label[] == "Put the molecule in a periodic box" && all(p -> p.visible[], w.triad.plots)  # axes shown
         # the molecule's box: one dashed grey line plot (no coloured a b c edges), and only with Unit cell on
         segs = filter(p -> p isa AtomBond.Makie.LineSegments, w.plots)

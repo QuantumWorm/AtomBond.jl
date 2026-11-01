@@ -24,8 +24,8 @@ end
     bridge_position(a, b, c; offset=0.5, flip=false) -> Vec3
 
 Cartesian position of an atom bridging bond a–b: the bond's midpoint plus
-`offset` Å along [`bridge_offset_direction`](@ref) (towards c, inside the
-triangle a b c), or minus it with `flip=true` (the other side of the bond).
+`offset` Å perpendicular to the bond in the plane a b c (towards c, inside
+the triangle a b c), or minus it with `flip=true` (the other side of the bond).
 """
 function bridge_position(a, b, c; offset::Real=0.5, flip::Bool=false)
     offset >= 0 || throw(ArgumentError("the offset must be ≥ 0"))

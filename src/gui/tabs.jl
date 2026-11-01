@@ -37,7 +37,7 @@ const TAB_MAXNAME = 24
 # tabs switch (New structure and the library do not depend on it).
 const STRUCTURE_TOOLS = Dict(:surface => surface_dialog, :export => export_dialog, :atoms => atoms_dialog,
                              :supercell => supercell_dialog, :shift => shift_dialog, :rotate => rotate_dialog,
-                             :cell => cell_dialog, :bridge_window => bridge_dialog)
+                             :cell => cell_dialog, :bridge_tool => bridge_dialog)
 
 """Number of open tabs."""
 ntabs(v::Viewer) = length(v.tabs)

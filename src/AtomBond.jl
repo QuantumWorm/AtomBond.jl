@@ -80,7 +80,7 @@ export Element, element, element_property, vdw_radius, ismetal, atomic_mass, ove
 export cell_vectors, cell_volume, lattice_parameters, frac_to_cart, cart_to_frac
 export natoms, cartesian_positions, species_list, formula, wrap, atoms_outside_cell
 export with_positions, with_constraints, has_constraints, fix_atoms, free_atoms, periodic_box, as_molecule
-export CELL_CONSTRAINT_PRESETS, describe_cell_constraints, cell_constraints_vasp, cell_constraints_qe
+export describe_cell_constraints
 # io
 export read_poscar, write_poscar, read_xyz, write_xyz, read_cif, load_structure, save_structure
 export read_castep_cell, read_castep_geom, read_castep_geom_frames, read_castep_output, structure_format
@@ -91,25 +91,22 @@ export read_car, write_car, read_xsd, read_res, write_res
 export kpoint_grid, write_kpoints, write_vasp_inputs, write_qe, write_castep, write_cif, export_inputs
 export to_atomsbase, from_atomsbase
 # analysis
-export Bond, find_bonds, coordination, neighbor_pairs, bond_cutoff, inherit_bond_cutoffs!
+export Bond, find_bonds, coordination, neighbor_pairs, bond_cutoff
 export spacegroup, symmetry_dataset, primitive_cell, conventional_cell
 export distance, bond_angle, dihedral, measure, min_image_distance
 # build
 export supercell, delete_atoms, substitute, add_atom, move_atoms, translate_atoms, rotate_atoms, rotation_matrix, closest_contact, set_position, replace_species
 export surface_cell, slab, best_termination, add_vacuum, stack_cells, superlattice
 export prototype_crystal
-export bridge_position, bridge_offset_direction, bridge_max_offset, add_bridge
+export bridge_position, add_bridge
 # render / gui
-export ViewSettings, DISPLAY_STYLES, build_display, draw_structure!, draw_crystal!
+export ViewSettings, DISPLAY_STYLES, draw_structure!
 export view_direction, view_along!, reset_camera!
 export Viewer, visualize, redraw!, set_crystal!, save_view, snapshot
-export select!, clear_selection!, edit!, undo!, redo!, surface_dialog, close_tool!, open_tool, export_dialog, open_dialog, open_structure!, atoms_dialog
-export open_context_menu!, close_context_menu!, select_species!, select_all!
-export supercell_dialog, shift_dialog, shift_atoms!, wrap_atoms!, rotate_dialog, rotate_atoms!, click_feedback!
-export bridge_dialog, add_bridge!, flip_bridge!
-export set_bond_lengths!, set_bond_angles!, set_dihedrals!, set_coordinates!, set_charge_labels!, set_magmom_labels!, set_bond_length_labels!, cell_dialog, fix_selected!, free_selected!, free_all_atoms!, set_cell_constraints!, periodic_box!, make_molecule!
-export LibraryEntry, structure_library, library_entry, load_library, library_dialog, open_library!
-export save!, save_to!, save_dialog, new_structure_dialog, create_structure!, recent_files, exit!
+export select!, select_all!, clear_selection!, edit!, undo!, redo!, open_tool, close_tool!, click_feedback!
+export set_bond_lengths!, set_bond_angles!, set_dihedrals!, set_coordinates!, set_charge_labels!, set_magmom_labels!, set_bond_length_labels!
+export LibraryEntry, structure_library, library_entry, load_library, open_library!
+export open_structure!, save!, save_to!, exit!
 export new_tab!, switch_tab!, close_tab!, open_in_tab!, ntabs, active_tab
 
 """

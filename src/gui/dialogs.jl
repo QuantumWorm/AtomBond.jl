@@ -139,7 +139,7 @@ end
 """
     surface_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-Open the Build surface window for `viewer`. With `show=false` the figure is
+Open the Build surface tool for `viewer`. With `show=false` the figure is
 built but not displayed (for tests).
 """
 function surface_dialog(v::Viewer; show::Bool=true)
@@ -199,7 +199,7 @@ end
 """
     export_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-Open the Export window: choose a format, folder and name, k-point spacing
+Open the Export tool: choose a format, folder and name, k-point spacing
 (the resulting mesh for the current structure is shown) and, for Quantum
 ESPRESSO, the cutoff and pseudopotential file pattern.
 """
@@ -280,7 +280,7 @@ end
 """
     atoms_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-Edit atoms window. Selected atoms: change the element (all selected atoms)
+Edit atoms tool. Selected atoms: change the element (all selected atoms)
 and, for a single atom, set its position (fractional or Cartesian Å; for an
 image atom, ′, the position of that copy). Replace species: change every atom
 of one element into another. All changes are undoable.
@@ -423,7 +423,7 @@ end
 """
     supercell_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-Supercell window: repeat the cell n1 × n2 × n3, or give the new cell vectors
+Supercell tool: repeat the cell n1 × n2 × n3, or give the new cell vectors
 a′ b′ c′ as integer combinations of a, b, c (e.g. a′ = 1 1 0, b′ = -1 1 0 for
 √2×√2 R45°). Presets fill in common rotated cells. A preview shows the atom
 count and the new cell; Create replaces the structure (undoable).
@@ -500,7 +500,7 @@ end
 """
     shift_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-Shift atoms window: translate all atoms (or the selected ones) by a vector in
+Shift atoms tool: translate all atoms (or the selected ones) by a vector in
 fractional or Cartesian coordinates, optionally wrapping them into the cell
 afterwards; "Selected atom → origin" fills in the shift that puts the selected
 atom at (0, 0, 0). A second section wraps atoms that are outside the cell back
@@ -584,7 +584,7 @@ const ROTATE_AXES = ["Cartesian  x y z", "Lattice  u v w", "Through 2 selected a
 const ROTATE_CENTRES = ["Centre of the rotated atoms", "First selected atom", "Point (fractional)", "Point (Cartesian Å)"]
 
 """
-The rotation chosen in the Rotate atoms window, as a NamedTuple (angle,
+The rotation chosen in the Rotate atoms tool, as a NamedTuple (angle,
 Cartesian axis and centre, atoms and images to rotate, `about` text), or a
 string saying what is missing. Selected atoms are taken as the copies that
 were clicked, so a group across a cell face turns as one piece.
@@ -666,7 +666,7 @@ end
 """
     rotate_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-Rotate atoms window: turn all atoms (or the selected ones) by an angle about
+Rotate atoms tool: turn all atoms (or the selected ones) by an angle about
 an axis (Cartesian, a lattice direction, the line through two selected atoms,
 or the viewing direction) through a centre (the rotated atoms' centroid, the
 first selected atom, or a point). The cell is not rotated. A preview names
@@ -775,7 +775,7 @@ end
 """
     library_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-Structure library window: choose crystals, molecules or all, pick a
+Structure library tool: choose crystals, molecules or all, pick a
 structure and see its formula, symmetry, cell and source (paper, database
 entry), then Open it in the main window.
 """
@@ -867,7 +867,7 @@ end
 """
     cell_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-Cell and constraints window:
+Cell and constraints tool:
 - Cell: periodicity, lattice parameters, volume, density and vectors.
 - Periodic box: put a molecule in a box with a given vacuum (for plane-wave
   codes), or treat a structure as a molecule.
@@ -979,7 +979,7 @@ end
 
 const BRIDGE_OFFSET = 0.5     # Å, default offset of a bridge from the bond midpoint
 
-"""Element, offset and side for a bridge: from the Oxygen bridge window when it is open, else defaults."""
+"""Element, offset and side for a bridge: from the Oxygen bridge tool when it is open, else defaults."""
 function bridge_settings(v::Viewer)
     d = get(v.dialogs, :bridge_form, nothing)
     d === nothing && return (; element=:O, offset=BRIDGE_OFFSET, flip=false)
@@ -1033,7 +1033,7 @@ end
 """
     bridge_dialog(viewer; show=true) -> NamedTuple of the dialog's controls
 
-Oxygen bridge window: select three atoms in the main window (the bond's two
+Oxygen bridge tool: select three atoms in the main window (the bond's two
 atoms, then a third). The bridging atom (O by default) goes at the bond's
 middle plus an offset v perpendicular to the bond, in the plane of the three
 atoms, towards the third (inside the triangle), or with "Other side" at −v.
@@ -1041,7 +1041,7 @@ atoms, towards the third (inside the triangle), or with "Other side" at −v.
 """
 function bridge_dialog(v::Viewer; show::Bool=true)
     width = 520
-    d = new_dialog(v, :bridge_window, "Oxygen bridge", 560; show, width)
+    d = new_dialog(v, :bridge_tool, "Oxygen bridge", 560; show, width)
     d === nothing && return nothing
     fig, f = d
     heading!(f, "Bridge a bond with oxygen")
@@ -1081,6 +1081,6 @@ function bridge_dialog(v::Viewer; show::Bool=true)
         add_bridge!(v; element=known_element(el), offset=x, flip=flip.active[])
     end
     Makie.on(_ -> flip_bridge!(v), flip_last.clicks)
-    finish_dialog!(v, :bridge_window, "Oxygen bridge", fig, f; show, labelwidth=0.42)
+    finish_dialog!(v, :bridge_tool, "Oxygen bridge", fig, f; show, labelwidth=0.42)
     return (; figure=fig, element, offset, flip, preview, add, flip_last)
 end

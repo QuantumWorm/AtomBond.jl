@@ -1,4 +1,4 @@
-# Open and Save as windows: a small file browser drawn with Makie (WSL has no
+# Open and Save as tools: a small file browser drawn with Makie (WSL has no
 # native file dialog). Folders and readable structure files are listed; click
 # selects and previews, double-click (or Open / Enter) opens a folder or loads
 # a file into the main window as an undoable edit. In the Save as window a
@@ -60,8 +60,6 @@ mutable struct FileBrowser
     format::Any                                   # format Menu (save mode)
     confirm::String                               # existing file the next Save will replace
 end
-
-selected_path(b::FileBrowser) = b.selected == 0 ? nothing : joinpath(b.dir, b.entries[b.selected][1])
 
 function refresh!(b::FileBrowser)
     n = length(b.entries)
@@ -246,7 +244,7 @@ end
 """
     open_dialog(viewer; show=true, dir=viewer.folder) -> FileBrowser
 
-Open window for loading structures into `viewer`. Lists folders and files
+Open tool for loading structures into `viewer`. Lists folders and files
 that [`load_structure`](@ref) reads (CIF, POSCAR/CONTCAR/.vasp, XYZ, CASTEP
 .cell/.geom); "All files" lists everything. Keys: ↑/↓, Page Up/Down, Enter
 opens, Backspace goes to the parent folder.
@@ -256,7 +254,7 @@ open_dialog(v::Viewer; show::Bool=true, dir::AbstractString=v.folder) = file_dia
 """
     save_dialog(viewer; show=true, dir, format=nothing) -> FileBrowser
 
-Save as window: choose a folder, type a file name and pick a format (POSCAR,
+Save as tool: choose a folder, type a file name and pick a format (POSCAR,
 CIF, XYZ, CASTEP .cell, Quantum ESPRESSO .in, or a PNG image of the view).
 Replacing an existing file needs a second click on Save.
 """
