@@ -83,6 +83,22 @@ blocks and strained layers get no Poisson relaxation, so relax them.
 In code: [`slab`](@ref), [`surface_cell`](@ref), [`add_vacuum`](@ref),
 [`superlattice`](@ref), [`stack_cells`](@ref).
 
+## Nanotubes
+
+Build → *Nanotube…* makes a single-wall (n, m) nanotube for any indices:
+n = m is armchair, m = 0 zigzag, anything else chiral, and a carbon tube is
+metallic when n − m is a multiple of 3. The preview gives the diameter, the
+period along the axis and the number of atoms before you create it; the tube
+opens in a new tab. It is periodic along c only (pbc F F T), with the chosen
+vacuum between neighbouring tubes in a and b, and as many periods along c as
+asked. The bond length defaults to graphite's C–C distance (1.4226 Å, from
+COD 9011577); two elements, e.g. `B N`, give a tube with one element per
+sublattice (enter the B–N distance as the bond length). The tube is an ideal
+rolled sheet, so relax it before use.
+
+In code: [`nanotube`](@ref), e.g. `nanotube(6, 5)` or
+`nanotube(5, 5; periods=4, vacuum=15)`.
+
 ## Bridging atoms
 
 Build → *Oxygen bridge…* (or *Add oxygen bridge* in the right-click menu)

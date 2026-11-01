@@ -18,6 +18,7 @@
 using Downloads, Printf, LinearAlgebra
 
 include("molecules.jl")
+include(joinpath(@__DIR__, "..", "src", "build", "nanotube_geometry.jl"))
 
 # name, file, COD id, category, description; optional formula, note, ordered_sige
 const CRYSTALS = [
@@ -215,28 +216,12 @@ function graphene_xyz(a, vacuum)
 end
 
 """
-Single-wall (n, m) carbon nanotube: the graphene sheet rolled along the chiral
-vector C_h = n a1 + m a2; one translational period T along the tube axis (c,
-periodic), with `vacuum` Å between periodic images in a and b (not periodic).
+Single-wall (n, m) carbon nanotube from src/build/nanotube_geometry.jl (the
+code behind AtomBond's `nanotube`): one translational period along c
+(periodic), with `vacuum` Å between periodic images in a and b (not periodic).
 """
 function nanotube_xyz(n, m, a, vacuum)
-    a1, a2 = [a, 0.0], [a / 2, a * sqrt(3) / 2]
-    basis = [(a1 + a2) / 3, 2(a1 + a2) / 3]                   # the two atoms of the graphene cell
-    ch = n * a1 + m * a2
-    d = gcd(2m + n, 2n + m)
-    t = ((2m + n) ÷ d) * a1 - ((2n + m) ÷ d) * a2
-    lc, lt = norm(ch), norm(t)
-    R = lc / 2π
-    pos = Vector{Float64}[]
-    span = 2(abs(n) + abs(m) + abs((2m + n) ÷ d) + abs((2n + m) ÷ d))
-    for i in -span:span, j in -span:span, b in basis
-        p = i * a1 + j * a2 + b
-        u, v = dot(p, ch) / lc^2, dot(p, t) / lt^2            # fractions of C_h and T
-        (-1e-9 <= u < 1 - 1e-9 && -1e-9 <= v < 1 - 1e-9) || continue
-        push!(pos, [R * cos(2π * u), R * sin(2π * u), v * lt])
-    end
-    natoms = 4 * (n^2 + n * m + m^2) ÷ d
-    length(pos) == natoms || error("($n,$m) nanotube: $(length(pos)) atoms, expected $natoms")
+    pos, _, R, lt = nanotube_geometry(n, m, a / sqrt(3))
     box = 2R + vacuum
     pos = [p + [box / 2, box / 2, 0] for p in pos]
     return extxyz("($n,$m) nanotube", [box 0 0; 0 box 0; 0 0 lt], fill("C", length(pos)), pos, (false, false, true)), R, lt

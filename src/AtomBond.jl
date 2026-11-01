@@ -52,6 +52,7 @@ include("build/edit.jl")
 include("build/surface.jl")
 include("build/bridge.jl")
 include("build/prototypes.jl")
+include("build/nanotube.jl")
 include("build/constraints.jl")
 
 include("render/style.jl")
@@ -97,7 +98,7 @@ export distance, bond_angle, dihedral, measure, min_image_distance
 # build
 export supercell, delete_atoms, substitute, add_atom, move_atoms, translate_atoms, rotate_atoms, rotation_matrix, closest_contact, set_position, replace_species
 export surface_cell, slab, best_termination, add_vacuum, stack_cells, superlattice
-export prototype_crystal
+export prototype_crystal, nanotube
 export bridge_position, add_bridge
 # render / gui
 export ViewSettings, DISPLAY_STYLES, draw_structure!

@@ -272,6 +272,7 @@ function menubar_items(v::Viewer, name::AbstractString)
                 MenuItem("From library…", () -> library_dialog(v); shortcut="Ctrl+L"),
                 MenuItem("Supercell…", () -> supercell_dialog(v)),
                 MenuItem("Surface, superlattice…", () -> surface_dialog(v)),
+                MenuItem("Nanotube…", () -> nanotube_dialog(v)),
                 SEPARATOR,
                 MenuItem("Cell and constraints…", () -> cell_dialog(v)),
                 SEPARATOR,

@@ -403,6 +403,87 @@ function supercell_preview(c::Crystal, P)
                     n, n * natoms(c), a, b, cc, α, β, γ)
 end
 
+"""Two non-negative integers n m, not both zero (nanotube indices), or `nothing`."""
+function nanotube_indices(s::AbstractString)
+    t = split(replace(s, ',' => ' '))
+    length(t) == 2 || return nothing
+    nm = tryparse.(Int, t)
+    any(isnothing, nm) && return nothing
+    n, m = nm
+    return n >= 0 && m >= 0 && n + m > 0 ? (n, m) : nothing
+end
+
+"""Preview text of the nanotube tool: kind, diameter, period and number of atoms, or what to fix."""
+function nanotube_preview(nm, bond, periods, vacuum, els)
+    nm === nothing && return "Enter the indices as two integers n m (n, m ≥ 0), e.g. 6 5"
+    bond === nothing && return "Enter the bond length in Å"
+    periods === nothing && return "Enter the number of periods (1 or more)"
+    vacuum === nothing && return "Enter the vacuum in Å"
+    els === nothing && return "Enter one element (C) or two, one per sublattice (B N)"
+    n, m = nm
+    _, _, R, T = nanotube_geometry(n, m, bond)
+    shape, metallic = nanotube_kind(n, m)
+    natom = periods * 4 * (n^2 + n * m + m^2) ÷ gcd(2m + n, 2n + m)
+    elec = els[1] == els[2] == :C ? (metallic ? ", metallic" : ", semiconducting") : ""
+    return @sprintf("(%d,%d) %s%s\ndiameter %.3f Å, period %.3f Å along c\n%d atoms in the cell (%d period%s)",
+                    n, m, shape, elec, 2R, T, natom, periods, periods == 1 ? "" : "s")
+end
+
+"""
+    nanotube_dialog(viewer) -> NamedTuple of the tool's controls
+
+Nanotube tool: a single-wall (n, m) nanotube (carbon by default, or two
+elements such as B N), periodic along c, opened in a new tab.
+"""
+function nanotube_dialog(v::Viewer)
+    f = new_dialog(v, :nanotube, "Nanotube")
+    f === nothing && return nothing
+    heading!(f, "Single-wall (n, m) nanotube")
+    indices = field!(f, "Indices n m", "6 5", s -> nanotube_indices(s) !== nothing)
+    periods = field!(f, "Periods along c", "1", s -> (k = tryparse(Int, strip(s)); k !== nothing && k >= 1))
+    bond = field!(f, "Bond length (Å)", @sprintf("%.4f", GRAPHITE_CC), s -> isnum(s) && parse(Float64, s) > 0)
+    vacuum = field!(f, "Vacuum (Å)", "10", s -> isnum(s) && parse(Float64, s) > 0)
+    elements = field!(f, "Elements", "C", s -> tube_elements(s) !== nothing)
+    preview = Makie.Observable("")
+    Makie.Label(f.g[nextrow!(f), 1:2], preview; halign=:left, fontsize=13, color=:gray25, justification=:left)
+    note!(f, "n = m armchair, m = 0 zigzag, else chiral.\n" *
+             "Carbon: metallic when n − m is a multiple of 3.\n" *
+             "Bond length: graphite's C–C by default.\n" *
+             "An ideal rolled sheet: relax it before use.")
+    create = button!(f, "Create nanotube")
+    num(t) = (x = tryparse(Float64, strip(shown_text(t))); x === nothing || x <= 0 ? nothing : x)
+    count(t) = (k = tryparse(Int, strip(shown_text(t))); k === nothing || k < 1 ? nothing : k)
+    values() = (nanotube_indices(shown_text(indices)), num(bond), count(periods), num(vacuum),
+                tube_elements(shown_text(elements)))
+    update(_...) = (preview[] = nanotube_preview(values()...))
+    foreach(t -> Makie.on(update, t.displayed_string), (indices, periods, bond, vacuum, elements))
+    update()
+    Makie.on(create.clicks) do _
+        nm, b, k, vac, els = values()
+        if any(isnothing, (nm, b, k, vac, els))
+            v.status[] = nanotube_preview(nm, b, k, vac, els)
+            return
+        end
+        c = nanotube(nm...; bond=b, periods=k, vacuum=vac, species=els)
+        open_in_tab!(v, c)
+        v.status[] = "Created the $(c.title): $(natoms(c)) atoms (not saved yet)"
+    end
+    finish_dialog!(v, :nanotube, "Nanotube", f)
+    return (; indices, periods, bond, vacuum, elements, preview, create)
+end
+
+"""One element (both sublattices) or two, as symbols, or `nothing`."""
+function tube_elements(s::AbstractString)
+    t = split(replace(s, ',' => ' '))
+    1 <= length(t) <= 2 || return nothing
+    els = try
+        [known_element(x) for x in t]
+    catch
+        return nothing
+    end
+    return length(els) == 1 ? (els[1], els[1]) : (els[1], els[2])
+end
+
 """
     supercell_dialog(viewer) -> NamedTuple of the tool's controls
 

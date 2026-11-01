@@ -1384,6 +1384,25 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         end
         @test load_library("Graphene").pbc == (true, true, false) && load_library("Carbon nanotube (6,5)").pbc == (false, false, true)
         @test natoms(load_library("Carbon nanotube (6,5)")) == 364
+        # nanotube(n, m) for any indices
+        for (n, m) in ((5, 5), (9, 0), (6, 5), (12, 3), (1, 1), (7, 0))
+            c = nanotube(n, m)
+            nb = zeros(Int, natoms(c))
+            for b in find_bonds(c)
+                nb[b.i] += 1; nb[b.j] += 1
+            end
+            @test (n, m, natoms(c)) == (n, m, 4 * (n^2 + n * m + m^2) ÷ gcd(2m + n, 2n + m))
+            @test (n, m, all(==(3), nb)) == (n, m, true) || n + m < 4             # very thin tubes: odd contacts
+        end
+        t3 = nanotube(5, 5; periods=3, vacuum=12)
+        @test natoms(t3) == 60 && t3.pbc == (false, false, true) && isapprox(lattice_parameters(t3.lattice)[3], 3 * 2.464; atol=1e-3)
+        @test isapprox(lattice_parameters(t3.lattice)[1] - 12, 2 * 5 * 2.464 * sqrt(3) / 2π; atol=1e-3)   # box = diameter + vacuum
+        bn = nanotube(5, 0; species=(:B, :N), bond=1.45)
+        @test formula(bn) == "B10N10" && all(b -> bn.species[b.i] != bn.species[b.j], find_bonds(bn))
+        @test cartesian_positions(load_library("Carbon nanotube (6,5)")) ≈ cartesian_positions(nanotube(6, 5)) atol=1e-5
+        @test_throws ArgumentError nanotube(0, 0)
+        @test_throws ArgumentError nanotube(4, 4; species=(:C, :Xx))
+        @test AtomBond.nanotube_kind(9, 0) == ("zigzag", true) && AtomBond.nanotube_kind(6, 5) == ("chiral", false)
         dmso = load_library("Dimethyl sulfoxide")
         @test formula(dmso) == "S1O1C2H6" && isapprox(bond(dmso, 1, 3), 1.799; atol=1e-3)
         @test_throws ArgumentError load_library("Unobtainium")
@@ -1401,6 +1420,18 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
         @test "Structure library…" in [it.label for it in AtomBond.menubar_items(v, "File")]
         @test "From library…" in [it.label for it in AtomBond.menubar_items(v, "Build")]
+        @test "Nanotube…" in [it.label for it in AtomBond.menubar_items(v, "Build")]
+        nt = AtomBond.nanotube_dialog(v)
+        @test startswith(nt.preview[], "(6,5) chiral, semiconducting\ndiameter 7.4") && occursin("364 atoms", nt.preview[])
+        AtomBond.settext!(nt.indices, "10 10"); AtomBond.settext!(nt.periods, "2")
+        @test startswith(nt.preview[], "(10,10) armchair, metallic\n") && occursin("80 atoms in the cell (2 periods)", nt.preview[])
+        AtomBond.settext!(nt.indices, "0 0")
+        @test startswith(nt.preview[], "Enter the indices")
+        AtomBond.settext!(nt.indices, "8 0"); AtomBond.settext!(nt.periods, "1"); AtomBond.settext!(nt.elements, "B N")
+        tabs0 = ntabs(v)
+        nt.create.clicks[] = 1
+        @test ntabs(v) == tabs0 + 1 && formula(v.crystal) == "B16N16" && v.crystal.pbc == (false, false, true)
+        close_tab!(v)
         d = AtomBond.library_dialog(v)
         @test startswith(d.info[], "Si, 8 atoms in the cell, Fd-3m (227)") && occursin("COD 9011998", d.info[])
         d.kind.i_selected[] = 3                                       # molecules
