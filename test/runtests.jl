@@ -1351,12 +1351,12 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
                   "Carbon: graphite and graphene" => 2, "Carbon: nanotubes" => 5, "Organic: hydrocarbons" => 11,
                   "Organic: halocarbons" => 22, "Organic: alcohols and ethers" => 3, "Organic: carbonyl compounds" => 5,
                   "Organic: nitrogen and sulfur compounds" => 11, "Organic: heterocycles" => 3, "Organic: radicals" => 6,
-                  "Organometallic: metal alkyls" => 6, "Organometallic: metal carbonyls" => 3, "Inorganic: elements" => 9,
-                  "Inorganic: hydrides" => 17, "Inorganic: oxides and sulfides" => 18, "Inorganic: oxoacids" => 6,
+                  "Organometallic: metal alkyls" => 11, "Organometallic: metal carbonyls" => 3, "Inorganic: elements" => 9,
+                  "Inorganic: hydrides" => 19, "Inorganic: oxides and sulfides" => 19, "Inorganic: oxoacids" => 6,
                   "Inorganic: nitrides" => 1,
-                  "Inorganic: nonmetal halides" => 32, "Inorganic: metal halides" => 14, "Inorganic: oxyhalides" => 6,
-                  "Inorganic: radicals" => 8, "Carbon: fullerenes" => 1]
-        @test length(lib) == 214 && [e.category for e in lib] == reduce(vcat, [fill(g, n) for (g, n) in groups])
+                  "Inorganic: nonmetal halides" => 42, "Inorganic: metal halides" => 14, "Inorganic: oxyhalides" => 12,
+                  "Inorganic: radicals" => 9, "Carbon: fullerenes" => 1]
+        @test length(lib) == 239 && [e.category for e in lib] == reduce(vcat, [fill(g, n) for (g, n) in groups])
         @test [e.name for e in lib[[1, 2, 3, 33, end]]] == ["Silicon", "Diamond", "Silicon-germanium Si0.5Ge0.5",
                                                              "Acetylene", "Buckminsterfullerene"]
         mols = structure_library(; kind=:molecule)                    # sorted by name within each group
@@ -1396,7 +1396,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test lattice_parameters(load_library("GaAs").lattice)[1] == 5.65325
         @test lattice_parameters(load_library("InSb").lattice)[1] == 6.4794
         @test all(e -> isfile(e.file) && !isempty(e.source) && !isempty(e.reference), lib)
-        @test length(structure_library(; kind=:molecule)) == 182
+        @test length(structure_library(; kind=:molecule)) == 207
         # crystals: published lattice constants and symmetry
         si = load_library("Silicon")
         @test si.title == "Silicon" && formula(si) == "Si8" && spacegroup(si)[1] == 227
@@ -1495,7 +1495,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
                                                  "formula = \"NaCl\"\nfile = \"NaCl.vasp\"\nsource = \"my file\"\n")
             @test structure_library()[end].name == "Rock salt" && formula(load_library("Rock salt")) == "Na4Cl4"
         end
-        @test length(structure_library()) == 214
+        @test length(structure_library()) == 239
 
         # Window
         v = visualize(joinpath(STRUCTS, "Si_conv.vasp"); show=false)
@@ -1516,11 +1516,11 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         d = AtomBond.library_dialog(v)
         @test startswith(d.info[], "Si, 8 atoms in the cell, Fd-3m (227)") && occursin("COD 9011998", d.info[])
         d.kind.i_selected[] = 3                                       # molecules
-        @test length(d.entries[]) == 182 && startswith(d.info[], "C2H2, 4 atoms") && occursin("Group: Organic: hydrocarbons", d.info[])
+        @test length(d.entries[]) == 207 && startswith(d.info[], "C2H2, 4 atoms") && occursin("Group: Organic: hydrocarbons", d.info[])
         @test d.group.options[][1] == "All groups" && length(d.group.options[]) == 20 &&    # all + 19 molecule groups
               d.group.options[][2] == "Organic: hydrocarbons"
         d.group.i_selected[] = findfirst(==("Inorganic: hydrides"), d.group.options[])
-        @test length(d.entries[]) == 17 && all(e -> e.category == "Inorganic: hydrides", d.entries[])
+        @test length(d.entries[]) == 19 && all(e -> e.category == "Inorganic: hydrides", d.entries[])
         d.group.i_selected[] = 1
         d.search.stored_string[] = "etch"                             # search: name, formula, group or use
         @test length(d.entries[]) == 18 && occursin("Used as: etch gas", d.info[])
@@ -1531,7 +1531,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         d.search.stored_string[] = "solvent"
         @test length(d.entries[]) == 8
         d.search.stored_string[] = ""
-        @test length(d.entries[]) == 182
+        @test length(d.entries[]) == 207
         d.structure.i_selected[] = findfirst(e -> e.name == "Methanol", d.entries[])
         @test occursin("Venkateswarlu", d.info[])
         d.open.clicks[] = 1

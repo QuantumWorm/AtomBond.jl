@@ -483,6 +483,65 @@ function xzy2w(x, z, y, w, rxz, rxy, rxw, θzxy, θyxy, θwxz)
     return [x, z, y, y, w], [[0.0, 0, 0], [0.0, 0, rxz], ys..., rxw * [-sind(θwxz), 0.0, cosd(θwxz)]]
 end
 
+"""
+Seesaw XY4 (C2v, SF4 type): equatorial Y in the xz plane with Y–X–Y `θeq`
+about +z, axial Y in the yz plane with Y–X–Y `θax` measured through +z (on
+the side of the equatorial atoms).
+"""
+function seesaw(x, y, req, rax, θeq, θax)
+    eq = [req * [s * sind(θeq / 2), 0.0, cosd(θeq / 2)] for s in (1, -1)]
+    ax = [rax * [0.0, s * sind(θax / 2), cosd(θax / 2)] for s in (1, -1)]
+    return [x; fill(y, 4)], [[[0.0, 0, 0]]; eq; ax]
+end
+
+"""
+Square-pyramidal XY4ZW (C4v, SF5Cl type): Z along +z, W along -z (trans to
+Z), four Y at angle Z–X–Y `θ`.
+"""
+function xy4zw(x, y, z, w, rxy, rxz, rxw, θ)
+    ys = [rxy * [sind(θ) * cos(k * π / 2), sind(θ) * sin(k * π / 2), cosd(θ)] for k in 0:3]
+    return [x; fill(y, 4); z; w], [[[0.0, 0, 0]]; ys; [[0.0, 0, rxz], [0.0, 0, -rxw]]]
+end
+
+"""
+trans X2Y4 (C2h, N2F4 type): X–X along x, each X with two Y at X–X–Y `β` and
+Y–X–Y `θ`; the two YXY groups related by the inversion centre.
+"""
+function trans_x2y4(x, y, rxx, rxy, β, θ)
+    a = cosd(β)                                  # direction of a Y from X1: (a, ±b, -c), X2 along +x
+    b = sqrt((1 - cosd(θ)) / 2)
+    c = sqrt(1 - a^2 - b^2)
+    y1 = [rxy * [a, s * b, -c] for s in (1, -1)]
+    x1, x2 = [-rxx / 2, 0.0, 0], [rxx / 2, 0.0, 0]
+    f1 = [x1 + v for v in y1]
+    return [x, x, fill(y, 4)...], [x1, x2, f1..., (-f for f in f1)...]
+end
+
+"""
+Pyramidal X(CH3)3 (C3v, trimethylphosphine type): X–C, C–X–C, C–H and X–C–H
+with C3v methyl groups on the X–C axes, staggered: one C–H of each methyl
+anti to the threefold axis (the lone pair, or the bond to `top`). `top` is an
+optional atom on the axis at `rtop` (e.g. the H of trimethylsilane).
+"""
+function pyramidal_trimethyl(x, rxc, θ, rch, β; top=nothing, rtop=0.0)
+    syms, pos = pyramid(x, "C", rxc, θ)                          # C atoms below X (−z)
+    hs = [h for c in pos[2:4] for h in methyl_h([0.0, 0, 0], c, [0.0, 0, 1], rch, β, 180.0)]
+    syms, pos = [syms; fill("H", 9)], [pos; hs]
+    top === nothing || (push!(syms, top); push!(pos, [0.0, 0, rtop]))
+    return syms, pos
+end
+
+"""
+Bent X(CH3)2 (C2v, dimethyltellurium type): X–C, C–X–C, C–H, X–C–H, methyl
+groups on the X–C axes and staggered with respect to the other X–C bond (one
+C–H of each anti to it).
+"""
+function bent_dimethyl(x, rxc, θ, rch, β)
+    cs = [rxc * [s * sind(θ / 2), 0.0, -cosd(θ / 2)] for s in (1, -1)]
+    hs = [methyl_h([0.0, 0, 0], cs[k], cs[3-k] - cs[k], rch, β, 180.0) for k in 1:2]
+    return [x, "C", "C", fill("H", 6)...], [[[0.0, 0, 0]]; cs; hs[1]; hs[2]]
+end
+
 """Angle in degrees from degrees and arc minutes."""
 dm(d, m) = d + m / 60
 
@@ -1426,6 +1485,154 @@ const MOLECULES = [
             "electronic state, J. Mol. Spectrosc. 187, 153 (1998)", "10.1006/jmsp.1997.7457")],
      note="Zero-point average structure r_z of the X̃ 2B1 ground state, read in the authors' abstract (CiNii). " *
           spin_note("doublet")),
+    # Sulfur, tellurium and nitrogen fluorides and oxyfluorides
+    (name="Sulfur tetrafluoride", formula="SF4", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=seesaw("S", "F", 1.542, 1.643, 103.8, 176.8),
+     refs=[("K. Kimura, S. H. Bauer, Electron diffraction study of the molecular structures of sulfur tetrafluoride " *
+            "(SF4) and thionyl tetrafluoride (SOF4), J. Chem. Phys. 39, 3172 (1963)", "10.1063/1.1734179")],
+     note="Electron-diffraction r_g. The axial F–S–F angle (176.8 ± 2.5°) is measured on the side of the " *
+          "equatorial F atoms, as the authors define it."),
+    (name="Sulfur difluoride", formula="SF2", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=zmatrix([("S",), ("F", 1, 1.58745), ("F", 1, 1.58745, 2, 98.048)]),
+     refs=[("Y. Endo, S. Saito, E. Hirota, T. Chikaraishi, Microwave spectrum of sulfur difluoride in the first " *
+            "excited vibrational states: vibrational potential function and equilibrium structure, J. Mol. Spectrosc. " *
+            "77, 222 (1979)", "10.1016/0022-2852(79)90104-8")],
+     note="Equilibrium r_e, read in the authors' abstract (OpenAIRE)."),
+    (name="Thiothionyl fluoride", formula="SSF2", category="Inorganic: nonmetal halides", pg="Cs",
+     geometry=xyz2_pyramid("S", "S", "F", 1.86, 1.59, 108.5, 92.0),
+     refs=[("R. L. Kuczkowski, Microwave spectra and structure of S2F2, Ohio State University Symposium on Molecular " *
+            "Spectroscopy, 1963, http://hdl.handle.net/1811/8199", "")],
+     note="Low-precision microwave structure (± 0.03 Å, ± 1–1.5°) from the author's symposium abstract; the " *
+          "S=SF2 isomer of S2F2."),
+    (name="Sulfur chloride pentafluoride", formula="SF5Cl", category="Inorganic: nonmetal halides", pg="C4v",
+     geometry=xy4zw("S", "F", "Cl", "F", 1.571, 2.055, 1.571, 90.4),
+     refs=[("L. S. Bartell, S. Doun, C. J. Marsden, An improved electron diffraction–microwave and molecular orbital " *
+            "study of the structure of SF5Cl, J. Mol. Struct. 75, 271 (1981)", "10.1016/0022-2860(81)85241-6")],
+     note="Electron diffraction with microwave constants, r_g (axial S–F ± 0.008 Å)."),
+    (name="Tellurium hexafluoride", formula="TeF6", category="Inorganic: nonmetal halides", pg="Oh",
+     geometry=octahedron("Te", "F", 1.815),
+     refs=[("G. Gundersen, K. Hedberg, T. G. Strand, Electron-diffraction from gaseous tellurium hexafluoride at 20, " *
+            "90, and 150 °C, J. Chem. Phys. 68, 3548 (1978)", "10.1063/1.436211")],
+     note="Electron-diffraction r_a at 20 °C."),
+    (name="Thiazyl trifluoride", formula="NSF3", category="Inorganic: nonmetal halides", pg="C3v",
+     geometry=xy3z("S", "F", "N", 1.552, dm(94, 2), 1.416),
+     refs=[("W. H. Kirchhoff, The microwave spectrum of NSF3, Ohio State University Symposium on Molecular " *
+            "Spectroscopy, 1961, http://hdl.handle.net/1811/8050", "")],
+     note="Microwave structure (normal, 34S and 15N species) from the author's symposium abstract; no " *
+          "uncertainties given."),
+    (name="Tetrafluorohydrazine (trans)", formula="N2F4", category="Inorganic: nonmetal halides", pg="C2h",
+     geometry=trans_x2y4("N", "F", 1.492, 1.372, 101.4, 103.1),
+     refs=[("M. M. Gilbert, G. Gundersen, K. Hedberg, On a reinvestigation of the structure of dinitrogen " *
+            "tetrafluoride, N2F4, by gaseous electron diffraction, J. Chem. Phys. 56, 1691 (1972)", "10.1063/1.1677426")],
+     note="Electron-diffraction r_a. The vapour is 71% trans and 29% gauche; this is the trans conformer, with the " *
+          "parameters the authors fitted for both."),
+    (name="cis-Difluorodiazene", formula="N2F2", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=planar_ab("N", "N", 1.214, [("F", 1, 1.384, 114.5, 1), ("F", 2, 1.384, 114.5, 1)]),
+     refs=[("R. L. Kuczkowski, E. B. Wilson, Microwave spectrum, structure, and dipole moment of \"cis\"-N2F2, J. " *
+            "Chem. Phys. 39, 1030 (1963)", "10.1063/1.1734353")],
+     note="Microwave structure (F14N14NF and F15N14NF); N–F ± 0.01 Å."),
+    (name="Difluoramine", formula="HNF2", category="Inorganic: nonmetal halides", pg="Cs",
+     geometry=xyz2_pyramid("N", "H", "F", 1.026, 1.400, 99.8, 102.9),
+     refs=[("D. R. Lide, Microwave spectrum and structure of difluoramine, J. Chem. Phys. 38, 456 (1963)",
+            "10.1063/1.1733680")],
+     note="Ground-state structure from NF2H and NF2D."),
+    (name="Difluoroamino radical", formula="NF2", category="Inorganic: radicals", pg="C2v",
+     geometry=zmatrix([("N",), ("F", 1, 1.34691), ("F", 1, 1.34691, 2, 103.132)]),
+     refs=[("H. S. P. Müller, K. Löblein, H. Hübner, W. Hüttner, J. M. Brown, The rotational spectrum of the NF2 free " *
+            "radical: determination of molecular structure, J. Mol. Spectrosc. 251, 185 (2008)",
+            "10.1016/j.jms.2008.02.014")],
+     note="Semi-experimental r_e of the X 2B1 state (the authors' vibrational corrections are ab initio). " *
+          spin_note("doublet")),
+    (name="Thionyl fluoride", formula="SOF2", category="Inorganic: oxyhalides", pg="Cs",
+     geometry=xyz2_pyramid("S", "O", "F", 1.420, 1.583, 106.2, 92.2),
+     refs=[("I. Hargittai, F. C. Mijlhoff, Electron diffraction study of the thionyl fluoride molecular structure, " *
+            "J. Mol. Struct. 16, 69 (1973)", "10.1016/0022-2860(73)80042-0")],
+     note="Electron-diffraction r_a."),
+    (name="Sulfuryl fluoride", formula="SO2F2", category="Inorganic: oxyhalides", pg="C2v",
+     geometry=xy2z2("S", "O", "F", 1.405, dm(123, 58), 1.530, dm(96, 7)),
+     refs=[("D. R. Lide, D. E. Mann, R. M. Fristrom, Microwave spectrum and structure of sulfuryl fluoride, J. Chem. " *
+            "Phys. 26, 734 (1957)", "10.1063/1.1743394")],
+     note="Effective ground-state microwave structure."),
+    (name="Trifluoramine oxide", formula="NOF3", category="Inorganic: oxyhalides", pg="C3v",
+     geometry=xy3z_axial("N", "F", "O", 1.432, 117.4, 1.159),
+     refs=[("V. Plato, W. D. Hartford, K. Hedberg, Electron-diffraction investigation of the molecular structure of " *
+            "trifluoramine oxide, F3NO, J. Chem. Phys. 53, 3488 (1970)", "10.1063/1.1674522")],
+     note="Electron-diffraction r_a constrained to the microwave B0; built from N=O, N–F and O–N–F (117.4°), which " *
+          "gives F–N–F 100.5° as the authors state."),
+    (name="Nitryl fluoride", formula="FNO2", category="Inorganic: oxyhalides", pg="C2v",
+     geometry=zmatrix([("N",), ("F", 1, 1.467), ("O", 1, 1.1798, 2, 180 - 136 / 2), ("O", 1, 1.1798, 2, 180 - 136 / 2, 3, 180.0)]),
+     refs=[("A. C. Legon, D. J. Millen, The microwave spectrum, structure, and dipole moment of nitryl fluoride, J. " *
+            "Chem. Soc. A 1968, 1736", "10.1039/J19680001736")],
+     note="Microwave structure from three isotopic species (N–F ± 0.015 Å, O–N–O ± 1.5°)."),
+    (name="Nitryl chloride", formula="ClNO2", category="Inorganic: oxyhalides", pg="C2v",
+     geometry=zmatrix([("N",), ("Cl", 1, 1.83), ("O", 1, 1.21, 2, 180 - 129.5 / 2), ("O", 1, 1.21, 2, 180 - 129.5 / 2, 3, 180.0)]),
+     refs=[("L. Clayton, Q. Williams, T. L. Weatherly, Nitryl chloride molecular constants from microwave spectrum " *
+            "analysis, J. Chem. Phys. 30, 1328 (1959)", "10.1063/1.1730181")],
+     note="Low-precision effective microwave structure; no uncertainties given."),
+    # Methyl compounds of group 14–16 elements and boron compounds
+    (name="Trimethylphosphine", formula="P(CH3)3", category="Organometallic: metal alkyls", pg="C3v",
+     geometry=pyramidal_trimethyl("P", 1.8465, 98.6, 1.091, 110.7),
+     refs=[("L. S. Bartell, L. O. Brockway, Electron diffraction study of the structure of trimethylphosphine, J. " *
+            "Chem. Phys. 32, 512 (1960)", "10.1063/1.1730726")],
+     note="Electron-diffraction r_g; methyl groups staggered as the authors found."),
+    (name="Trimethylarsine", formula="As(CH3)3", category="Organometallic: metal alkyls", use="deposition precursor", pg="C3v",
+     geometry=pyramidal_trimethyl("As", 1.968, 96.1, 1.100, 109.0),
+     refs=[("R. Blom, A. Haaland, R. Seip, The molecular structures of trimethylarsenic, trimethylantimony and " *
+            "dimethyltellurium determined by gas electron diffraction, Acta Chem. Scand. A 37, 595 (1983)",
+            "10.3891/acta.chem.scand.37a-0595")],
+     note="Electron-diffraction r_a (Table 1); C3v methyl groups staggered, as in the authors' model."),
+    (name="Trimethylstibine", formula="Sb(CH3)3", category="Organometallic: metal alkyls", use="deposition precursor", pg="C3v",
+     geometry=pyramidal_trimethyl("Sb", 2.163, 94.1, 1.113, 110.1),
+     refs=[("R. Blom, A. Haaland, R. Seip, The molecular structures of trimethylarsenic, trimethylantimony and " *
+            "dimethyltellurium determined by gas electron diffraction, Acta Chem. Scand. A 37, 595 (1983)",
+            "10.3891/acta.chem.scand.37a-0595")],
+     note="Electron-diffraction r_a (Table 1); C3v methyl groups staggered, as in the authors' model."),
+    (name="Dimethyltellurium", formula="Te(CH3)2", category="Organometallic: metal alkyls", use="deposition precursor",
+     pg="C2v",
+     geometry=bent_dimethyl("Te", 2.142, 94.0, 1.07, 112.0),
+     refs=[("R. Blom, A. Haaland, R. Seip, The molecular structures of trimethylarsenic, trimethylantimony and " *
+            "dimethyltellurium determined by gas electron diffraction, Acta Chem. Scand. A 37, 595 (1983)",
+            "10.3891/acta.chem.scand.37a-0595")],
+     note="Electron-diffraction r_a (Table 1), angles ± 2°; C3v methyl groups staggered, as in the authors' model."),
+    (name="Trimethylsilane", formula="(CH3)3SiH", category="Organometallic: metal alkyls", use="deposition precursor",
+     pg="C3v",
+     geometry=pyramidal_trimethyl("Si", 1.868, dm(110, 10), 1.095, 180 - methyl_axis_angle(dm(107, 56)); top="H",
+                                  rtop=1.489),
+     refs=[("L. Pierce, D. H. Petersen, Microwave spectrum, structure, dipole moment, and internal rotation of " *
+            "trimethyl silane, J. Chem. Phys. 33, 907 (1960)", "10.1063/1.1731287")],
+     note="Microwave structure, no uncertainties given; methyl groups staggering the Si–H and Si–C bonds as the " *
+          "authors found, taken as C3v on the Si–C axes."),
+    (name="Borane carbonyl", formula="H3BCO", category="Inorganic: hydrides", pg="C3v",
+     geometry=let s = xy3z_axial("B", "H", "C", 1.221, 103.79, 1.534)
+         ([s[1]; "O"], [s[2]; [[0.0, 0, 1.534 + 1.135]]])
+     end,
+     refs=[("A. C. Venkatachar, R. C. Taylor, R. L. Kuczkowski, Microwave spectrum, structure, quadrupole coupling " *
+            "constants and dipole moment of carbon monoxide-borane, J. Mol. Struct. 38, 17 (1977)",
+            "10.1016/0022-2860(77)87074-9")],
+     note="Microwave structure (B–C and C–O ± 0.01 Å); H–B–H comes out at the authors' 114.5°."),
+    (name="Ammonia borane", formula="H3BNH3", category="Inorganic: hydrides", pg="C3v",
+     geometry=let s = xy3z_axial("B", "H", "N", 1.2160, 104.69, 1.6576)
+         ([s[1]; fill("H", 3)], [s[2]; methyl_h(zeros(3), s[2][end], [1.0, 0, 0], 1.0140, 110.28, 60.0)])
+     end,
+     refs=[("L. R. Thorne, R. D. Suenram, F. J. Lovas, Microwave spectrum, torsional barrier, and structure of " *
+            "BH3NH3, J. Chem. Phys. 78, 167 (1983)", "10.1063/1.444528")],
+     note="Substitution structure r_s. The abstract gives no conformation; the BH3 and NH3 groups are placed " *
+          "staggered."),
+    (name="Difluoroborane", formula="HBF2", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=zmatrix([("B",), ("H", 1, 1.195), ("F", 1, 1.315, 2, 180 - 118.0 / 2), ("F", 1, 1.315, 2, 180 - 118.0 / 2, 3, 180.0)]),
+     refs=[("A. G. Robiette, M. C. L. Gerry, The harmonic force field and ground-state average structure of " *
+            "difluoroborane, J. Mol. Spectrosc. 80, 403 (1980)", "10.1016/0022-2852(80)90151-4")],
+     note="Ground-state average structure r_z."),
+    (name="Boron hydride oxide", formula="HBO", category="Inorganic: oxides and sulfides", pg="C∞v",
+     geometry=linear(("H", "B", "O"), (1.16667, 1.20068)),
+     refs=[("Y. Kawashima, Y. Endo, E. Hirota, Microwave spectrum, molecular structure, and force field of HBO, J. " *
+            "Mol. Spectrosc. 133, 116 (1989)", "10.1016/0022-2852(89)90247-6")],
+     note="Equilibrium r_e; an unstable (transient) molecule."),
+    (name="Fluoroborane oxide", formula="FBO", category="Inorganic: oxyhalides", pg="C∞v",
+     geometry=linear(("F", "B", "O"), (1.2833, 1.2072)),
+     refs=[("Y. Kawashima, K. Kawaguchi, Y. Endo, E. Hirota, Infrared diode laser and microwave spectra and molecular " *
+            "structure of an unstable molecule, FBO, J. Chem. Phys. 87, 2006 (1987)", "10.1063/1.453175")],
+     note="Partial substitution structure r_s; an unstable (transient) molecule."),
     # Carbon nanostructures
     (name="Buckminsterfullerene", formula="C60", category="Carbon: fullerenes", pg="Ih",
      geometry=fullerene_c60(1.458, 1.401),

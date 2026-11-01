@@ -27,7 +27,7 @@ as Quantum ESPRESSO, ABINIT, SIESTA and [DFTK.jl](https://dftk.org).
   ([Labels](labels.md)).
 - **DFT inputs:** fixed atoms and cell constraints, k-point meshes and spin
   ([DFT inputs](dft.md)).
-- **Structure library:** 214 crystals and molecules: Crystallography Open
+- **Structure library:** 239 crystals and molecules: Crystallography Open
   Database structures and experimental geometries from the literature, each
   with its reference
   ([Library and element data](library.md)).
