@@ -884,6 +884,20 @@ note = "Electron diffraction (r_a). The methyl groups rotate freely; the stagger
 use = "deposition precursor"
 
 [[structure]]
+name = "Methylsilane"
+kind = "molecule"
+category = "Organometallic: metal alkyls"
+formula = "CH3SiH3"
+file = "molecules/CH3SiH3.xyz"
+description = "Experimental geometry, point group C3v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.1743646"
+reference = "R. W. Kilb, L. Pierce, Microwave spectrum, structure, and internal barrier of methyl silane, J. Chem. Phys. 27, 108 (1957)"
+doi = "10.1063/1.1743646"
+note = "Ground-state (effectively r_0) structure; methyl and silyl groups staggered, as the authors established."
+use = "deposition precursor"
+
+[[structure]]
 name = "Trimethylaluminium"
 kind = "molecule"
 category = "Organometallic: metal alkyls"
@@ -1268,6 +1282,20 @@ note = ""
 use = "deposition precursor"
 
 [[structure]]
+name = "Trisilane"
+kind = "molecule"
+category = "Inorganic: hydrides"
+formula = "Si3H8"
+file = "molecules/Si3H8.xyz"
+description = "Experimental geometry, point group C2v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.3891/acta.chem.scand.48-0046"
+reference = "A. Haaland, K. Rypdal, H. Stüger, H. V. Volden, Molecular structures and conformational composition of trisilane and tetrasilane by gas-phase electron diffraction, Acta Chem. Scand. 48, 46 (1994)"
+doi = "10.3891/acta.chem.scand.48-0046"
+note = "Electron-diffraction r_a (Table 1); the central H–Si–H angle (107.8°) was fixed at an ab initio value by the authors."
+use = "deposition precursor"
+
+[[structure]]
 name = "Water"
 kind = "molecule"
 category = "Inorganic: hydrides"
@@ -1359,6 +1387,19 @@ url = "https://doi.org/10.1063/1.1677901"
 reference = "B. W. McClelland, G. Gundersen, K. Hedberg, Reinvestigation of the structure of dinitrogen tetroxide, N2O4, by gaseous electron diffraction, J. Chem. Phys. 56, 4541 (1972)"
 doi = "10.1063/1.1677901"
 note = "Planar electron-diffraction r_a structure (O–N–O 135.4°). The N–N bond, 1.782 Å, is unusually long and beyond the default bond limit, so it is not drawn; ViewSettings(bond_cutoffs=Dict((:N, :N) => 1.85)) shows it."
+
+[[structure]]
+name = "Disiloxane"
+kind = "molecule"
+category = "Inorganic: oxides and sulfides"
+formula = "(SiH3)2O"
+file = "molecules/SiH3_2O.xyz"
+description = "Experimental geometry, point group C2v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.3891/acta.chem.scand.17-2455"
+reference = "A. Almenningen, O. Bastiansen, V. Ewing, K. Hedberg, M. Trætteberg, The molecular structure of disiloxane, (SiH3)2O, Acta Chem. Scand. 17, 2455 (1963)"
+doi = "10.3891/acta.chem.scand.17-2455"
+note = "Electron diffraction. The wide Si–O–Si angle (144°) is a thermal average of a floppy bend; the SiH3 orientation (one H of each group towards the C2 axis) is the authors' tentative choice."
 
 [[structure]]
 name = "Nitric oxide"
@@ -1507,6 +1548,32 @@ note = "The C2 conformer from the microwave spectrum (structure type not stated)
 use = "wet etch and cleaning"
 
 [[structure]]
+name = "Antimony trichloride"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "SbCl3"
+file = "molecules/SbCl3.xyz"
+description = "Experimental geometry, point group C3v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1246/bcsj.46.404"
+reference = "S. Konaka, M. Kimura, The molecular structure of antimony trichloride as determined by gas-electron diffraction, Bull. Chem. Soc. Jpn. 46, 404 (1973)"
+doi = "10.1246/bcsj.46.404"
+note = "Electron-diffraction r_g with the angle θ_α."
+
+[[structure]]
+name = "Arsenic trichloride"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "AsCl3"
+file = "molecules/AsCl3.xyz"
+description = "Experimental geometry, point group C3v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.1747872"
+reference = "P. Kisliuk, C. H. Townes, The microwave spectra and molecular structure of phosphorus and arsenic trichloride, J. Chem. Phys. 18, 1109 (1950)"
+doi = "10.1063/1.1747872"
+note = "Early microwave structure (effectively r_0)."
+
+[[structure]]
 name = "Arsenic trifluoride"
 kind = "molecule"
 category = "Inorganic: nonmetal halides"
@@ -1575,6 +1642,19 @@ note = "Planar T shape; effective ground-state structure from the moments of ine
 use = "etch gas"
 
 [[structure]]
+name = "Chlorosilane"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "SiH3Cl"
+file = "molecules/SiH3Cl.xyz"
+description = "Experimental geometry, point group C3v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1080/00268976.2012.680518"
+reference = "G. Cazzoli, C. Puzzarini, J. Gauss, Rotational spectrum of silyl chloride: hyperfine structure and equilibrium geometry, Mol. Phys. 110, 2359 (2012)"
+doi = "10.1080/00268976.2012.680518"
+note = "Recommended equilibrium structure (semi-experimental r_e in agreement with theory)."
+
+[[structure]]
 name = "Dichlorosilane"
 kind = "molecule"
 category = "Inorganic: nonmetal halides"
@@ -1589,6 +1669,19 @@ note = ""
 use = "deposition precursor"
 
 [[structure]]
+name = "Fluorosilane"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "SiH3F"
+file = "molecules/SiH3F.xyz"
+description = "Experimental geometry, point group C3v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1016/j.jms.2010.05.001"
+reference = "C. Puzzarini, G. Cazzoli, J. Gauss, Silyl fluoride: Lamb-dip spectra and equilibrium structure, 64th International Symposium on Molecular Spectroscopy, Columbus (2009), talk, http://hdl.handle.net/1811/38302; C. Puzzarini, G. Cazzoli, J. Gauss, J. Mol. Spectrosc. 262, 37 (2010) (the paper of this work)"
+doi = "10.1016/j.jms.2010.05.001"
+note = "Semi-experimental r_e, read in the authors' symposium slides (the journal paper was not readable)."
+
+[[structure]]
 name = "Hexachlorodisilane"
 kind = "molecule"
 category = "Inorganic: nonmetal halides"
@@ -1601,6 +1694,19 @@ reference = "D. A. Swick, I. L. Karle, Structure and internal motion of C2F6 and
 doi = "10.1063/1.1742337"
 note = "Early electron-diffraction structure of low precision (Si–Si ± 0.06 Å): relax before use."
 use = "deposition precursor"
+
+[[structure]]
+name = "Nitrogen trichloride"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "NCl3"
+file = "molecules/NCl3.xyz"
+description = "Experimental geometry, point group C3v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1016/0022-2860(71)87058-8"
+reference = "H. B. Bürgi, D. Stedman, L. S. Bartell, Molecular structure of nitrogen trichloride as determined by electron diffraction, J. Mol. Struct. 10, 31 (1971)"
+doi = "10.1016/0022-2860(71)87058-8"
+note = "Electron-diffraction r_g. Explosive."
 
 [[structure]]
 name = "Nitrogen trifluoride"
@@ -1630,6 +1736,19 @@ doi = "10.1063/1.1731711"
 note = "An early effective structure from one isotopologue, no uncertainties given."
 
 [[structure]]
+name = "Phosphorus pentachloride"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "PCl5"
+file = "molecules/PCl5.xyz"
+description = "Experimental geometry, point group D3h"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1016/0022-2860(71)80038-8"
+reference = "W. J. Adams, L. S. Bartell, Structure and vibrational assignments for PCl5. An electron diffraction study, J. Mol. Struct. 8, 23 (1971)"
+doi = "10.1016/0022-2860(71)80038-8"
+note = "Electron diffraction (Table 2): axial bonds 0.104 Å longer than equatorial."
+
+[[structure]]
 name = "Phosphorus pentafluoride"
 kind = "molecule"
 category = "Inorganic: nonmetal halides"
@@ -1641,6 +1760,19 @@ url = "https://doi.org/10.1016/0022-2860(86)80149-1"
 reference = "H. Kurimura, S. Yamamoto, T. Egawa, K. Kuchitsu, Geometrical structure of PF5 as studied by gas electron diffraction and spectroscopic data, J. Mol. Struct. 140, 79 (1986)"
 doi = "10.1016/0022-2860(86)80149-1"
 note = "Electron-diffraction r_g; the authors estimate r_e = 1.576 Å (axial) and 1.529 Å (equatorial)."
+
+[[structure]]
+name = "Phosphorus trichloride"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "PCl3"
+file = "molecules/PCl3.xyz"
+description = "Experimental geometry, point group C3v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.1747872"
+reference = "P. Kisliuk, C. H. Townes, The microwave spectra and molecular structure of phosphorus and arsenic trichloride, J. Chem. Phys. 18, 1109 (1950)"
+doi = "10.1063/1.1747872"
+note = "Early microwave structure (effectively r_0)."
 
 [[structure]]
 name = "Phosphorus trifluoride"
@@ -1736,6 +1868,61 @@ url = "https://doi.org/10.1021/jp9842042"
 reference = "K. Aarset, Q. Shen, H. Thomassen, A. D. Richardson, K. Hedberg, Molecular structure of the aluminum halides, Al2Cl6, AlCl3, Al2Br6, AlBr3, and AlI3, obtained by gas-phase electron-diffraction and ab initio molecular orbital calculations, J. Phys. Chem. A 103, 1644 (1999)"
 doi = "10.1021/jp9842042"
 note = "Electron-diffraction r_g, planar Al2Cl2 ring (the thermal average is puckered); Cl(t)–Al–Cl(t) is known only to ± 3°."
+use = "deposition precursor"
+
+[[structure]]
+name = "Aluminium trichloride (monomer)"
+kind = "molecule"
+category = "Inorganic: metal halides"
+formula = "AlCl3"
+file = "molecules/AlCl3.xyz"
+description = "Experimental geometry, point group D3h"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1021/jp9842042"
+reference = "K. Aarset, Q. Shen, H. Thomassen, A. D. Richardson, K. Hedberg, Molecular structure of the aluminum halides, Al2Cl6, AlCl3, Al2Br6, AlBr3, and AlI3, obtained by gas-phase electron-diffraction and ab initio molecular orbital calculations, J. Phys. Chem. A 103, 1644 (1999)"
+doi = "10.1021/jp9842042"
+note = "Electron-diffraction r_g of the monomer (D3h assumed); the vapour is mostly the dimer Al2Cl6 at lower temperature."
+use = "deposition precursor"
+
+[[structure]]
+name = "Beryllium dichloride"
+kind = "molecule"
+category = "Inorganic: metal halides"
+formula = "BeCl2"
+file = "molecules/BeCl2.xyz"
+description = "Experimental geometry, point group D∞h"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1016/S0022-2860(96)09333-7"
+reference = "A. G. Girichev, N. I. Giricheva, N. Vogt, G. V. Girichev, J. Vogt, Structural investigation of molecules in the vapour over beryllium dichloride using electron diffraction and mass spectrometric data, J. Mol. Struct. 384, 175 (1996)"
+doi = "10.1016/S0022-2860(96)09333-7"
+note = "Equilibrium r_e^anh of the linear monomer (r_g = 1.798 Å). Highly toxic."
+
+[[structure]]
+name = "Gallium trichloride (monomer)"
+kind = "molecule"
+category = "Inorganic: metal halides"
+formula = "GaCl3"
+file = "molecules/GaCl3.xyz"
+description = "Experimental geometry, point group D3h"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1039/DT9920002209"
+reference = "A. Haaland, A. Hammel, K.-G. Martinsen, J. Tremmel, H. V. Volden, Molecular structures of monomeric gallium trichloride, indium trichloride and lead tetrachloride by gas electron diffraction, J. Chem. Soc., Dalton Trans. 1992, 2209"
+doi = "10.1039/DT9920002209"
+note = "Electron-diffraction r_a of the monomer (about 380 °C)."
+use = "deposition precursor"
+
+[[structure]]
+name = "Indium trichloride (monomer)"
+kind = "molecule"
+category = "Inorganic: metal halides"
+formula = "InCl3"
+file = "molecules/InCl3.xyz"
+description = "Experimental geometry, point group D3h"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1039/DT9920002209"
+reference = "A. Haaland, A. Hammel, K.-G. Martinsen, J. Tremmel, H. V. Volden, Molecular structures of monomeric gallium trichloride, indium trichloride and lead tetrachloride by gas electron diffraction, J. Chem. Soc., Dalton Trans. 1992, 2209"
+doi = "10.1039/DT9920002209"
+note = "Electron-diffraction r_a of the monomer (about 480 °C)."
 use = "deposition precursor"
 
 [[structure]]

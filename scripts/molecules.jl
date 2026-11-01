@@ -376,6 +376,45 @@ function crown_ring(x, n, r, θ)
     return fill(x, n), pos(R, hof(R))
 end
 
+"""
+Methylsilane-type H3C–XH3 (C3v, staggered): C–X, C–H, X–H and the H–C–H and
+H–X–H angles (both groups C3v about the C–X axis).
+"""
+function methyl_xh3(x, rcx, rch, rxh, θhch, θhxh)
+    c, xx = [0.0, 0, 0], [0.0, 0, rcx]
+    hc = methyl_h(xx, c, [1.0, 0, 0], rch, 180 - methyl_axis_angle(θhch), 0.0)
+    hx = methyl_h(c, xx, [1.0, 0, 0], rxh, 180 - methyl_axis_angle(θhxh), 60.0)
+    return ["C", x, "H", "H", "H", "H", "H", "H"], [[c, xx]; hc; hx]
+end
+
+"""
+Disiloxane-type H3X–O–XH3 (C2v): X–O, X–H, X–O–X, H–X–O (XH3 groups C3v
+about X–O), with one H of each group in the XOX plane, towards the other X.
+"""
+function disiloxane(x, rxo, rxh, θxox, θhxo)
+    o = [0.0, 0, 0]
+    x1 = rxo * [sind(θxox / 2), 0, cosd(θxox / 2)]
+    x2 = rxo * [-sind(θxox / 2), 0, cosd(θxox / 2)]
+    h1 = methyl_h(o, x1, x2 - x1, rxh, θhxo, 0.0)
+    h2 = methyl_h(o, x2, x1 - x2, rxh, θhxo, 0.0)
+    return ["O", x, x, fill("H", 6)...], [[o, x1, x2]; h1; h2]
+end
+
+"""
+Trisilane-type H3X–XH2–XH3 (C2v, terminal groups staggered): X–X, X–H
+(terminal and central), X–X–X, X(2)–X(1)–H and H–X(2)–H; one terminal H in
+the XXX plane, anti to the far X.
+"""
+function trisilane(x, rxx, rxh1, rxh2, θxxx, θxxh, θhxh)
+    x2 = [0.0, 0, 0]
+    x1 = rxx * [sind(θxxx / 2), 0, -cosd(θxxx / 2)]
+    x3 = rxx * [-sind(θxxx / 2), 0, -cosd(θxxx / 2)]
+    hc = [rxh2 * [0, s * sind(θhxh / 2), cosd(θhxh / 2)] for s in (1, -1)]
+    h1 = methyl_h(x2, x1, x1 - x3, rxh1, θxxh, 0.0)                # first H anti to X(3)
+    h3 = methyl_h(x2, x3, x3 - x1, rxh1, θxxh, 0.0)
+    return [x, x, x, fill("H", 8)...], [[x1, x2, x3]; hc; h1; h3]
+end
+
 # --- references --------------------------------------------------------------------------
 
 const HUBER_HERZBERG = ("K. P. Huber, G. Herzberg, Molecular Spectra and Molecular Structure IV. Constants of " *
@@ -991,6 +1030,86 @@ const MOLECULES = [
      refs=[("H. Takeo, E. Hirota, Y. Morino, Equilibrium structure and potential function of selenium dioxide by " *
             "microwave spectroscopy, J. Mol. Spectrosc. 34, 370 (1970)", "10.1016/0022-2852(70)90020-2")],
      note="Equilibrium r_e of the gas-phase monomer."),
+    # Main-group halides
+    (name="Aluminium trichloride (monomer)", formula="AlCl3", category="Inorganic: metal halides",
+     use="deposition precursor", pg="D3h",
+     geometry=planar_xy3("Al", "Cl", 2.062),
+     refs=[("K. Aarset, Q. Shen, H. Thomassen, A. D. Richardson, K. Hedberg, Molecular structure of the aluminum " *
+            "halides, Al2Cl6, AlCl3, Al2Br6, AlBr3, and AlI3, obtained by gas-phase electron-diffraction and ab " *
+            "initio molecular orbital calculations, J. Phys. Chem. A 103, 1644 (1999)", "10.1021/jp9842042")],
+     note="Electron-diffraction r_g of the monomer (D3h assumed); the vapour is mostly the dimer Al2Cl6 at lower " *
+          "temperature."),
+    (name="Gallium trichloride (monomer)", formula="GaCl3", category="Inorganic: metal halides",
+     use="deposition precursor", pg="D3h", geometry=planar_xy3("Ga", "Cl", 2.108), refs=[("A. Haaland, A. Hammel, K.-G. Martinsen, J. Tremmel, H. V. Volden, Molecular structures of monomeric gallium " *
+            "trichloride, indium trichloride and lead tetrachloride by gas electron diffraction, J. Chem. Soc., Dalton " *
+            "Trans. 1992, 2209", "10.1039/DT9920002209")],
+     note="Electron-diffraction r_a of the monomer (about 380 °C)."),
+    (name="Indium trichloride (monomer)", formula="InCl3", category="Inorganic: metal halides",
+     use="deposition precursor", pg="D3h", geometry=planar_xy3("In", "Cl", 2.289), refs=[("A. Haaland, A. Hammel, K.-G. Martinsen, J. Tremmel, H. V. Volden, Molecular structures of monomeric gallium " *
+            "trichloride, indium trichloride and lead tetrachloride by gas electron diffraction, J. Chem. Soc., Dalton " *
+            "Trans. 1992, 2209", "10.1039/DT9920002209")],
+     note="Electron-diffraction r_a of the monomer (about 480 °C)."),
+    (name="Beryllium dichloride", formula="BeCl2", category="Inorganic: metal halides", pg="D∞h",
+     geometry=linear(("Cl", "Be", "Cl"), (1.791, 1.791)),
+     refs=[("A. G. Girichev, N. I. Giricheva, N. Vogt, G. V. Girichev, J. Vogt, Structural investigation of molecules " *
+            "in the vapour over beryllium dichloride using electron diffraction and mass spectrometric data, J. Mol. " *
+            "Struct. 384, 175 (1996)", "10.1016/S0022-2860(96)09333-7")],
+     note="Equilibrium r_e^anh of the linear monomer (r_g = 1.798 Å). Highly toxic."),
+    (name="Phosphorus trichloride", formula="PCl3", category="Inorganic: nonmetal halides", pg="C3v",
+     geometry=pyramid("P", "Cl", 2.043, 100.10), refs=[("P. Kisliuk, C. H. Townes, The microwave spectra and molecular structure of phosphorus and arsenic " *
+            "trichloride, J. Chem. Phys. 18, 1109 (1950)", "10.1063/1.1747872")],
+     note="Early microwave structure (effectively r_0)."),
+    (name="Arsenic trichloride", formula="AsCl3", category="Inorganic: nonmetal halides", pg="C3v",
+     geometry=pyramid("As", "Cl", 2.161, 98.42), refs=[("P. Kisliuk, C. H. Townes, The microwave spectra and molecular structure of phosphorus and arsenic " *
+            "trichloride, J. Chem. Phys. 18, 1109 (1950)", "10.1063/1.1747872")],
+     note="Early microwave structure (effectively r_0)."),
+    (name="Antimony trichloride", formula="SbCl3", category="Inorganic: nonmetal halides", pg="C3v",
+     geometry=pyramid("Sb", "Cl", 2.333, 97.2),
+     refs=[("S. Konaka, M. Kimura, The molecular structure of antimony trichloride as determined by gas-electron " *
+            "diffraction, Bull. Chem. Soc. Jpn. 46, 404 (1973)", "10.1246/bcsj.46.404")],
+     note="Electron-diffraction r_g with the angle θ_α."),
+    (name="Nitrogen trichloride", formula="NCl3", category="Inorganic: nonmetal halides", pg="C3v",
+     geometry=pyramid("N", "Cl", 1.759, 107.1),
+     refs=[("H. B. Bürgi, D. Stedman, L. S. Bartell, Molecular structure of nitrogen trichloride as determined by " *
+            "electron diffraction, J. Mol. Struct. 10, 31 (1971)", "10.1016/0022-2860(71)87058-8")],
+     note="Electron-diffraction r_g. Explosive."),
+    (name="Phosphorus pentachloride", formula="PCl5", category="Inorganic: nonmetal halides", pg="D3h",
+     geometry=bipyramid("P", "Cl", 2.124, 2.020),
+     refs=[("W. J. Adams, L. S. Bartell, Structure and vibrational assignments for PCl5. An electron diffraction " *
+            "study, J. Mol. Struct. 8, 23 (1971)", "10.1016/0022-2860(71)80038-8")],
+     note="Electron diffraction (Table 2): axial bonds 0.104 Å longer than equatorial."),
+    # Silicon compounds
+    (name="Methylsilane", formula="CH3SiH3", category="Organometallic: metal alkyls", use="deposition precursor",
+     pg="C3v", geometry=methyl_xh3("Si", 1.8668, 1.093, 1.485, 107.667, 108.25),
+     refs=[("R. W. Kilb, L. Pierce, Microwave spectrum, structure, and internal barrier of methyl silane, J. Chem. " *
+            "Phys. 27, 108 (1957)", "10.1063/1.1743646")],
+     note="Ground-state (effectively r_0) structure; methyl and silyl groups staggered, as the authors established."),
+    (name="Chlorosilane", formula="SiH3Cl", category="Inorganic: nonmetal halides", pg="C3v",
+     geometry=xy3z_axial("Si", "H", "Cl", 1.469, 108.43, 2.046),
+     refs=[("G. Cazzoli, C. Puzzarini, J. Gauss, Rotational spectrum of silyl chloride: hyperfine structure and " *
+            "equilibrium geometry, Mol. Phys. 110, 2359 (2012)", "10.1080/00268976.2012.680518")],
+     note="Recommended equilibrium structure (semi-experimental r_e in agreement with theory)."),
+    (name="Fluorosilane", formula="SiH3F", category="Inorganic: nonmetal halides", pg="C3v",
+     geometry=xy3z_axial("Si", "H", "F", 1.4698, 108.29, 1.5906),
+     refs=[("C. Puzzarini, G. Cazzoli, J. Gauss, Silyl fluoride: Lamb-dip spectra and equilibrium structure, " *
+            "64th International Symposium on Molecular Spectroscopy, Columbus (2009), talk, " *
+            "http://hdl.handle.net/1811/38302", ""),
+           ("C. Puzzarini, G. Cazzoli, J. Gauss, J. Mol. Spectrosc. 262, 37 (2010) (the paper of this work)",
+            "10.1016/j.jms.2010.05.001")],
+     note="Semi-experimental r_e, read in the authors' symposium slides (the journal paper was not readable)."),
+    (name="Disiloxane", formula="(SiH3)2O", category="Inorganic: oxides and sulfides", pg="C2v",
+     geometry=disiloxane("Si", 1.634, 1.486, 144.1, 109.9),
+     refs=[("A. Almenningen, O. Bastiansen, V. Ewing, K. Hedberg, M. Trætteberg, The molecular structure of " *
+            "disiloxane, (SiH3)2O, Acta Chem. Scand. 17, 2455 (1963)", "10.3891/acta.chem.scand.17-2455")],
+     note="Electron diffraction. The wide Si–O–Si angle (144°) is a thermal average of a floppy bend; the SiH3 " *
+          "orientation (one H of each group towards the C2 axis) is the authors' tentative choice."),
+    (name="Trisilane", formula="Si3H8", category="Inorganic: hydrides", use="deposition precursor", pg="C2v",
+     geometry=trisilane("Si", 2.332, 1.483, 1.486, 110.2, 112.9, 107.8),
+     refs=[("A. Haaland, K. Rypdal, H. Stüger, H. V. Volden, Molecular structures and conformational composition of " *
+            "trisilane and tetrasilane by gas-phase electron diffraction, Acta Chem. Scand. 48, 46 (1994)",
+            "10.3891/acta.chem.scand.48-0046")],
+     note="Electron-diffraction r_a (Table 1); the central H–Si–H angle (107.8°) was fixed at an ab initio value " *
+          "by the authors."),
     # Carbon nanostructures
     (name="Buckminsterfullerene", formula="C60", category="Carbon: fullerenes", pg="Ih",
      geometry=fullerene_c60(1.458, 1.401),

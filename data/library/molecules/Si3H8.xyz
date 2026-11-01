@@ -1,0 +1,13 @@
+11
+Trisilane Si3H8, experimental geometry (A. Haaland, K. Rypdal, H. Stüger, H. V. Volden, Molecular structures and conformational composition of trisilane and tetrasilane by gas-phase electron diffraction, Acta Chem. Scand. 48, 46 (1994))
+Si     1.9126    -0.3430     0.0000
+Si     0.0000     0.9913     0.0000
+Si    -1.9126    -0.3430    -0.0000
+H      0.0000     1.8668    -1.2007
+H     -0.0000     1.8668     1.2007
+H      3.1675     0.4473     0.0000
+H      1.9951    -1.2334     1.1831
+H      1.9951    -1.2334    -1.1831
+H     -3.1675     0.4473    -0.0000
+H     -1.9951    -1.2334    -1.1831
+H     -1.9951    -1.2334     1.1831
