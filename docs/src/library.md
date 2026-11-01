@@ -19,7 +19,9 @@ formula, group or use contain all the words typed (`ethane`, `WF6`,
 | Semiconductors: group IV | Si, diamond, Si0.5Ge0.5 (ordered model) | COD (Hom et al. 1975 precision lattice constants; Dismukes 1964 for SiGe) |
 | Semiconductors: III–V | GaAs, AlAs, InAs, GaP, AlP, InP, GaSb, AlSb, InSb (zincblende); GaN, AlN, InN (wurtzite) | 300 K lattice constants from Vurgaftman, Meyer, Ram-Mohan, *J. Appl. Phys.* 89, 5815 (2001); wurtzite u from Paszkowicz et al. (2003, 2004) |
 | Oxides | α-quartz SiO₂, corundum Al₂O₃, monoclinic HfO₂ and ZrO₂, rutile and anatase TiO₂, ZnO, MgO, β-Ga₂O₃, SrTiO₃ | COD (published refinements, listed per entry) |
-| Molecules | 86 molecules in the groups below | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
+| Carbon: graphite and graphene | graphite (2H); graphene (one layer, periodic in-plane) | COD (Trucano & Chen 1975, neutron diffraction); graphene from that lattice constant |
+| Carbon: nanotubes | single-wall (5,5), (10,10), (9,0), (10,0), (6,5) | Rolled graphene sheet with graphite's C–C distance: models, periodic along the tube axis only |
+| Molecules | 99 molecules in the groups below | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
 
 Molecules are grouped the way chemistry textbooks classify them: first
 organic (carbon compounds), organometallic (metal–carbon bonds) or inorganic,
@@ -28,9 +30,10 @@ alphabetical order.
 
 | Class | Groups (examples) |
 |-------|-------------------|
-| Organic | hydrocarbons (CH₄, C₂H₂, propyne, cyclopropane, C₆H₆); halocarbons (CF₄, CH₂Cl₂, CHCl₃); alcohols and ethers (CH₃OH, oxirane); carbonyl compounds: aldehydes, ketones, acids, esters, amides (H₂CO, HCOOH, ketene, methyl formate, formamide); nitrogen and sulfur compounds (HCN, CH₃CN, DMSO); heterocycles (pyridine, furan, thiophene) |
+| Organic | hydrocarbons (CH₄, C₂H₂, propyne, cyclopropane, C₆H₆); halocarbons (CF₄, CH₂Cl₂, CHCl₃); alcohols and ethers (CH₃OH, oxirane); carbonyl compounds: aldehydes, ketones, acids, esters, amides (H₂CO, HCOOH, ketene, methyl formate, formamide); nitrogen and sulfur compounds (HCN, CH₃CN, DMSO); heterocycles (pyridine, furan, thiophene); radicals (CH, CH₂, HCO, CF₃) |
 | Organometallic | metal alkyls (Al(CH₃)₃ and its dimer, Zn(CH₃)₂, In(CH₃)₃); metal carbonyls (Ni(CO)₄, W(CO)₆) |
-| Inorganic | elements (H₂, O₂, O₃, Cl₂); hydrides (H₂O, NH₃, SiH₄, B₂H₆, HF); oxides (CO, CO₂, SO₂); nonmetal halides (BCl₃, SiCl₄, NF₃, SF₆); metal halides (TiCl₄, WF₆, Al₂Cl₆) |
+| Inorganic | elements (H₂, O₂, O₃, Cl₂); hydrides (H₂O, NH₃, SiH₄, B₂H₆, HF); oxides (CO, CO₂, SO₂, NO₂, SiO); nonmetal halides (BCl₃, SiCl₄, NF₃, SF₆); metal halides (TiCl₄, WF₆, Al₂Cl₆); radicals (NH₂, SiH₂, SiH₃, HO₂, SH, ClO) |
+| Carbon | fullerenes (C₆₀) |
 
 Molecules used in semiconductor processing also say what for (*Used as*):
 etch gas, dopant source, deposition precursor, ALD/CVD co-reactant
@@ -49,6 +52,12 @@ etch gas, dopant source, deposition precursor, ALD/CVD co-reactant
   non-periodic box with 5 Å of space; the
   library's *Molecules: in a periodic cubic box* switch makes the box
   periodic for plane-wave codes.
+- **Radicals** are open-shell species (surface adsorbates, plasma and CVD
+  intermediates); their note gives the spin state to use.
+- **Graphene and nanotubes** are periodic only along some directions
+  (extended XYZ with `pbc`): graphene in-plane, a nanotube along its axis
+  (c), with vacuum elsewhere. Nanotubes are ideal rolled sheets, so relax them
+  before use.
 - **SiGe:** the real alloy is random; the library holds the ordered model
   (Si and Ge on the two diamond sublattices) at the measured alloy lattice
   constant.

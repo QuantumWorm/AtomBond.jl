@@ -307,6 +307,24 @@ function cyclobutane(rcc, rch, θhch, θ, β)
     return [fill("C", 4); fill("H", 8)], [cs; hs]
 end
 
+"""
+Buckminsterfullerene C60 (Ih, truncated icosahedron) from its two bonds: `r56`
+(in a pentagon, fusing a 5- and a 6-ring) and `r66` (fusing two 6-rings). Each
+atom lies on an edge of an icosahedron with edge r66 + 2 r56, at r56 from a vertex.
+"""
+function fullerene_c60(r56, r66)
+    φ = (1 + sqrt(5)) / 2
+    ico = [Float64[0, s1, s2 * φ] for s1 in (1, -1) for s2 in (1, -1)]
+    ico = [ico; [circshift(v, 1) for v in ico]; [circshift(v, 2) for v in ico]]   # 12 vertices, edge 2
+    L = r66 + 2r56
+    ico = ico .* (L / 2)
+    pos = V3[]
+    for i in eachindex(ico), j in eachindex(ico)
+        i != j && isapprox(norm(ico[i] - ico[j]), L; rtol=1e-9) && push!(pos, ico[i] + r56 / L * (ico[j] - ico[i]))
+    end
+    return fill("C", length(pos)), pos
+end
+
 # --- references --------------------------------------------------------------------------
 
 const HUBER_HERZBERG = ("K. P. Huber, G. Herzberg, Molecular Spectra and Molecular Structure IV. Constants of " *
@@ -331,6 +349,8 @@ function methyl_formate()
 end
 
 spin_note(state) = "The ground state is a spin $state (open shell): use a spin-polarized calculation."
+odd_electron_note(extra="") = "A radical with an odd number of electrons: the ground state is a spin doublet (open " *
+                              "shell), use a spin-polarized calculation." * (isempty(extra) ? "" : " " * extra)
 
 # name, formula, category, point group, geometry (symbols, positions), references
 # (text, DOI), optional note. The values are those of the references.
@@ -748,6 +768,79 @@ const MOLECULES = [
             "structure and puckering potential function of cyclobutane studied by gas electron diffraction and " *
             "infrared spectroscopy, J. Chem. Phys. 86, 6018 (1987)", "10.1063/1.452489")],
      note="r_z structure (electron diffraction with infrared data): puckered ring, axial and equatorial C–H equal."),
+    # Radicals and fragments (surface science, plasma and CVD intermediates)
+    (name="Methylene", formula="CH2", category="Organic: radicals", pg="C2v",
+     geometry=zmatrix([("C",), ("H", 1, 1.0748), ("H", 1, 1.0748, 2, 133.84)]),
+     refs=[("P. R. Bunker, P. Jensen, A refined potential surface for the X̃ 3B1 electronic state of methylene CH2, " *
+            "J. Chem. Phys. 79, 1224 (1983)", "10.1063/1.445927")],
+     note="Equilibrium structure of the X̃ 3B1 ground state, fitted to experimental energy levels. " *
+          spin_note("triplet")),
+    (name="Formyl radical", formula="HCO", category="Organic: radicals", pg="Cs",
+     geometry=zmatrix([("C",), ("O", 1, 1.17), ("H", 1, 1.11, 2, 127.0)]),
+     refs=[("J. A. Austin, D. H. Levy, C. A. Gottlieb, H. E. Radford, Microwave spectrum of the HCO radical, " *
+            "J. Chem. Phys. 60, 207 (1974)", "10.1063/1.1680769")],
+     note=odd_electron_note("Low-precision geometry (no uncertainties given): relax before use.")),
+    (name="Trifluoromethyl radical", formula="CF3", category="Organic: radicals", pg="C3v",
+     geometry=pyramid("C", "F", 1.318, 110.76),
+     refs=[("C. Yamada, E. Hirota, Infrared diode laser spectroscopy of the CF3 ν3 band, J. Chem. Phys. 78, 1703 " *
+            "(1983)", "10.1063/1.444969")],
+     note="Pyramidal r_0 structure. " * odd_electron_note()),
+    (name="Amidogen radical", formula="NH2", category="Inorganic: radicals", pg="C2v",
+     geometry=zmatrix([("N",), ("H", 1, 1.0245), ("H", 1, 1.0245, 2, 103.34)]),
+     refs=[("I. Morino, K. Kawaguchi, Fourier transform far-infrared spectroscopy of the NH2, NHD, and ND2 " *
+            "radicals, J. Mol. Spectrosc. 182, 428 (1997)", "10.1006/jmsp.1996.7221")],
+     note="r_0 structure. " * odd_electron_note()),
+    (name="Silylene", formula="SiH2", category="Inorganic: radicals", pg="C2v",
+     geometry=zmatrix([("Si",), ("H", 1, 1.516), ("H", 1, 1.516, 2, 92.083)]),
+     refs=[("I. Dubois, The absorption spectrum of the free SiH2 radical, Can. J. Phys. 46, 2485 (1968)",
+            "10.1139/p68-608")],
+     note="Ground state 1A1 (singlet, closed shell) from the electronic spectrum; no uncertainties given."),
+    (name="Silyl radical", formula="SiH3", category="Inorganic: radicals", pg="C3v",
+     geometry=pyramid("Si", "H", 1.468, 110.5),
+     refs=[("C. Yamada, E. Hirota, Detection of the silyl radical SiH3 by infrared diode-laser spectroscopy, Phys. " *
+            "Rev. Lett. 56, 923 (1986)", "10.1103/PhysRevLett.56.923")],
+     note="Pyramidal effective structure (no uncertainties given). " * odd_electron_note()),
+    (name="Hydroperoxyl radical", formula="HO2", category="Inorganic: radicals", pg="Cs",
+     geometry=zmatrix([("O",), ("O", 1, 1.33054), ("H", 1, 0.9707, 2, 104.29)]),
+     refs=[("K. G. Lubic, T. Amano, H. Uehara, K. Kawaguchi, E. Hirota, The ν1 band of the DO2 radical by difference " *
+            "frequency laser and diode laser spectroscopy: the equilibrium structure of the hydroperoxyl radical, " *
+            "J. Chem. Phys. 81, 4826 (1984)", "10.1063/1.447508")],
+     note="Equilibrium structure r_e. " * odd_electron_note()),
+    (name="Nitrogen dioxide", formula="NO2", category="Inorganic: oxides", pg="C2v",
+     geometry=zmatrix([("N",), ("O", 1, 1.1949), ("O", 1, 1.1949, 2, 133.75)]),
+     refs=[("J. Demaison, J. Liévin, A. Perrin, Equilibrium structure of nitrogen dioxide revisited, Mol. Phys. 122, " *
+            "e2318016 (2024)", "10.1080/00268976.2024.2318016")],
+     note="Experimental r_e (Table 1) of the X̃ 2A1 ground state. " * spin_note("doublet")),
+    (name="Methylidyne radical", formula="CH", category="Organic: radicals", pg="C∞v",
+     geometry=linear(("C", "H"), (1.11983,)),
+     refs=[("P. F. Bernath, The vibration-rotation emission spectrum of CH(X 2Π), J. Chem. Phys. 86, 4838 (1987)",
+            "10.1063/1.452677")],
+     note="Equilibrium r_e of the X 2Π ground state. " * spin_note("doublet")),
+    (name="Mercapto radical", formula="SH", category="Inorganic: radicals", pg="C∞v",
+     geometry=linear(("S", "H"), (1.3503,)),
+     refs=[("D. A. Ramsay, Absorption spectra of SH and SD produced by flash photolysis of H2S and D2S, J. Chem. " *
+            "Phys. 20, 1920 (1952)", "10.1063/1.1700339")],
+     note="Ground-state r_0 (2Π), no uncertainty given. " * spin_note("doublet")),
+    (name="Chlorine monoxide", formula="ClO", category="Inorganic: radicals", pg="C∞v",
+     geometry=linear(("Cl", "O"), (1.569,)),
+     refs=[("T. Amano, S. Saito, E. Hirota, Y. Morino, D. R. Johnson, F. X. Powell, The microwave spectrum of the ClO " *
+            "radical, Ohio State University International Symposium on Molecular Spectroscopy, 1968, paper E2, " *
+            "http://hdl.handle.net/1811/15452", "")],
+     note="Estimated equilibrium distance (± 0.001 Å) from the authors' symposium abstract; 2Π ground state. " *
+          spin_note("doublet")),
+    (name="Silicon monoxide", formula="SiO", category="Inorganic: oxides", pg="C∞v",
+     geometry=linear(("Si", "O"), (1.50973,)),
+     refs=[("T. Törring, Das Mikrowellenrotationsspektrum des SiO, Z. Naturforsch. A 23, 777 (1968)",
+            "10.1515/zna-1968-0527")],
+     note="Equilibrium r_e from the microwave spectrum (Table 2)."),
+    # Carbon nanostructures
+    (name="Buckminsterfullerene", formula="C60", category="Carbon: fullerenes", pg="Ih",
+     geometry=fullerene_c60(1.458, 1.401),
+     refs=[("K. Hedberg, L. Hedberg, D. S. Bethune, C. A. Brown, H. C. Dorn, R. D. Johnson, M. de Vries, Bond " *
+            "lengths in free molecules of buckminsterfullerene, C60, from gas-phase electron diffraction, Science 254, " *
+            "410 (1991)", "10.1126/science.254.5030.410")],
+     note="Electron-diffraction r_g (thermal average at about 1000 K): 1.458 Å in the pentagons (5:6 bonds), " *
+          "1.401 Å between hexagons (6:6 bonds)."),
 ]
 
 """

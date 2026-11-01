@@ -15,7 +15,7 @@
 # index data/library/library.toml. To add a structure, add an entry to CRYSTALS
 # or MOLECULES and run the script again. Only the Julia standard library is used.
 
-using Downloads, Printf
+using Downloads, Printf, LinearAlgebra
 
 include("molecules.jl")
 
@@ -50,6 +50,9 @@ const CRYSTALS = [
      description="Periclase, rocksalt Fm-3m, a = 4.2113 Å"),
     (name="Gallium oxide (beta-Ga2O3)", file="Ga2O3_beta.cif", cod=2004987, category="Oxides", formula="Ga2O3",
      description="beta-Ga2O3, C2/m, a = 12.214, b = 3.0371, c = 5.7981 Å, beta = 103.83°"),
+    (name="Graphite", file="C_graphite.cif", cod=9011577, category="Carbon: graphite and graphene", formula="C",
+     description="Hexagonal (2H, AB-stacked) graphite, P6_3/mmc, a = 2.464 Å, c = 6.711 Å; neutron diffraction on " *
+                 "natural crystals"),
     (name="Strontium titanate (SrTiO3)", file="SrTiO3_perovskite.cif", cod=9006864, category="Oxides",
      formula="SrTiO3", description="Cubic perovskite, Pm-3m, a = 3.90528 Å (room temperature)"),
 ]
@@ -179,7 +182,8 @@ ordered_sige(a, source_ref) = """
     Ge1 Ge 0.25 0.25 0.25
     """
 
-const CRYSTAL_GROUPS = ["Semiconductors: group IV", "Semiconductors: III-V", "Oxides"]
+const CRYSTAL_GROUPS = ["Semiconductors: group IV", "Semiconductors: III-V", "Oxides",
+                        "Carbon: graphite and graphene", "Carbon: nanotubes"]
 
 # Molecules: the usual chemical classification (organic, organometallic,
 # inorganic) with groups by functional group or compound type, so a molecule
@@ -187,10 +191,78 @@ const CRYSTAL_GROUPS = ["Semiconductors: group IV", "Semiconductors: III-V", "Ox
 # extra information, shown and searchable in the library tool.
 const MOLECULE_GROUPS = ["Organic: hydrocarbons", "Organic: halocarbons", "Organic: alcohols and ethers",
                          "Organic: carbonyl compounds", "Organic: nitrogen and sulfur compounds",
-                         "Organic: heterocycles",
+                         "Organic: heterocycles", "Organic: radicals",
                          "Organometallic: metal alkyls", "Organometallic: metal carbonyls",
                          "Inorganic: elements", "Inorganic: hydrides", "Inorganic: oxides",
-                         "Inorganic: nonmetal halides", "Inorganic: metal halides"]
+                         "Inorganic: nonmetal halides", "Inorganic: metal halides",
+                         "Inorganic: radicals", "Carbon: fullerenes"]
+
+# --- carbon nanostructures from graphite's in-plane lattice constant ------------------
+
+"""Extended XYZ text: lattice vectors as columns of `L`, Cartesian positions, pbc flags."""
+function extxyz(title, L, syms, pos, pbc)
+    lat = join((@sprintf("%.6f", x) for x in vec(L)), " ")
+    lines = ["$(length(syms))", "Lattice=\"$lat\" Properties=species:S:1:pos:R:3 pbc=\"$(join((p ? "T" : "F" for p in pbc), " "))\" $title"]
+    append!(lines, [@sprintf("%-2s %12.6f %12.6f %12.6f", s, p...) for (s, p) in zip(syms, pos)])
+    return join(lines, "\n") * "\n"
+end
+
+"""Graphene: one layer, periodic in-plane, `vacuum` Å along c (not periodic)."""
+function graphene_xyz(a, vacuum)
+    L = [a a/2 0; 0 a*sqrt(3)/2 0; 0 0 vacuum]
+    pos = [L * [1/3, 1/3, 0.5], L * [2/3, 2/3, 0.5]]                # a1, a2 at 60°
+    return extxyz("graphene", L, ["C", "C"], pos, (true, true, false))
+end
+
+"""
+Single-wall (n, m) carbon nanotube: the graphene sheet rolled along the chiral
+vector C_h = n a1 + m a2; one translational period T along the tube axis (c,
+periodic), with `vacuum` Å between periodic images in a and b (not periodic).
+"""
+function nanotube_xyz(n, m, a, vacuum)
+    a1, a2 = [a, 0.0], [a / 2, a * sqrt(3) / 2]
+    basis = [(a1 + a2) / 3, 2(a1 + a2) / 3]                   # the two atoms of the graphene cell
+    ch = n * a1 + m * a2
+    d = gcd(2m + n, 2n + m)
+    t = ((2m + n) ÷ d) * a1 - ((2n + m) ÷ d) * a2
+    lc, lt = norm(ch), norm(t)
+    R = lc / 2π
+    pos = Vector{Float64}[]
+    span = 2(abs(n) + abs(m) + abs((2m + n) ÷ d) + abs((2n + m) ÷ d))
+    for i in -span:span, j in -span:span, b in basis
+        p = i * a1 + j * a2 + b
+        u, v = dot(p, ch) / lc^2, dot(p, t) / lt^2            # fractions of C_h and T
+        (-1e-9 <= u < 1 - 1e-9 && -1e-9 <= v < 1 - 1e-9) || continue
+        push!(pos, [R * cos(2π * u), R * sin(2π * u), v * lt])
+    end
+    natoms = 4 * (n^2 + n * m + m^2) ÷ d
+    length(pos) == natoms || error("($n,$m) nanotube: $(length(pos)) atoms, expected $natoms")
+    box = 2R + vacuum
+    pos = [p + [box / 2, box / 2, 0] for p in pos]
+    return extxyz("($n,$m) nanotube", [box 0 0; 0 box 0; 0 0 lt], fill("C", length(pos)), pos, (false, false, true)), R, lt
+end
+
+const NANOTUBES = [(5, 5, "armchair, metallic"), (10, 10, "armchair, metallic"), (9, 0, "zigzag, small gap"),
+                   (10, 0, "zigzag, semiconducting"), (6, 5, "chiral, semiconducting")]
+
+"""Graphene and nanotube entries built from graphite's in-plane lattice constant `a`."""
+function carbon_entries(a, cod, ref, doi)
+    src = "Built from the graphite lattice constant a = $a Å (COD $cod)"
+    common = (url="https://www.crystallography.net/cod/$cod.html", reference=ref, doi=doi)
+    out = [(; name="Graphene", file="C_graphene.xyz", formula="C", category="Carbon: graphite and graphene",
+              text=graphene_xyz(a, 15.0), description="Single layer, periodic in-plane, C–C = $(round(a / sqrt(3); digits=4)) Å, 15 Å vacuum along c",
+              source=src, common..., note="One layer of the graphite structure (flat, as in graphite).")]
+    for (n, m, kind) in NANOTUBES
+        text, R, lt = nanotube_xyz(n, m, a, 10.0)
+        push!(out, (; name="Carbon nanotube ($n,$m)", file="CNT_$(n)_$(m).xyz", formula="C", category="Carbon: nanotubes",
+                    text, description="Single-wall ($n,$m) nanotube, $kind, diameter $(round(2R; digits=2)) Å, " *
+                                      "one period $(round(lt; digits=3)) Å along c (periodic), 10 Å vacuum around it",
+                    source=src, common...,
+                    note="A model, not a measured structure: the graphene sheet rolled into a cylinder. Relax before use " *
+                         "(curvature changes the bonds slightly, more for thin tubes)."))
+    end
+    return out
+end
 
 toml_string(s) = "\"" * replace(s, "\\" => "\\\\", "\"" => "\\\"") * "\""
 
@@ -213,6 +285,16 @@ function main(args=ARGS)
                         source="Crystallography Open Database, COD $(c.cod)",
                         url="https://www.crystallography.net/cod/$(c.cod).html",
                         reference=ref, doi, note=get(c, :note, "")))
+    end
+
+    g = only(c for c in CRYSTALS if c.file == "C_graphite.cif")
+    gcif = get_text("https://www.crystallography.net/cod/$(g.cod).cif", joinpath(cache, "$(g.cod).cif"))
+    for e in carbon_entries(parse(Float64, replace(cif_field(gcif, "_cell_length_a"), r"\(.*" => "")), g.cod,
+                            cif_reference(gcif)...)
+        write(joinpath(root, "crystals", e.file), e.text)
+        push!(entries, (name=e.name, kind="crystal", category=e.category, formula=e.formula,
+                        file="crystals/" * e.file, description=e.description, source=e.source,
+                        url=e.url, reference=e.reference, doi=e.doi, note=e.note))
     end
 
     for e in iii_v_entries()
