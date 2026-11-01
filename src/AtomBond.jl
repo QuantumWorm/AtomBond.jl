@@ -131,6 +131,8 @@ function wsl_software_rendering!(env=ENV)
     return true
 end
 
+include("precompile.jl")
+
 function __init__()
     load_user_elements!()      # user overrides of element colors/radii (~/.atombond/elements.csv)
     wsl_software_rendering!()

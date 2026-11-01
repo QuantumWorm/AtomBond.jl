@@ -24,7 +24,8 @@ function draw_bonds!(ax, dm::DisplayModel, vs::ViewSettings)
         push!(scales, Vec3f(r, r, len))
         push!(colors, halfbond_color(dm, h, vs))
     end
-    cylinder = Makie.Tessellation(Cylinder(Point3f(0, 0, 0), Point3f(0, 0, 1), 1.0f0), vs.bond_resolution)
+    cylinder = Makie.Tessellation(Cylinder(Point3f(0, 0, 0), Point3f(0, 0, 1), 1.0f0),
+                                  mesh_detail(vs, length(dm.atoms))[2])
     Makie.meshscatter!(ax, starts;
         marker=cylinder, rotation=dirs, markersize=scales, color=colors,
         specular=vs.specular, shininess=vs.shininess, ssao=vs.ssao)

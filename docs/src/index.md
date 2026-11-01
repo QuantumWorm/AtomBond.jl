@@ -44,6 +44,10 @@ using Pkg
 Pkg.add(url="https://github.com/QuantumWorm/AtomBond.jl")
 ```
 
+Installing compiles AtomBond and caches a typical session (reading files,
+the window, its tools), which takes a few minutes once; afterwards the
+window opens in seconds.
+
 ## Getting started
 
 ```julia

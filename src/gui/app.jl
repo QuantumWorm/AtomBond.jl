@@ -172,8 +172,26 @@ function visualize(; show::Bool=true, kwargs...)
     return v
 end
 
-"""Render the whole figure to an image, using the open window or an offscreen screen."""
+"""
+Render the whole figure to an image, using the open window or an offscreen
+screen. Images get full sphere and bond detail even when the interactive view
+uses less (`ViewSettings.adaptive_detail`).
+"""
 function render_image(v::Viewer)
+    vs = v.settings
+    reduced = mesh_detail(vs, length(v.display.atoms)) != (vs.sphere_resolution, vs.bond_resolution)
+    reduced || return render_image_now(v)
+    vs.adaptive_detail = false
+    try
+        redraw!(v)
+        return render_image_now(v)
+    finally
+        vs.adaptive_detail = true
+        redraw!(v)
+    end
+end
+
+function render_image_now(v::Viewer)
     v.screen === nothing || return Makie.colorbuffer(v.screen)
     # Already drawn offscreen (a figure can be on one GLMakie screen only).
     s = Makie.getscreen(v.figure.scene)

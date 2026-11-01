@@ -2096,5 +2096,16 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         rotate_view!(v, 30); rotate_view!(v, 60)
         @test all(isapprox.(screen(p), (x1, y1); atol=1e-4))                         # angles add up
         @test "Turn view 90° clockwise" in [it.label for it in AtomBond.menubar_items(v, "View")]
+        # Fewer sphere/bond segments for large structures while viewing; images use full detail
+        vs = ViewSettings()
+        @test AtomBond.mesh_detail(vs, 100) == (48, 24) && AtomBond.mesh_detail(vs, 1000) == (24, 12) &&
+              AtomBond.mesh_detail(vs, 5000) == (16, 8)
+        @test AtomBond.mesh_detail(ViewSettings(adaptive_detail=false), 5000) == (48, 24)
+        @test AtomBond.mesh_detail(ViewSettings(sphere_resolution=12), 1000) == (12, 12)          # never more than asked
+        big = visualize(supercell(si, 4, 4, 4); show=false, panel=false)           # 512 atoms (+ boundary copies)
+        @test AtomBond.mesh_detail(big.settings, length(big.display.atoms)) == (24, 12)
+        nplots = length(big.plots)
+        img = AtomBond.render_image(big)                                         # drawn at full detail, then back
+        @test size(img, 1) > 0 && big.settings.adaptive_detail && length(big.plots) == nplots
     end
 end

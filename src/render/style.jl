@@ -23,7 +23,9 @@ viewer and call [`redraw!`](@ref). Main fields: `style` (see
 `show_cell`, `show_boundary_atoms`, `wrap_atoms`, `show_labels`,
 `show_triad`, `orthographic`, `bond_lengths` (`:selected` or `:all`),
 `show_bond_angles`, `show_dihedrals`, `show_coordinates`, `show_charges`,
-`show_magmoms` and `bond_cutoffs` (per element pair).
+`show_magmoms`, `bond_cutoffs` (per element pair) and `adaptive_detail`
+(fewer sphere and bond segments for structures over 200 atoms while viewing;
+saved images always use the full `sphere_resolution` / `bond_resolution`).
 """
 Base.@kwdef mutable struct ViewSettings
     style::Symbol = :ball_and_stick
@@ -33,6 +35,9 @@ Base.@kwdef mutable struct ViewSettings
     min_radius::Float64 = 0.2
     cpk_scale::Float64 = 1.0       # CPK: radius = cpk_scale * r_vdW
     sphere_resolution::Int = 48
+    # Fewer sphere/cylinder segments for large structures while viewing (saved
+    # images use full detail); see `mesh_detail`.
+    adaptive_detail::Bool = true
     specular::Float64 = 0.4
     shininess::Float64 = 32.0
 
@@ -119,3 +124,18 @@ function atom_radius(s::Symbol, vs::ViewSettings)
 end
 
 bonds_visible(vs::ViewSettings) = vs.show_bonds && vs.style !== :cpk
+
+"""
+    mesh_detail(settings, natoms) -> (sphere segments, cylinder segments)
+
+Segments used to draw spheres and bond cylinders for `natoms` drawn atoms:
+the full `sphere_resolution` / `bond_resolution` up to 200 atoms; with
+`adaptive_detail`, at most 24 / 12 up to 2000 atoms and 16 / 8 beyond. A
+48-segment sphere has about 4600 triangles, so large cells draw several times
+faster (most on software OpenGL), with hardly visible faceting at that size.
+"""
+function mesh_detail(vs::ViewSettings, n::Integer)
+    (!vs.adaptive_detail || n <= 200) && return vs.sphere_resolution, vs.bond_resolution
+    n <= 2000 && return min(vs.sphere_resolution, 24), min(vs.bond_resolution, 12)
+    return min(vs.sphere_resolution, 16), min(vs.bond_resolution, 8)
+end
