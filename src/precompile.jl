@@ -25,7 +25,7 @@ using PrecompileTools: @setup_workload, @compile_workload
         sc = supercell(si, 2, 2, 2)
         sl = slab(si, (1, 1, 1); layers=2, vacuum=10)
         fixed = with_constraints(fix_atoms(sl, 1:2); cell=(1, 1, 1, 0, 0, 0))
-        for w in (write_qe, write_abinit, write_siesta, write_castep, write_cif, write_xyz, write_poscar)
+        for w in (write_qe, write_abinit, write_siesta, write_dftk, write_castep, write_cif, write_xyz, write_poscar)
             sprint(io -> w(io, fixed))
         end
         nanotube(6, 5)

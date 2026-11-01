@@ -186,7 +186,7 @@ end
 
 Open the Export tool: choose a format, folder and name, k-point spacing
 (the resulting mesh for the current structure is shown) and, for Quantum
-ESPRESSO, the cutoff and pseudopotential file pattern.
+ESPRESSO, ABINIT and DFTK, the cutoff and pseudopotentials.
 """
 function export_dialog(v::Viewer)
     f = new_dialog(v, :export, "Export")
@@ -215,15 +215,18 @@ function export_dialog(v::Viewer)
     update_mesh()
     Makie.Label(f.g[nextrow!(f), 1:2], mesh; halign=:left, fontsize=PANEL_FONTSIZE)
 
-    heading!(f, "Plane waves (Quantum ESPRESSO, ABINIT)")
+    heading!(f, "Plane waves (Quantum ESPRESSO, ABINIT, DFTK)")
     ecut = field!(f, "Cutoff (Ry)", "40", s -> isnum(s) && parse(Float64, s) > 0)
-    pseudo = field!(f, "Pseudopotential file", "{El}.UPF", s -> occursin("{El}", s))
-    note!(f, "{El} is replaced by each element symbol.\nABINIT gets ecut in Ha (half the Ry value).")
-    # The usual pseudopotential file type follows the code.
+    pseudo = field!(f, "Pseudopotentials", "{El}.UPF", s -> occursin("{El}", s) || occursin(r"^[\w.+-]+$", s))
+    note!(f, "{El} is replaced by each element symbol; DFTK also takes\na PseudoPotentialData family name. ABINIT and DFTK\nget the cutoff in Ha (half the Ry value).")
+    # The usual pseudopotential files follow the code.
+    defaults = ("{El}.UPF", "{El}.psp8", DFTK_PSEUDO_FAMILY)
     Makie.on(format.selection) do fmt
         t = shown_text(pseudo)
-        fmt === :abinit && t == "{El}.UPF" && settext!(pseudo, "{El}.psp8")
-        fmt === :qe && t == "{El}.psp8" && settext!(pseudo, "{El}.UPF")
+        t in defaults || return
+        fmt === :abinit && settext!(pseudo, "{El}.psp8")
+        fmt === :qe && settext!(pseudo, "{El}.UPF")
+        fmt === :dftk && settext!(pseudo, DFTK_PSEUDO_FAMILY)
     end
 
     go = button!(f, "Export")
@@ -947,7 +950,10 @@ function cell_constraints_preview(c::Crystal, cc)
     _, abinit = abinit_optcell(t)
     siesta = cc == (0, 0, 0, 0, 0, 0) ? "cell fixed" : cc == FREE_CELL ? "MD.VariableCell T" :
              "MD.VariableCell T relaxes the whole cell (constraints not applied)"
+    dftk = cc == (0, 0, 0, 0, 0, 0) ? "variablecell=false" : cc == FREE_CELL ? "variablecell=true" :
+           "variablecell=true relaxes the whole cell (constraints not applied)"
     return describe_cell_constraints(cc) * "\nQE: " * qe * "\nABINIT: " * abinit * "\nSIESTA: " * siesta *
+           "\nDFTK: " * dftk *
            "\nVASP: " * vasp * "\nCASTEP: CELL_CONSTRAINTS " * join(cc[1:3], " ") * " / " * join(cc[4:6], " ")
 end
 
@@ -972,7 +978,7 @@ Cell and constraints tool:
   codes), or treat a structure as a molecule.
 - Lattice constraints for geometry optimization: presets or numbers for
   a b c α β γ (0 fixed, equal numbers tied) with how each code gets them
-  (Quantum ESPRESSO, ABINIT, SIESTA, VASP, CASTEP).
+  (Quantum ESPRESSO, ABINIT, SIESTA, DFTK, VASP, CASTEP).
 - Atom constraints: fix the fractional x, y, z of the selected atoms.
 All changes are undoable and are written by the exporters.
 """

@@ -320,6 +320,106 @@ function write_siesta(io::IO, c::Crystal; kspacing::Real=0.25)
 end
 
 # ---------------------------------------------------------------------------
+# DFTK.jl
+
+"""Default pseudopotential family of DFTK scripts (PseudoDojo, norm-conserving, PBE)."""
+const DFTK_PSEUDO_FAMILY = "dojo.nc.sr.pbe.v0_4_1.standard.upf"
+
+"""
+    write_dftk(path, c; kspacing=0.25, ecutwfc=40, pseudo=DFTK_PSEUDO_FAMILY)
+
+A Julia script that runs the structure in [DFTK.jl](https://dftk.org)
+(DFTK 0.8): the cell and Cartesian positions as an AtomsBase system, a PBE
+model with a little Gaussian smearing, `Ecut` in Ha (= `ecutwfc`/2, as
+`ecutwfc` is in Ry like Quantum ESPRESSO's) and a Γ-centred k-grid. `pseudo`
+is a PseudoPotentialData family name, or a file pattern with `{El}` (one
+file per element). Initial magnetic moments go on the atoms
+(`magnetic_moment`), which makes the calculation spin-polarized.
+
+Without constraints the script runs an SCF and prints the energies and
+forces. With constraints it relaxes the structure with GeometryOptimization.jl
+instead: fully fixed atoms are clamped (`clamp=true`), and the cell is
+relaxed as a whole when any of it may change (`variablecell`); partly fixed
+atoms and partial cell constraints cannot be expressed there and are noted
+in a comment. With clamped atoms the script switches DFTK's symmetries off
+(they no longer hold once the free atoms move). Run with `julia <name>.jl` in an environment that has DFTK,
+PseudoPotentialData, AtomsBase, Unitful and UnitfulAtomic
+(+ GeometryOptimization for a relaxation).
+"""
+write_dftk(path::AbstractString, c::Crystal; kw...) = open(io -> write_dftk(io, c; kw...), path, "w")
+
+function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
+                    pseudo::AbstractString=DFTK_PSEUDO_FAMILY)
+    spc = species_list(c)
+    title = isempty(c.title) ? formula(c) : c.title
+    relax = has_constraints(c)
+    println(io, "# ", title, " — DFTK.jl script written by AtomBond")
+    println(io, "# Run with `julia <this file>` in an environment with DFTK, PseudoPotentialData, AtomsBase,")
+    println(io, "# Unitful and UnitfulAtomic", relax ? " (and GeometryOptimization for the relaxation)." : ".")
+    println(io, "using DFTK, PseudoPotentialData, AtomsBase, Unitful, UnitfulAtomic")
+    relax && println(io, "using GeometryOptimization")
+    all(c.pbc) || println(io, "\n# Not periodic along every axis in AtomBond: DFTK treats the cell as periodic, ",
+                             "so keep enough vacuum.")
+    println(io, "\n# Cell vectors and Cartesian positions (Å)")
+    println(io, "cell_vectors = [")
+    for v in cell_vectors(c.lattice)
+        @printf(io, "    [%.10f, %.10f, %.10f],\n", v...)
+    end
+    println(io, "]u\"Å\"")
+    println(io, "atoms = [")
+    for (i, (s, r)) in enumerate(zip(c.species, cartesian_positions(c)))
+        props = String[]
+        m = c.magmoms[i]
+        isnan(m) || push!(props, @sprintf("magnetic_moment=%.4f", m))
+        relax && all(c.fixed[i]) && push!(props, "clamp=true")
+        @printf(io, "    Atom(:%s, [%.10f, %.10f, %.10f]u\"Å\"%s),\n", s, r..., isempty(props) ? "" : "; " * join(props, ", "))
+    end
+    println(io, "]")
+    println(io, "system = periodic_system(atoms, cell_vectors)")
+    any(!isnan, c.magmoms) && println(io, "# Initial magnetic moments (μB) on the atoms make the run spin-polarized.")
+
+    println(io, "\n# Model and basis (check Ecut against your pseudopotentials)")
+    if occursin("{El}", pseudo)
+        println(io, "pseudopotentials = Dict(", join((":$s => \"$(replace(pseudo, "{El}" => string(s)))\"" for s in spc), ", "), ")")
+    else
+        println(io, "pseudopotentials = PseudoFamily(\"", pseudo, "\")")
+    end
+    println(io, "model_kwargs = (; functionals=PBE(), pseudopotentials, temperature=1e-3, smearing=Smearing.Gaussian())")
+    n = kpoint_grid(c; kspacing)
+    @printf(io, "basis_kwargs = (; Ecut=%.2f, kgrid=[%d, %d, %d])  # Ecut in Ha (= %.2f Ry); k-spacing %s 1/Å\n",
+            ecutwfc / 2, n..., ecutwfc, kspacing)
+
+    if !relax
+        println(io, "\n# SCF")
+        println(io, "model = model_DFT(system; model_kwargs...)")
+        println(io, "basis = PlaneWaveBasis(model; basis_kwargs...)")
+        println(io, "scfres = self_consistent_field(basis; ρ=guess_density(basis, system), tol=1e-8)")
+        println(io, "display(scfres.energies)")
+        println(io, "forces = compute_forces_cart(scfres)  # Ha/bohr")
+        println(io, "foreach(((i, f),) -> println(\"atom \", i, \": \", f), enumerate(forces))")
+        return
+    end
+    cc = c.cell_constraints
+    variable = cc != (0, 0, 0, 0, 0, 0)
+    println(io, "\n# Relaxation: ", describe_cell_constraints(cc))
+    variable && cc != FREE_CELL &&
+        println(io, "# Note: GeometryOptimization relaxes the whole cell; these cell constraints are not applied")
+    any(f -> any(f) && !all(f), c.fixed) &&
+        println(io, "# Note: partly fixed atoms are not written (only fully fixed atoms are clamped)")
+    if any(all, c.fixed)
+        println(io, "# Clamped atoms break the symmetry of the starting structure, so DFTK must not use it")
+        println(io, "model_kwargs = (; model_kwargs..., symmetries=false)")
+    end
+    println(io, "calc = DFTKCalculator(; model_kwargs, basis_kwargs, scf_kwargs=(; tol=1e-8))")
+    println(io, "results = minimize_energy!(system, calc; variablecell=", variable,
+            ", tol_forces=1e-3u\"eV/Å\", maxiters=100, verbosity=1)")
+    println(io, "relaxed = results.system")
+    println(io, "println(relaxed)")
+    println(io, "# To open the relaxed structure in AtomBond:")
+    println(io, "#   using AtomBond; save_structure(\"relaxed.xyz\", from_atomsbase(relaxed))")
+end
+
+# ---------------------------------------------------------------------------
 # CASTEP
 
 """
@@ -413,6 +513,7 @@ const EXPORT_FORMATS = [
     ("Quantum ESPRESSO (.in)", :qe),
     ("ABINIT (.abi)", :abinit),
     ("SIESTA (.fdf)", :siesta),
+    ("DFTK.jl (.jl script)", :dftk),
     ("VASP (POSCAR + KPOINTS)", :vasp),
     ("CASTEP (.cell)", :castep),
     ("CIF (P1)", :cif),
@@ -422,24 +523,31 @@ const EXPORT_FORMATS = [
 """
     export_inputs(c, format, dir, name; kspacing=0.25, ecutwfc=40, pseudo="{El}.UPF") -> paths
 
-Write `c` for `format` ∈ (:qe, :abinit, :siesta, :vasp, :castep, :cif, :xyz)
-into `dir`. VASP files go into a sub-folder `name`; the others are
-`dir/name.<ext>`. `pseudo` is the pseudopotential file pattern for Quantum
-ESPRESSO and ABINIT (`{El}` becomes the element; ABINIT gets `.psp8` when
-the pattern is the default `.UPF` one).
+Write `c` for `format` ∈ (:qe, :abinit, :siesta, :dftk, :vasp, :castep, :cif,
+:xyz) into `dir`. VASP files go into a sub-folder `name`; the others are
+`dir/name.<ext>` (DFTK: a `.jl` script). `pseudo` is the pseudopotential
+file pattern for Quantum ESPRESSO and ABINIT (`{El}` becomes the element;
+ABINIT gets `.psp8` when the pattern is the default `.UPF` one); for DFTK it
+is a PseudoPotentialData family name or a `{El}` pattern, and the default
+`.UPF` pattern becomes the PseudoDojo family `DFTK_PSEUDO_FAMILY`.
 """
 function export_inputs(c::Crystal, format::Symbol, dir::AbstractString, name::AbstractString;
                        kspacing::Real=0.25, ecutwfc::Real=40, pseudo::AbstractString="{El}.UPF")
     isempty(strip(name)) && throw(ArgumentError("empty file name"))
     mkpath(dir)
     format === :vasp && return write_vasp_inputs(joinpath(dir, name), c; kspacing)
-    ext = Dict(:qe => ".in", :abinit => ".abi", :siesta => ".fdf", :castep => ".cell", :cif => ".cif", :xyz => ".xyz")
+    ext = Dict(:qe => ".in", :abinit => ".abi", :siesta => ".fdf", :dftk => ".jl", :castep => ".cell", :cif => ".cif",
+               :xyz => ".xyz")
     haskey(ext, format) || throw(ArgumentError("unknown export format $format"))
+    format in (:qe, :abinit) && !occursin("{El}", pseudo) &&
+        throw(ArgumentError("the pseudopotential pattern needs {El} (replaced by each element)"))
     path = joinpath(dir, name * ext[format])
     format === :qe ? write_qe(path, c; kspacing, ecutwfc, pseudo) :
     format === :abinit ? write_abinit(path, c; kspacing, ecutwfc,
                                       pseudo=pseudo == "{El}.UPF" ? "{El}.psp8" : pseudo) :
     format === :siesta ? write_siesta(path, c; kspacing) :
+    format === :dftk ? write_dftk(path, c; kspacing, ecutwfc,
+                                  pseudo=pseudo == "{El}.UPF" ? DFTK_PSEUDO_FAMILY : pseudo) :
     format === :castep ? write_castep(path, c; kspacing) :
     format === :cif ? write_cif(path, c) : write_xyz(path, c)
     return [path]

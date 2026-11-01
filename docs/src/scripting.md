@@ -111,6 +111,7 @@ dir = mktempdir()
 write_qe(joinpath(dir, "si.in"), si; ecutwfc=40, pseudo="{El}.UPF")
 write_abinit(joinpath(dir, "si.abi"), si; ecutwfc=40, pseudo="{El}.psp8")
 write_siesta(joinpath(dir, "si.fdf"), si)
+write_dftk(joinpath(dir, "si.jl"), si; ecutwfc=40)   # DFTK.jl script
 readdir(dir)
 ```
 

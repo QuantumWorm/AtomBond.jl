@@ -4,7 +4,7 @@ AtomBond is a crystal-structure builder and interactive ball-and-stick viewer
 written in Julia with [GLMakie](https://docs.makie.org). It is meant for
 preparing ab-initio (DFT) calculations: open or build a structure, edit it,
 set relaxation constraints, and export input files for open-source codes such
-as Quantum ESPRESSO, ABINIT and SIESTA.
+as Quantum ESPRESSO, ABINIT, SIESTA and [DFTK.jl](https://dftk.org).
 
 ![AtomBond window showing a GaN wurtzite supercell](assets/window.png)
 

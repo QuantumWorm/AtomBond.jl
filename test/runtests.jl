@@ -672,6 +672,26 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
             mag = with_magmoms(si, fill(1.0, natoms(si)))
             @test occursin("nsppol 2\nspinat", sprint(io -> write_abinit(io, mag)))
             @test occursin("Spin polarized\n%block DM.InitSpin\n  1 1.0000", sprint(io -> write_siesta(io, mag)))
+            # DFTK.jl script: valid Julia, the same atoms, the k-grid, cutoff and pseudopotentials
+            dj = sprint(io -> write_dftk(io, gan; kspacing=0.5, ecutwfc=50))
+            @test Meta.parseall(dj).head === :toplevel && !any(e -> e isa Expr && e.head in (:error, :incomplete),
+                                                              Meta.parseall(dj).args)
+            rows = [m.captures for m in eachmatch(r"Atom\(:(\w+), \[([-\d.]+), ([-\d.]+), ([-\d.]+)\]", dj)]
+            @test Symbol.(first.(rows)) == gan.species
+            @test all(isapprox.([parse.(Float64, r[2:4]) for r in rows], cartesian_positions(gan); atol=1e-8))
+            @test occursin("kgrid=[" * join(kpoint_grid(gan; kspacing=0.5), ", ") * "]", dj) && occursin("Ecut=25.00", dj)
+            @test occursin("PseudoFamily(\"$(AtomBond.DFTK_PSEUDO_FAMILY)\")", dj) && occursin("self_consistent_field", dj)
+            @test !occursin("minimize_energy!", dj) && !occursin("magnetic_moment", dj)
+            @test occursin("Dict(:Ga => \"Ga.upf\", :N => \"N.upf\")", sprint(io -> write_dftk(io, gan; pseudo="{El}.upf")))
+            dj = sprint(io -> write_dftk(io, gc))
+            @test occursin("using GeometryOptimization", dj) && occursin("variablecell=true", dj) &&
+                  count("clamp=true", dj) == 2 && occursin("cell constraints are not applied", dj) &&
+                  occursin("symmetries=false", dj)
+            @test occursin("variablecell=false", sprint(io -> write_dftk(io, with_constraints(gc; cell=(0, 0, 0, 0, 0, 0)))))
+            @test count("magnetic_moment=1.0000", sprint(io -> write_dftk(io, mag))) == natoms(si)
+            p = only(export_inputs(gan, :dftk, dir, "GaN"))                   # default .UPF pattern → PseudoDojo family
+            @test endswith(p, "GaN.jl") && occursin("PseudoFamily(", read(p, String))
+            @test_throws ArgumentError export_inputs(gan, :qe, dir, "GaN"; pseudo=AtomBond.DFTK_PSEUDO_FAMILY)
             @test natoms(load_structure(save_structure(joinpath(dir, "s.fdf"), si))) == natoms(si)
             @test natoms(load_structure(save_structure(joinpath(dir, "s.abi"), si))) == natoms(si)
             @test natoms(load_structure(save_structure(joinpath(dir, "rt.cif"), rut))) == 6
@@ -690,6 +710,13 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test back.lattice.matrix ≈ gan.lattice.matrix
         w = to_atomsbase(load_structure(joinpath(STRUCTS, "water.xyz")))
         @test all(.!AtomBond.AtomsBase.periodicity(w))
+        # magnetic moments and fully fixed atoms travel as the atom properties DFTK and GeometryOptimization use
+        mc = with_magmoms(fix_atoms(gan, [2]), [1.5, NaN, 0.0, NaN])
+        ms = to_atomsbase(mc)
+        @test ms[1][:magnetic_moment] == 1.5 && !haskey(ms[2], :magnetic_moment) && ms[2][:clamp] === true
+        back = from_atomsbase(ms)
+        @test isequal(back.magmoms, mc.magmoms) && back.fixed == mc.fixed
+        @test !has_magmoms(from_atomsbase(sys)) && !has_constraints(from_atomsbase(sys))
     end
 
     @testset "export dialog" begin
@@ -706,6 +733,10 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
             @test AtomBond.shown_text(d.pseudo) == "{El}.psp8"
             d.go.clicks[] += 1
             @test isfile(joinpath(dir, "gan.abi")) && occursin("ngkpt 5 5 3", read(joinpath(dir, "gan.abi"), String))
+            d.format.i_selected[] = findfirst(o -> o[2] === :dftk, AtomBond.EXPORT_FORMATS)   # DFTK: a pseudo family
+            @test AtomBond.shown_text(d.pseudo) == AtomBond.DFTK_PSEUDO_FAMILY
+            d.go.clicks[] += 1
+            @test isfile(joinpath(dir, "gan.jl")) && occursin("kgrid=[5, 5, 3]", read(joinpath(dir, "gan.jl"), String))
             d.format.i_selected[] = 1                         # Quantum ESPRESSO
             @test AtomBond.shown_text(d.pseudo) == "{El}.UPF"
             d.go.clicks[] += 1
