@@ -30,15 +30,3 @@ function draw_structure!(lscene, c::Crystal, vs::ViewSettings)
     filter!(!isnothing, plots)
     return dm, plots, atom_plot
 end
-
-"""
-    draw_crystal!(lscene, crystal, settings) -> DisplayModel
-
-Draw the structure and aim the camera at it.
-"""
-function draw_crystal!(lscene, c::Crystal, vs::ViewSettings)
-    setup_camera!(lscene, vs)
-    dm, _, _ = draw_structure!(lscene, c, vs)
-    reset_camera!(lscene, dm, vs)
-    return dm
-end

@@ -1820,4 +1820,108 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         wav = read(AtomBond.click_wav())
         @test String(wav[1:4]) == "RIFF" && String(wav[9:12]) == "WAVE" && length(wav) == 44 + 2 * round(Int, 0.025 * 44100)
     end
+
+    @testset "less common file variants" begin
+        # QE Bravais lattices: one atom per cell gives the lattice's own space group,
+        # which checks the centring of each ibrav; the volume checks the lengths.
+        qe(sys) = read_qe(IOBuffer("&system\nnat=1, ntyp=1, $sys\n/\nATOMIC_POSITIONS crystal\nFe 0 0 0\n"))
+        a, b, c = 10AtomBond.BOHR, 12AtomBond.BOHR, 15AtomBond.BOHR
+        abc = "celldm(1)=10, celldm(2)=1.2, celldm(3)=1.5"
+        for (sys, sg, vol) in [("ibrav=5, celldm(1)=10, celldm(4)=0.3", 166, a^3 * sqrt(1 - 3 * 0.3^2 + 2 * 0.3^3)),
+                               ("ibrav=6, celldm(1)=10, celldm(3)=1.5", 123, a^2 * c),
+                               ("ibrav=7, celldm(1)=10, celldm(3)=1.5", 139, a^2 * c / 2),
+                               ("ibrav=8, $abc", 47, a * b * c),
+                               ("ibrav=9, $abc", 65, a * b * c / 2),
+                               ("ibrav=10, $abc", 69, a * b * c / 4),
+                               ("ibrav=11, $abc", 71, a * b * c / 2),
+                               ("ibrav=12, $abc, celldm(4)=0.2", 10, a * b * c * sqrt(1 - 0.2^2)),
+                               ("ibrav=-12, $abc, celldm(5)=0.2", 10, a * b * c * sqrt(1 - 0.2^2))]
+            x = qe(sys)
+            @test (sys, spacegroup(x)[1]) == (sys, sg)
+            @test cell_volume(x.lattice) ≈ vol
+        end
+        @test lattice_parameters(qe("ibrav=12, $abc, celldm(4)=0.2").lattice)[6] ≈ acosd(0.2)
+        @test lattice_parameters(qe("ibrav=-12, $abc, celldm(5)=0.2").lattice)[5] ≈ acosd(0.2)
+        @test lattice_parameters(qe("ibrav=12, A=4, B=5, C=6, cosAB=0.2").lattice)[6] ≈ acosd(0.2)
+
+        # pw.x output: cell in alat or Å, positions in Å or Bohr
+        pwo(cell, pos) = read_qe_output(IOBuffer("     Program PWSCF v.7.2\n" *
+            "     lattice parameter (alat)  =      10.0000  a.u.\nBegin final coordinates\n$cell\n$pos\nEnd final coordinates\n"))
+        q = pwo("CELL_PARAMETERS (alat= 10.00000000)\n 1 0 0\n 0 1 0\n 0 0 1",
+                "ATOMIC_POSITIONS (angstrom)\nFe 0 0 0\nFe $(a / 2) $(a / 2) $(a / 2)")
+        @test cell_volume(q.lattice) ≈ a^3 && q.frac[2] ≈ [0.5, 0.5, 0.5]
+        q = pwo("CELL_PARAMETERS (angstrom)\n 4 0 0\n 0 4 0\n 0 0 4", "ATOMIC_POSITIONS (bohr)\nFe $(2 / AtomBond.BOHR) 0 0")
+        @test cell_volume(q.lattice) ≈ 64 && q.frac[1] ≈ [0.5, 0, 0]
+
+        # CIF symmetry from the space-group number or symbol alone
+        cif(sym, atoms="Na1 Na 0 0 0\nCl1 Cl 0.5 0.5 0.5") = read_cif(IOBuffer(
+            "header before the first block\ndata_x\n_cell_length_a 5.64\n_cell_length_b 5.64\n_cell_length_c 5.64\n" *
+            "_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n$sym\nloop_\n_atom_site_label\n" *
+            "_atom_site_type_symbol\n_atom_site_fract_x\n_atom_site_fract_y\n_atom_site_fract_z\n$atoms\n"))
+        x = cif("_space_group_IT_number 225")
+        @test formula(x) == "Na4Cl4" && spacegroup(x)[1] == 225
+        x = @test_logs (:warn, r"several settings") match_mode=:any cif("_space_group_IT_number 227", "Si1 Si 0 0 0")
+        @test natoms(x) > 1
+        x = @test_logs (:warn, r"several settings") match_mode=:any cif("_symmetry_space_group_name_H-M 'F d -3 m'", "Si1 Si 0 0 0")
+        @test natoms(x) > 1
+        @test_throws ErrorException cif("_symmetry_space_group_name_H-M 'F d -3 m:9'", "Si1 Si 0 0 0")
+        x = @test_logs (:warn, r"no symmetry") match_mode=:any cif("")
+        @test formula(x) == "Na1Cl1"
+        @test_logs (:warn, r"share a position") match_mode=:any cif("", "Na1 Na 0 0 0\nNa2 Na 0 0 0")
+
+        # VASP 4 POSCAR: no species line, the names come from the comment line
+        p = read_poscar(IOBuffer("Si Ge\n1.0\n5.4 0 0\n0 5.4 0\n0 0 5.4\n1 1\nDirect\n0 0 0\n0.5 0.5 0.5\n"))
+        @test p.species == [:Si, :Ge]
+        @test_throws ErrorException read_poscar(IOBuffer("x\n1.0\n5.4 0 0\n0 5.4 0\n0 0 5.4\n1 1\nDirect\n0 0 0\n0.5 0.5 0.5\n"))
+
+        # XSF: the conventional cell and data grids are skipped
+        x = read_xsf(IOBuffer("CRYSTAL\nPRIMVEC\n0 2.7 2.7\n2.7 0 2.7\n2.7 2.7 0\nCONVVEC\n5.4 0 0\n0 5.4 0\n0 0 5.4\n" *
+                              "PRIMCOORD\n2 1\nSi 0 0 0\nSi 1.35 1.35 1.35\nCONVCOORD\n8 1\n" * "Si 0 0 0\n"^8 *
+                              "BEGIN_BLOCK_DATAGRID_3D\ndensity\nEND_BLOCK_DATAGRID_3D\n"))
+        @test natoms(x) == 2 && spacegroup(x)[1] == 227
+
+        # SIESTA cell from LatticeParameters (diamond in its 60° primitive cell)
+        s = read_siesta(IOBuffer("LatticeConstant 3.84 Ang\n%block LatticeParameters\n1 1 1 60 60 60\n%endblock LatticeParameters\n" *
+                                 "%block ChemicalSpeciesLabel\n1 14 Si\n%endblock ChemicalSpeciesLabel\n" *
+                                 "AtomicCoordinatesFormat Fractional\n%block AtomicCoordinatesAndAtomicSpecies\n" *
+                                 "0 0 0 1\n0.25 0.25 0.25 1\n%endblock AtomicCoordinatesAndAtomicSpecies\n"))
+        @test spacegroup(s)[1] == 227 && cell_volume(s.lattice) ≈ 3.84^3 / sqrt(2)
+
+        # vasprun.xml of an unfinished run: the last structure written
+        st(x) = "<structure><crystal><varray name=\"basis\"><v>2.8 0 0</v><v>0 2.8 0</v><v>0 0 2.8</v></varray>" *
+                "</crystal><varray name=\"positions\"><v>$x 0 0</v></varray></structure>\n"
+        r = read_vasprun(IOBuffer("<modeling><atominfo><array name=\"atoms\"><set><rc><c>Fe</c><c>1</c></rc></set></array>" *
+                                  "</atominfo>\n" * st(0) * st(0.1) * "</modeling>"))
+        @test r.frac[1] ≈ [0.1, 0, 0] && endswith(r.title, "(last step, unfinished)")
+
+        # .in files: pw.x, FHI-aims or ABINIT by content; unknown files and extensions
+        dir = mktempdir()
+        f(name, text) = (p = joinpath(dir, name); write(p, text); p)
+        @test formula(load_structure(f("aims.in", "lattice_vector 3 0 0\nlattice_vector 0 3 0\nlattice_vector 0 0 3\natom_frac 0 0 0 Fe\n"))) == "Fe1"
+        @test formula(load_structure(f("abinit.in", "acell 3*3.0 angstrom\nnatom 1 ntypat 1 typat 1 znucl 26\nxred 0 0 0\n"))) == "Fe1"
+        @test_throws ArgumentError load_structure(f("other.in", "nothing to read\n"))
+        @test_throws ArgumentError save_structure(joinpath(dir, "x.unknown"), x)
+    end
+
+    @testset "printing in the REPL" begin
+        si = load_structure(joinpath(STRUCTS, "Si_conv.vasp"))
+        @test sprint(show, si) == "Crystal(Si8, 8 atoms)"
+        txt = sprint(show, MIME"text/plain"(), supercell(si, 2, 1, 1))
+        @test startswith(txt, "Crystal Si16") && occursin("Lattice(a=10.86", txt) && endswith(txt, "… 6 more atoms")
+        @test sprint(show, element(:Si)) == "Element(Si, Z=14)"
+        @test sprint(show, library_entry("Silicon")) == "LibraryEntry(\"Silicon\", crystal)"
+    end
+
+    @testset "view options" begin
+        si = load_structure(joinpath(STRUCTS, "Si_conv.vasp"))
+        png = joinpath(mktempdir(), "si.png")
+        @test snapshot(png, si; settings=ViewSettings(show_labels=true, show_axis_labels=true)) == png && filesize(png) > 0
+        v = visualize(si; show=false, panel=false, settings=ViewSettings(style=:line, orthographic=true))
+        @test any(p -> p isa AtomBond.Makie.LineSegments, v.plots) && isempty(AtomBond.drawn_atoms(v.display, v.settings))
+        cam = AtomBond.camera(v.lscene)
+        for (which, dir) in [(:c, [0, 0, 1]), ([1, 1, 0], [1, 1, 0])]
+            view_along!(v, which)
+            @test norm(cross(normalize(cam.eyeposition[] - cam.lookat[]), normalize(dir))) < 1e-5
+        end
+    end
 end

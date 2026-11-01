@@ -224,11 +224,6 @@ function exit!(v::Viewer; force::Bool=false)
     end
     delete!(v.dialogs, :exit_armed)
     close_context_menu!(v)
-    for (k, d) in collect(v.dialogs)
-        d isa GLMakie.Screen || continue
-        isopen(d) && close(d)
-        delete!(v.dialogs, k)
-    end
     v.screen === nothing || (isopen(v.screen) && close(v.screen))
     v.status[] = "Closed"
     return true

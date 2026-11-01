@@ -175,7 +175,6 @@ function save_from_browser!(b::FileBrowser)
     if ok
         v.folder = b.dir
         navigate!(b, b.dir)                   # show the new file
-        get(v.dialogs, :save, nothing) isa GLMakie.Screen && close(v.dialogs[:save])
     end
     return ok
 end
