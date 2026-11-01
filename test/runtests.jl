@@ -211,7 +211,7 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test ismetal(:Ti) && !ismetal(:O) && !ismetal(:Si)
         rut = load_structure(joinpath(STRUCTS, "TiO2_rutile.cif"))
         # Ti–Ti along c (2.96 Å) is under the covalent cutoff; only kept on request.
-        @test length(find_bonds(rut; metal_metal=true)) > length(find_bonds(rut))
+        @test length(find_bonds(rut; metal_metal=true, bridge_angle=nothing)) > length(find_bonds(rut))
         # A pure metal keeps its metal–metal bonds automatically.
         cu = supercell(Crystal(cubic(3.615), [:Cu, :Cu, :Cu, :Cu],
                                [[0, 0, 0], [0, 0.5, 0.5], [0.5, 0, 0.5], [0.5, 0.5, 0]]), 1, 1, 1)
@@ -518,6 +518,11 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         @test AtomBond.bridge_max_offset(a, b, c) ≈ 3 && AtomBond.bridge_max_offset(a, b, V(3, 1, 0)) ≈ 1 / 3
         @test_throws ArgumentError bridge_position(a, b, V(5, 0, 0))              # third atom on the bond line
         @test_throws ArgumentError bridge_position(a, b, c; offset=-1)
+        # bridges in molecules: three-membered rings keep their bonds, a bridging H does not make a B–B bond
+        @test length(find_bonds(load_library("Cyclopropane"))) == 9 && length(find_bonds(load_library("Ethylene oxide (oxirane)"))) == 7
+        b2h6 = load_library("Diborane")
+        @test count(x -> b2h6.species[x.i] == b2h6.species[x.j] == :B, find_bonds(b2h6)) == 0 &&
+              count(x -> b2h6.species[x.i] == b2h6.species[x.j] == :B, find_bonds(b2h6; bridge_angle=nothing)) == 1
 
         # In the window: Si, bond centre–neighbour 1, side from neighbour 2
         v = visualize(load_library("Silicon"); show=false)
@@ -536,6 +541,14 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
         r = cartesian_positions(v.crystal)
         d.add.clicks[] = 1
         @test formula(v.crystal) == "Si8O1" && startswith(v.status[], "Add O bridge in")
+        # the bridged Si–Si bond is gone; Si–O–Si instead, every Si still has four bonds
+        nbonds(c, i) = count(x -> i in (x.i, x.j), find_bonds(c))
+        pair(x) = Set((x.i, x.j))
+        si_o = natoms(v.crystal)
+        @test !any(x -> pair(x) == Set((centre, nb[1])) && x.shift == S(0, 0, 0), find_bonds(v.crystal))
+        @test nbonds(v.crystal, si_o) == 2 && nbonds(v.crystal, centre) == 4 && nbonds(v.crystal, nb[1]) == 4
+        @test any(x -> pair(x) == Set((centre, nb[1])), find_bonds(v.crystal; bridge_angle=nothing))   # old rule
+        @test length(v.display.bonds) == length(find_bonds(v.crystal)) == 16 + 2 - 1      # drawn the same way
         o = cartesian_positions(v.crystal)[end]
         mid = (r[centre] + r[nb[1]]) / 2
         @test norm(o - mid) ≈ 0.5 && dot(o - mid, r[nb[2]] - mid) > 0                # towards the third atom

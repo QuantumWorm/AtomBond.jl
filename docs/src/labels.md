@@ -60,3 +60,10 @@ bonds are left out when the structure also contains non-metals (otherwise
 Ti–Ti in TiO₂ would show as bonds); pure metals and alloys keep them. The
 limit can be set per element pair with `ViewSettings.bond_cutoffs`, or
 `find_bonds(c; cutoffs)`.
+
+A bond is also left out when another atom bonded to both ends sits between
+them (the angle at that atom is over 80°): an O put into a Si–Si bond gives
+Si–O–Si without the old Si–Si bond, and the bridging H atoms of diborane give
+no B–B bond. Three-membered rings (cyclopropane, oxirane), whose angles are
+near 60°, keep all their bonds. `find_bonds(c; bridge_angle=nothing)` keeps
+every bond within the distance limit.

@@ -12,7 +12,7 @@ struct Bond
 end
 
 """
-    find_bonds(c; tolerance=1.15, min_length=0.4, metal_metal=:auto, cutoffs=Dict()) -> Vector{Bond}
+    find_bonds(c; tolerance=1.15, min_length=0.4, metal_metal=:auto, cutoffs=Dict(), bridge_angle=80) -> Vector{Bond}
 
 Atoms i and j are bonded when `min_length < d ≤ max(tolerance * (r_i + r_j), r_i + r_j + 0.3 Å)`,
 with r the covalent radius. `cutoffs` can raise that limit for given element
@@ -23,9 +23,14 @@ Covalent radii of metals are large enough that cation–cation pairs in oxides
 and nitrides (Ti–Ti in rutile, Hf–Hf in HfO₂) would count as bonded. With
 `metal_metal=:auto` such bonds are kept only when every species is a metal
 (metals and alloys); pass `true`/`false` to force it.
+
+A bond i–j is left out when an atom k bonded to both lies between them, i.e.
+the angle i–k–j exceeds `bridge_angle` degrees: k bridges i and j (an O put
+into a Si–Si bond, a bridging H). Three-membered rings keep all their bonds
+(their angles are near 60°). `bridge_angle=nothing` keeps every bond.
 """
 function find_bonds(c::Crystal; tolerance::Real=1.15, min_length::Real=0.4, metal_metal=:auto,
-                    cutoffs::AbstractDict=Dict{Tuple{Symbol,Symbol},Float64}())
+                    cutoffs::AbstractDict=Dict{Tuple{Symbol,Symbol},Float64}(), bridge_angle::Union{Nothing,Real}=80)
     natoms(c) == 0 && return Bond[]
     keep_mm = metal_metal === :auto ? all(ismetal, species_list(c)) : Bool(metal_metal)
     spc = species_list(c)
@@ -38,7 +43,36 @@ function find_bonds(c::Crystal; tolerance::Real=1.15, min_length::Real=0.4, meta
             push!(bonds, Bond(i, j, s, d))
         end
     end
-    return bonds
+    return bridge_angle === nothing ? bonds : drop_bridged(c, bonds, bridge_angle)
+end
+
+"""
+Bonds without those whose two atoms are bridged by a common neighbour k (the
+angle i–k–j above `angle` degrees). Images are matched through the bond
+vectors, so bridges across periodic boundaries count.
+"""
+function drop_bridged(c::Crystal, bonds::Vector{Bond}, angle::Real)
+    bondvec(b) = frac_to_cart(c.lattice, c.frac[b.j] + Vec3(b.shift) - c.frac[b.i])
+    nbrs = [Tuple{Int,Vec3}[] for _ in 1:natoms(c)]
+    for b in bonds
+        v = bondvec(b)
+        push!(nbrs[b.i], (b.j, v)); push!(nbrs[b.j], (b.i, -v))
+    end
+    cosmax = cosd(angle)
+    keep = trues(length(bonds))
+    for (n, b) in enumerate(bonds)
+        v = bondvec(b)                                  # i → j
+        for (k, vik) in nbrs[b.i], (k2, vjk) in nbrs[b.j]
+            k == k2 || continue
+            norm(vik - (v + vjk)) < 1e-6 || continue    # the same image of k next to both
+            a, bk = -vik, v - vik                       # k → i and k → j
+            if dot(a, bk) / (norm(a) * norm(bk)) < cosmax
+                keep[n] = false
+                break
+            end
+        end
+    end
+    return bonds[keep]
 end
 
 """Element pair in a fixed order, the key of bond `cutoffs`."""

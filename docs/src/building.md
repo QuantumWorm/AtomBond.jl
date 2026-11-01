@@ -109,6 +109,9 @@ puts an atom into a bond. Select the two atoms of the bond, then a third atom
   middle of the bond plus a vector v of length *offset* (default 0.5 Å). v is
   perpendicular to the bond, in the plane of the three atoms, and points
   towards the third atom, so the new atom is inside their triangle.
+- The bond between the two atoms is no longer drawn: they are now bonded
+  through the bridge (the atoms themselves are not moved, so relax the
+  structure to get realistic Si–O lengths and angles).
 - *Other side of the bond (−v)* places it at −v instead; *Flip last bridge*
   moves a bridge you just added to the other side.
 - The preview shows the two new bond lengths, the bridge angle, the closest
