@@ -21,7 +21,7 @@ formula, group or use contain all the words typed (`ethane`, `WF6`,
 | Oxides | α-quartz SiO₂, corundum Al₂O₃, monoclinic HfO₂ and ZrO₂, rutile and anatase TiO₂, ZnO, MgO, β-Ga₂O₃, SrTiO₃ | COD (published refinements, listed per entry) |
 | Carbon: graphite and graphene | graphite (2H); graphene (one layer, periodic in-plane) | COD (Trucano & Chen 1975, neutron diffraction); graphene from that lattice constant |
 | Carbon: nanotubes | single-wall (5,5), (10,10), (9,0), (10,0), (6,5) | Rolled graphene sheet with graphite's C–C distance: models, periodic along the tube axis only |
-| Molecules | 150 molecules in the groups below | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
+| Molecules | 182 molecules in the groups below | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
 
 Molecules are grouped the way chemistry textbooks classify them: first
 organic (carbon compounds), organometallic (metal–carbon bonds) or inorganic,
@@ -30,9 +30,9 @@ alphabetical order.
 
 | Class | Groups (examples) |
 |-------|-------------------|
-| Organic | hydrocarbons (CH₄, C₂H₂, propyne, cyclopropane, cyclopropene, C₄H₂, C₆H₆); halocarbons (CF₄, CH₂Cl₂, CHCl₃, vinyl chloride, C₂H₂F₂); alcohols and ethers (CH₃OH, oxirane); carbonyl compounds: aldehydes, ketones, acids, esters, amides (H₂CO, HCOOH, ketene, methyl formate, formamide); nitrogen and sulfur compounds (HCN, CH₃CN, C₂N₂, ClCN, CH₂NH, DMSO); heterocycles (pyridine, furan, thiophene); radicals (CH, CH₂, HCO, CF₃) |
+| Organic | hydrocarbons (CH₄, C₂H₂, propyne, cyclopropane, cyclopropene, C₄H₂, C₆H₆); halocarbons (CF₄, CHF₃, CH₂F₂, CF₃I, CH₂Cl₂, CHCl₃, vinyl chloride, C₂H₂F₂); alcohols and ethers (CH₃OH, oxirane); carbonyl compounds: aldehydes, ketones, acids, esters, amides (H₂CO, HCOOH, ketene, methyl formate, formamide); nitrogen and sulfur compounds (HCN, HNC, CH₃CN, C₂N₂, ClCN, CH₂NH, DMSO); heterocycles (pyridine, furan, thiophene); radicals and carbenes (CH, CH₂, CF₂, CCl₂, HCO, CF₃) |
 | Organometallic | metal alkyls (Al(CH₃)₃ and its dimer, Zn(CH₃)₂, In(CH₃)₃, CH₃SiH₃); metal carbonyls (Ni(CO)₄, W(CO)₆) |
-| Inorganic | elements (H₂, O₂, O₃, Cl₂, P₄, S₈); hydrides (H₂O, NH₃, SiH₄, Si₃H₈, B₂H₆, HF); oxides and sulfides (CO, CO₂, SO₂, SO₃, NO₂, N₂O₄, SiO, CS₂, C₃O₂, ClO₂); oxoacids (HNO₃, H₂SO₄, HONO, HOF); nonmetal halides (BCl₃, SiCl₄, SiH₃Cl, NF₃, PCl₃, PCl₅, SF₆, OF₂, BrF₃, IF₇, BrCl); metal halides (TiCl₄, WF₆, AlCl₃, GaCl₃, InCl₃, Al₂Cl₆); oxyhalides (COCl₂, POCl₃, SOCl₂, SO₂Cl₂); radicals (NH₂, SiH₂, SiH₃, HO₂, SH, ClO) |
+| Inorganic | elements (H₂, O₂, O₃, Cl₂, P₄, S₈); hydrides (H₂O, NH₃, SiH₄, Si₃H₈, B₂H₆, HF, H₂Se, H₂S₂); oxides and sulfides (CO, CO₂, SO₂, SO₃, NO₂, N₂O₄, SiO, SiS, GeO, CS₂, C₃O₂, ClO₂); oxoacids (HNO₃, H₂SO₄, HONO, HOF, HOCl, HNO); nitrides (PN); nonmetal halides (BCl₃, SiCl₄, SiH₃Cl, NF₃, PCl₃, PCl₅, SF₆, OF₂, BrF₃, IF₇, BrCl, SiF₂, GeCl₂); metal halides (TiCl₄, WF₆, AlCl₃, GaCl₃, InCl₃, Al₂Cl₆, AlCl, GaCl); oxyhalides (COCl₂, POCl₃, SOCl₂, SO₂Cl₂); radicals (NH₂, PH₂, SiH₂, SiH₃, SiF, HO₂, SH, ClO) |
 | Carbon | fullerenes (C₆₀) |
 
 Molecules used in semiconductor processing also say what for (*Used as*):

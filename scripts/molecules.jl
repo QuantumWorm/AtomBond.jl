@@ -472,6 +472,23 @@ function cyclopropene(r12, r22, rch2, rch1, θh, θhch)
     return ["C", "C", "C", "H", "H", "H", "H"], [[c1]; c2s; hs; hm]
 end
 
+"""
+Cs XZY2W (CHClF2 type): Z along +z at r_xz, two Y at angle Z–X–Y with
+Y–X–Y between them, and W in the mirror plane at angle W–X–Z on the side
+away from the Y atoms.
+"""
+function xzy2w(x, z, y, w, rxz, rxy, rxw, θzxy, θyxy, θwxz)
+    φ = acos((cosd(θyxy) - cosd(θzxy)^2) / sind(θzxy)^2)       # azimuth between the two Y bonds
+    ys = [rxy * [sind(θzxy) * cos(s * φ / 2), sind(θzxy) * sin(s * φ / 2), cosd(θzxy)] for s in (1, -1)]
+    return [x, z, y, y, w], [[0.0, 0, 0], [0.0, 0, rxz], ys..., rxw * [-sind(θwxz), 0.0, cosd(θwxz)]]
+end
+
+"""Angle in degrees from degrees and arc minutes."""
+dm(d, m) = d + m / 60
+
+"""Note for singlet carbenes and silylenes (closed shell)."""
+const SINGLET_NOTE = "Ground state 1A1 (singlet, closed shell)."
+
 const TYLER_SHERIDAN = ("J. K. Tyler, J. Sheridan, Structural studies of linear molecules by microwave spectroscopy, " *
                         "Trans. Faraday Soc. 59, 2661 (1963); values read in Table 5 of the authors' report of the " *
                         "same title (USAF contract AF61(052)-241, Feb. 1963, DTIC AD0409439, " *
@@ -1243,6 +1260,172 @@ const MOLECULES = [
             "in IF7: an electron diffraction study, J. Chem. Phys. 53, 4040 (1970)", "10.1063/1.1673876")],
      note="Electron diffraction, idealised D5h pentagonal bipyramid. The molecule pseudorotates: on average the " *
           "ring puckers by 7.5° and the axial bonds bend by 4.5°."),
+    # Halomethanes and fluorocarbon etch gases
+    (name="Bromomethane", formula="CH3Br", category="Organic: halocarbons", pg="C3v",
+     geometry=xy3z("C", "H", "Br", 1.086, dm(111, 10), 1.933),
+     refs=[("J. L. Duncan, The equilibrium geometries of the methyl halides, J. Mol. Struct. 6, 447 (1970)",
+            "10.1016/0022-2860(70)90027-X")],
+     note="Equilibrium r_e, read in the authors' abstract."),
+    (name="Trifluoroiodomethane", formula="CF3I", category="Organic: halocarbons", use="etch gas", pg="C3v",
+     geometry=xy3z("C", "F", "I", 1.3285, 108.42, 2.1438),
+     refs=[("A. P. Cox, G. Duxbury, J. A. Hardy, Y. Kawashima, Microwave spectra of CF3Br and CF3I. Structures and " *
+            "dipole moments, J. Chem. Soc., Faraday Trans. 2 76, 339 (1980)", "10.1039/F29807600339")],
+     note="Zero-point average structure r_z."),
+    (name="Bromotrifluoromethane", formula="CF3Br", category="Organic: halocarbons", pg="C3v",
+     geometry=xy3z("C", "F", "Br", 1.3265, 108.81, 1.9234),
+     refs=[("A. P. Cox, G. Duxbury, J. A. Hardy, Y. Kawashima, Microwave spectra of CF3Br and CF3I. Structures and " *
+            "dipole moments, J. Chem. Soc., Faraday Trans. 2 76, 339 (1980)", "10.1039/F29807600339")],
+     note="Zero-point average structure r_z."),
+    (name="Chlorotrifluoromethane", formula="CF3Cl", category="Organic: halocarbons", pg="C3v",
+     geometry=xy3z("C", "F", "Cl", 1.328, 108.6, 1.751),
+     refs=[("L. S. Bartell, L. O. Brockway, Structures of CF3Cl and CH3Cl, J. Chem. Phys. 23, 1860 (1955)",
+            "10.1063/1.1740593")],
+     note="Electron diffraction, most probable distances; no uncertainties given in the abstract."),
+    (name="Dichlorodifluoromethane", formula="CF2Cl2", category="Organic: halocarbons", pg="C2v",
+     geometry=xy2z2("C", "Cl", "F", 1.744, dm(112, 33), 1.345, dm(106, 14)),
+     refs=[("H. Takeo, C. Matsumura, The microwave spectrum of dichlorodifluoromethane, Bull. Chem. Soc. Jpn. 50, " *
+            "636 (1977)", "10.1246/bcsj.50.636")],
+     note="Microwave structure from three isotopologues; no uncertainties given."),
+    (name="Chlorodifluoromethane", formula="CHClF2", category="Organic: halocarbons", pg="Cs",
+     geometry=xzy2w("C", "Cl", "F", "H", 1.74, 1.35, 1.09, dm(110, 30), 107.0, 107.0),
+     refs=[("E. L. Beeson, T. L. Weatherly, Q. Williams, Molecular constants of chlorodifluoromethane from " *
+            "microwave spectrum analysis, J. Chem. Phys. 37, 2926 (1962)", "10.1063/1.1733119")],
+     note="Low-precision microwave structure (two isotopologues); the C–H distance (1.09 Å) was assumed by the " *
+          "authors."),
+    (name="Fluoroform", formula="CHF3", category="Organic: halocarbons", use="etch gas", pg="C3v",
+     geometry=xy3z("C", "F", "H", 1.332, dm(108, 48), 1.098),
+     refs=[("S. N. Ghosh, R. Trambarulo, W. Gordy, Microwave spectra and molecular structures of fluoroform, " *
+            "chloroform, and methyl chloroform, J. Chem. Phys. 20, 605 (1952)", "10.1063/1.1700501")],
+     note="Microwave structure from several isotopic species; no uncertainties given."),
+    (name="Difluoromethane", formula="CH2F2", category="Organic: halocarbons", use="etch gas", pg="C2v",
+     geometry=xy2z2("C", "F", "H", 1.3508, 108.49, 1.084, 112.8),
+     refs=[("E. Hirota, Anharmonic potential function and equilibrium structure of methylene fluoride, J. Mol. " *
+            "Spectrosc. 71, 145 (1978)", "10.1016/0022-2852(78)90079-6")],
+     note="Equilibrium r_e from five isotopologues, read in the authors' abstract."),
+    (name="Dibromomethane", formula="CH2Br2", category="Organic: halocarbons", pg="C2v",
+     geometry=xy2z2("C", "Br", "H", 1.930, 112.5, 1.079, 113.6),
+     refs=[("D. Chadwick, D. J. Millen, Microwave spectrum of dibromomethane. Part 1. Molecular structure, Trans. " *
+            "Faraday Soc. 67, 1539 (1971)", "10.1039/TF9716701539")],
+     note="Ground-state r_0, the authors' structure (I) with all parameters fitted (C–H ± 0.01 Å, H–C–H ± 1.5°)."),
+    (name="Bromoform", formula="CHBr3", category="Organic: halocarbons", pg="C3v",
+     geometry=xy3z("C", "Br", "H", 1.924, 111.7, 1.111),
+     refs=[("K. Tamagawa, M. Kimura, Molecular structure of bromoform as determined by a joint analysis of electron " *
+            "diffraction and microwave data, Bull. Chem. Soc. Jpn. 52, 2747 (1979)", "10.1246/bcsj.52.2747")],
+     note="Electron diffraction with microwave data: r_g distances (C–H ± 0.046 Å), average angles."),
+    (name="Difluorocarbene", formula="CF2", category="Organic: radicals", pg="C2v",
+     geometry=zmatrix([("C",), ("F", 1, 1.300), ("F", 1, 1.300, 2, 104.94)]),
+     refs=[("C. W. Mathews, The absorption spectrum of CF2, Can. J. Phys. 45, 2355 (1967)", "10.1139/p67-188")],
+     note="Ground-state r_0 from the electronic spectrum; no uncertainties given. " * SINGLET_NOTE),
+    (name="Dichlorocarbene", formula="CCl2", category="Organic: radicals", pg="C2v",
+     geometry=zmatrix([("C",), ("Cl", 1, 1.7157), ("Cl", 1, 1.7157, 2, 109.2)]),
+     refs=[("M. Fujitake, E. Hirota, The millimeter- and submillimeter-wave spectrum of dichlorocarbene CCl2, " *
+            "J. Chem. Phys. 91, 3426 (1989)", "10.1063/1.456916")],
+     note="Ground-state r_0. " * SINGLET_NOTE),
+    # Heavier hydrides, small inorganic molecules, Si/Ge halides, high-temperature diatomics
+    (name="Hydrogen selenide", formula="H2Se", category="Inorganic: hydrides", pg="C2v",
+     geometry=zmatrix([("Se",), ("H", 1, 1.460), ("H", 1, 1.460, 2, dm(90, 34))]),
+     refs=[("R. A. Hill, T. H. Edwards, Vibrational analysis and isotope effects in hydrogen selenide, J. Chem. " *
+            "Phys. 42, 1391 (1965)", "10.1063/1.1696127")],
+     note="Equilibrium structure calculated by the authors from experimental vibration–rotation constants; no " *
+          "uncertainties given."),
+    (name="Disulfane", formula="H2S2", category="Inorganic: hydrides", pg="C2",
+     geometry=zmatrix([("S",), ("S", 1, 2.0564), ("H", 1, 1.3421, 2, 97.88), ("H", 2, 1.3421, 1, 97.88, 3, 90.34)]),
+     refs=[("J. Hahn, P. Schmidt, K. Reinartz, J. Behrend, G. Winnewisser, K. M. T. Yamada, Synthesis and molecular " *
+            "structure of disulfane, Z. Naturforsch. B 46, 1338 (1991)", "10.1515/znb-1991-1011")],
+     note="The authors' \"partially corrected equilibrium structure\"; dihedral H–S–S–H 90.3(2)°."),
+    (name="Methylidynephosphine", formula="HCP", category="Inorganic: hydrides", pg="C∞v",
+     geometry=linear(("H", "C", "P"), (1.0666, 1.54020)),
+     refs=[("J. Lavigne, A. Cabana, The ν3 vibration–rotation band of DCP and the equilibrium structure of " *
+            "methinophosphide, Can. J. Phys. 60, 304 (1982)", "10.1139/p82-039")],
+     note="Equilibrium r_e. The phosphorus analogue of HCN (phosphaethyne)."),
+    (name="Hydrogen isocyanide", formula="HNC", category="Organic: nitrogen and sulfur compounds", pg="C∞v",
+     geometry=linear(("H", "N", "C"), (0.987, 1.171)),
+     refs=[("R. A. Creswell, E. F. Pearson, M. Winnewisser, G. Winnewisser, Detection of the millimeter wave " *
+            "spectrum of hydrogen isocyanide, HNC, Z. Naturforsch. A 31, 221 (1976)", "10.1515/zna-1976-3-401")],
+     note="Substitution-type structure (H and C by substitution, N from the centre of mass); ± 0.003–0.004 Å."),
+    (name="Nitroxyl", formula="HNO", category="Inorganic: oxoacids", pg="Cs",
+     geometry=zmatrix([("N",), ("O", 1, 1.2058), ("H", 1, 1.0628, 2, 109.09)]),
+     refs=[("E. Hirota, A simultaneous determination of third-order vibrational anharmonicity constants and " *
+            "equilibrium structure. Molecular structure of non-linear HXY-type molecules, Nippon Kagaku Kaishi " *
+            "1986, 1438", "10.1246/nikkashi.1986.1438")],
+     note="Equilibrium r_e (3σ: N–H ± 0.0025 Å), read in the author's abstract (CiNii)."),
+    (name="Hypochlorous acid", formula="HOCl", category="Inorganic: oxoacids", pg="Cs",
+     geometry=zmatrix([("O",), ("Cl", 1, 1.6891), ("H", 1, 0.9654, 2, 103.21)]),
+     refs=[("E. Hirota, A simultaneous determination of third-order vibrational anharmonicity constants and " *
+            "equilibrium structure. Molecular structure of non-linear HXY-type molecules, Nippon Kagaku Kaishi " *
+            "1986, 1438", "10.1246/nikkashi.1986.1438")],
+     note="Equilibrium r_e (3σ: O–H ± 0.0035 Å), read in the author's abstract (CiNii)."),
+    (name="Difluorosilane", formula="SiH2F2", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=xy2z2("Si", "F", "H", 1.5767, dm(107, 56), 1.471, dm(112, 1)),
+     refs=[("V. W. Laurie, Microwave spectrum, dipole moment, and structure of difluorosilane, J. Chem. Phys. 26, " *
+            "1359 (1957)", "10.1063/1.1743546")],
+     note="Ground-state microwave structure (Si–H ± 0.007 Å)."),
+    (name="Trifluorosilane", formula="SiHF3", category="Inorganic: nonmetal halides", pg="C3v",
+     geometry=xy3z("Si", "F", "H", 1.561, dm(108, 6), 1.55),
+     refs=[("J. Sheridan, W. Gordy, The microwave spectra and molecular structures of trifluorosilane derivatives, " *
+            "J. Chem. Phys. 19, 965 (1951)", "10.1063/1.1748418")],
+     note="Microwave structure in which the authors assumed Si–H = 1.55 ± 0.05 Å; Si–F and F–Si–F follow from it."),
+    (name="Silicon difluoride", formula="SiF2", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=zmatrix([("Si",), ("F", 1, 1.5947), ("F", 1, 1.5947, 2, dm(100, 53))]),
+     refs=[("V. M. Khanna, R. Hauge, R. F. Curl, J. L. Margrave, Infrared spectrum, force constants, and " *
+            "thermodynamic functions of SiF2, J. Chem. Phys. 47, 5031 (1967)", "10.1063/1.1701755")],
+     note="Ground-state average structure ⟨r⟩ (r_z type); no uncertainties given. A silylene: " * SINGLET_NOTE),
+    (name="Germanium difluoride", formula="GeF2", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=zmatrix([("Ge",), ("F", 1, 1.736), ("F", 1, 1.736, 2, 97.4)]),
+     refs=[("H. Takeo, R. F. Curl, P. W. Wilson, Microwave spectrum of GeF2, Ohio State University Symposium on " *
+            "Molecular Spectroscopy, 1970, http://hdl.handle.net/1811/8588", "")],
+     note="Ground-state structure from the authors' symposium abstract; no uncertainties given."),
+    (name="Germanium dichloride", formula="GeCl2", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=zmatrix([("Ge",), ("Cl", 1, 2.169452), ("Cl", 1, 2.169452, 2, 99.8825)]),
+     refs=[("M. J. Tsuchiya, H. Honjou, K. Tanaka, T. Tanaka, Millimeter-wave spectrum of germanium dichloride GeCl2. " *
+            "Equilibrium structure and anharmonic force field, J. Mol. Struct. 352–353, 407 (1995)",
+            "10.1016/0022-2860(95)08830-O")],
+     note="Equilibrium r_e, read in the authors' abstract (CiNii)."),
+    (name="Boron monofluoride", formula="BF", category="Inorganic: nonmetal halides", pg="C∞v",
+     geometry=linear(("B", "F"), (1.2625,)),
+     refs=[("F. J. Lovas, D. R. Johnson, Microwave spectrum of BF, J. Chem. Phys. 55, 41 (1971)", "10.1063/1.1675537")],
+     note="Equilibrium r_e (11BF); a high-temperature species."),
+    (name="Aluminium monofluoride", formula="AlF", category="Inorganic: metal halides", pg="C∞v",
+     geometry=linear(("Al", "F"), (1.6543601,)),
+     refs=[("J. Hoeft, F. J. Lovas, E. Tiemann, T. Törring, Microwave absorption spectra of AlF, GaF, InF, and TlF, " *
+            "Z. Naturforsch. A 25, 1029 (1970)", "10.1515/zna-1970-0706")],
+     note="Equilibrium r_e (Table 13); a high-temperature species."),
+    (name="Aluminium monochloride", formula="AlCl", category="Inorganic: metal halides", pg="C∞v",
+     geometry=linear(("Al", "Cl"), (2.13011,)),
+     refs=[("F. C. Wyse, W. Gordy, Millimeter wave rotational spectra of AlCl, AlBr, and AlI, J. Chem. Phys. 56, " *
+            "2130 (1972)", "10.1063/1.1677509")],
+     note="Equilibrium r_e; a high-temperature species."),
+    (name="Gallium monochloride", formula="GaCl", category="Inorganic: metal halides", pg="C∞v",
+     geometry=linear(("Ga", "Cl"), (2.201681,)),
+     refs=[("E. Tiemann, M. Grasshoff, J. Hoeft, Hyperfeinstruktur im Rotationsspektrum des GaCl, Z. Naturforsch. A " *
+            "27, 753 (1972)", "10.1515/zna-1972-0505")],
+     note="Equilibrium r_e of 69Ga35Cl (Tab. 5); the gallium carrier in GaCl-based (HVPE) growth."),
+    (name="Silicon monosulfide", formula="SiS", category="Inorganic: oxides and sulfides", pg="C∞v",
+     geometry=linear(("Si", "S"), (1.9293141,)),
+     refs=[("J. Hoeft, F. J. Lovas, T. Törring, Elektrisches Dipolmoment und Mikrowellenrotationsspektrum von SiS, " *
+            "Z. Naturforsch. A 24, 1422 (1969)", "10.1515/zna-1969-0932")],
+     note="Equilibrium r_e (Table 4)."),
+    (name="Germanium monoxide", formula="GeO", category="Inorganic: oxides and sulfides", pg="C∞v",
+     geometry=linear(("Ge", "O"), (1.624647,)),
+     refs=[("T. Törring, Das Mikrowellenrotationsspektrum des GeO, Z. Naturforsch. A 21, 287 (1966)",
+            "10.1515/zna-1966-0319")],
+     note="Equilibrium r_e (Tab. 2), 1Σ ground state."),
+    (name="Phosphorus mononitride", formula="PN", category="Inorganic: nitrides", pg="C∞v",
+     geometry=linear(("P", "N"), (1.49085,)),
+     refs=[("J. Hoeft, E. Tiemann, T. Törring, Rotationsspektrum des PN, Z. Naturforsch. A 27, 703 (1972)",
+            "10.1515/zna-1972-0424")],
+     note="Equilibrium r_e (Tab. 2)."),
+    (name="Silicon monofluoride", formula="SiF", category="Inorganic: radicals", pg="C∞v",
+     geometry=linear(("Si", "F"), (1.601018,)),
+     refs=[("K. Tanaka, Y. Akiyama, T. Tanaka, Infrared diode laser spectroscopy of the SiF radical, J. Mol. " *
+            "Spectrosc. 137, 55 (1989)", "10.1016/0022-2852(89)90268-3")],
+     note="Equilibrium r_e of the X 2Π ground state, read in the authors' abstract (CiNii). " * spin_note("doublet")),
+    (name="Phosphino radical", formula="PH2", category="Inorganic: radicals", pg="C2v",
+     geometry=zmatrix([("P",), ("H", 1, 1.43365), ("H", 1, 1.43365, 2, 91.622)]),
+     refs=[("T. Hirao, S. Hayakashi, S. Yamamoto, S. Saito, Microwave spectrum of the PD2 radical in the 2B1 ground " *
+            "electronic state, J. Mol. Spectrosc. 187, 153 (1998)", "10.1006/jmsp.1997.7457")],
+     note="Zero-point average structure r_z of the X̃ 2B1 ground state, read in the authors' abstract (CiNii). " *
+          spin_note("doublet")),
     # Carbon nanostructures
     (name="Buckminsterfullerene", formula="C60", category="Carbon: fullerenes", pg="Ih",
      geometry=fullerene_c60(1.458, 1.401),

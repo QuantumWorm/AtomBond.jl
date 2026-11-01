@@ -195,7 +195,7 @@ const MOLECULE_GROUPS = ["Organic: hydrocarbons", "Organic: halocarbons", "Organ
                          "Organic: heterocycles", "Organic: radicals",
                          "Organometallic: metal alkyls", "Organometallic: metal carbonyls",
                          "Inorganic: elements", "Inorganic: hydrides", "Inorganic: oxides and sulfides", "Inorganic: oxoacids",
-                         "Inorganic: nonmetal halides", "Inorganic: metal halides", "Inorganic: oxyhalides",
+                         "Inorganic: nitrides", "Inorganic: nonmetal halides", "Inorganic: metal halides", "Inorganic: oxyhalides",
                          "Inorganic: radicals", "Carbon: fullerenes"]
 
 # --- carbon nanostructures from graphite's in-plane lattice constant ------------------
