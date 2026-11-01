@@ -438,6 +438,46 @@ function methyl_formate()
     return [syms; fill("H", 3)], [pos; hs]
 end
 
+"""Pentagonal bipyramidal XY7 (D5h) with axial and equatorial bond lengths."""
+function pentagonal_bipyramid(x, y, rax, req)
+    eq = [[req * cos(2π * k / 5), req * sin(2π * k / 5), 0.0] for k in 0:4]
+    return [x; fill(y, 7)], [[0.0, 0, 0], eq..., [0.0, 0, rax], [0.0, 0, -rax]]
+end
+
+"""
+Planar molecule built on the bond A–B (A at the origin, B along x):
+substituents (symbol, 1 = on A or 2 = on B, bond length, angle to the A–B
+bond, side +1 or -1 of the bond) in the xy plane.
+"""
+function planar_ab(a, b, rab, subs)
+    pa, pb = [0.0, 0, 0], [rab, 0.0, 0]
+    syms, pos = [a, b], V3[pa, pb]
+    for (s, at, r, θ, side) in subs
+        o, other = at == 1 ? (pa, pb) : (pb, pa)
+        push!(syms, s)
+        push!(pos, place2d(o, other, r, θ, [0.0, -side * 100.0, 0]))
+    end
+    return syms, pos
+end
+
+"""
+Cyclopropene (C2v): C1–C2, C2=C2′, methylene and ethylenic C–H, the angle
+C2′=C2–H and H–C1–H; the CH2 plane perpendicular to the ring.
+"""
+function cyclopropene(r12, r22, rch2, rch1, θh, θhch)
+    c2s = [[r22 / 2, 0.0, 0], [-r22 / 2, 0.0, 0]]
+    c1 = [0.0, sqrt(r12^2 - (r22 / 2)^2), 0]
+    hs = [place2d(c2s[1], c2s[2], rch1, θh, c1), place2d(c2s[2], c2s[1], rch1, θh, c1)]
+    hm = [c1 + rch2 * (cosd(θhch / 2) * [0.0, 1, 0] + t * sind(θhch / 2) * [0.0, 0, 1]) for t in (1, -1)]
+    return ["C", "C", "C", "H", "H", "H", "H"], [[c1]; c2s; hs; hm]
+end
+
+const TYLER_SHERIDAN = ("J. K. Tyler, J. Sheridan, Structural studies of linear molecules by microwave spectroscopy, " *
+                        "Trans. Faraday Soc. 59, 2661 (1963); values read in Table 5 of the authors' report of the " *
+                        "same title (USAF contract AF61(052)-241, Feb. 1963, DTIC AD0409439, " *
+                        "doi:10.21236/ad0409439)", "10.1039/tf9635902661")
+const TYLER_SHERIDAN_NOTE = "Substitution structure r_s (authors' estimate: within 0.002 Å of r_e)."
+
 spin_note(state) = "The ground state is a spin $state (open shell): use a spin-polarized calculation."
 odd_electron_note(extra="") = "A radical with an odd number of electrons: the ground state is a spin doublet (open " *
                               "shell), use a spin-polarized calculation." * (isempty(extra) ? "" : " " * extra)
@@ -1110,6 +1150,99 @@ const MOLECULES = [
             "10.3891/acta.chem.scand.48-0046")],
      note="Electron-diffraction r_a (Table 1); the central H–Si–H angle (107.8°) was fixed at an ab initio value " *
           "by the authors."),
+    # Unsaturated organics, cyanides, interhalogens
+    (name="Diacetylene", formula="C4H2", category="Organic: hydrocarbons", pg="D∞h",
+     geometry=linear(("H", "C", "C", "C", "C", "H"), (1.0935, 1.2176, 1.3837, 1.2176, 1.0935)),
+     refs=[("M. Tanimoto, K. Kuchitsu, Y. Morino, Molecular structure of diacetylene as studied by gas electron " *
+            "diffraction, Bull. Chem. Soc. Jpn. 44, 386 (1971)", "10.1246/bcsj.44.386")],
+     note="Electron-diffraction r_g (thermal average)."),
+    (name="Cyclopropene", formula="C3H4", category="Organic: hydrocarbons", pg="C2v",
+     geometry=cyclopropene(1.509, 1.2959, 1.088, 1.072, 149.85, 114.57),
+     refs=[("W. M. Stigliani, V. W. Laurie, J. C. Li, Microwave spectrum and structure of cyclopropene, J. Chem. " *
+            "Phys. 62, 1890 (1975)", "10.1063/1.430674")],
+     note="Microwave structure (13C species). The ring is placed from the two C–C distances, giving a C–C–C " *
+          "angle of 50.86° (authors: 50.84 ± 0.05°)."),
+    (name="Fluoroacetylene", formula="HCCF", category="Organic: halocarbons", pg="C∞v",
+     geometry=linear(("H", "C", "C", "F"), (1.053, 1.198, 1.279)), refs=[TYLER_SHERIDAN],
+     note=TYLER_SHERIDAN_NOTE * " F is placed from the centre-of-mass condition."),
+    (name="Chloroacetylene", formula="HCCCl", category="Organic: halocarbons", pg="C∞v",
+     geometry=linear(("H", "C", "C", "Cl"), (1.0550, 1.2033, 1.6368)),
+     refs=[("H. Jones, M. Takami, J. Sheridan, Microwave spectrum of chloroacetylene in ground and excited " *
+            "vibrational states, Z. Naturforsch. A 33, 156 (1978)", "10.1515/zna-1978-0209")],
+     note="Substitution structure r_s, average over four isotopologues (consistent to 0.0005 Å)."),
+    (name="Vinyl chloride", formula="C2H3Cl", category="Organic: halocarbons", pg="Cs",
+     geometry=planar_ab("C", "C", 1.332, [("Cl", 1, 1.726, 122.0, 1), ("H", 1, 1.08, 124.0, -1),
+                                         ("H", 2, 1.08, 121.0, 1), ("H", 2, 1.08, 120.0, -1)]),
+     refs=[("D. Kivelson, E. B. Wilson, D. R. Lide, Microwave spectrum, structure, dipole moment, and nuclear " *
+            "quadrupole effects in vinyl chloride, J. Chem. Phys. 32, 205 (1960)", "10.1063/1.1700901")],
+     note="Microwave structure from nine isotopologues, planarity assumed; the authors give one average C–H " *
+          "(1.08 Å), used for all three, and angles to 1°."),
+    (name="1,1-Difluoroethylene", formula="H2CCF2", category="Organic: halocarbons", pg="C2v",
+     geometry=planar_ab("C", "C", 1.315, [("F", 1, 1.323, 180 - 109.1 / 2, 1), ("F", 1, 1.323, 180 - 109.1 / 2, -1),
+                                         ("H", 2, 1.079, 180 - 121.8 / 2, 1), ("H", 2, 1.079, 180 - 121.8 / 2, -1)]),
+     refs=[("V. W. Laurie, D. T. Pence, Microwave spectra and structures of difluoroethylenes, J. Chem. Phys. 38, " *
+            "2693 (1963)", "10.1063/1.1733575")],
+     note="Effective microwave structure (vinylidene fluoride), no uncertainties given."),
+    (name="cis-1,2-Difluoroethylene", formula="CHFCHF", category="Organic: halocarbons", pg="C2v",
+     geometry=planar_ab("C", "C", 1.324, [("F", 1, 1.335, 122.1, 1), ("F", 2, 1.335, 122.1, 1),
+                                         ("H", 1, 1.089, 124.0, -1), ("H", 2, 1.089, 124.0, -1)]),
+     refs=[("V. W. Laurie, D. T. Pence, Microwave spectra and structures of difluoroethylenes, J. Chem. Phys. 38, " *
+            "2693 (1963)", "10.1063/1.1733575")],
+     note="Effective microwave structure, no uncertainties given."),
+    (name="Methanimine", formula="CH2NH", category="Organic: nitrogen and sulfur compounds", pg="Cs",
+     geometry=planar_ab("C", "N", 1.273, [("H", 2, 1.021, 110.4, 1), ("H", 1, 1.09, 125.1, 1),
+                                         ("H", 1, 1.09, 360 - 125.1 - 117.0, -1)]),
+     refs=[("R. Pearson, F. J. Lovas, Microwave spectrum and molecular structure of methylenimine (CH2NH), J. Chem. " *
+            "Phys. 66, 4149 (1977)", "10.1063/1.434490")],
+     note="Pseudo-Kraitchman structure with the two C–H distances constrained equal by the authors; the C–H " *
+          "cis to the N–H at N=C–H 125.1°, H–C–H 117.0°."),
+    (name="Cyanogen", formula="C2N2", category="Organic: nitrogen and sulfur compounds", pg="D∞h",
+     geometry=linear(("N", "C", "C", "N"), (1.154, 1.389, 1.154)),
+     refs=[("A. G. Maki, High-resolution infrared spectra of cyanogen and cyanogen-15N2, J. Chem. Phys. 43, 3193 " *
+            "(1965)", "10.1063/1.1697293")],
+     note="Ground-state r_0 of low precision (3σ: C–C ± 0.030 Å, C≡N ± 0.017 Å)."),
+    (name="Cyanoacetylene", formula="HC3N", category="Organic: nitrogen and sulfur compounds", pg="C∞v",
+     geometry=linear(("H", "C", "C", "C", "N"), (1.058, 1.205, 1.378, 1.159)), refs=[TYLER_SHERIDAN],
+     note=TYLER_SHERIDAN_NOTE),
+    (name="Cyanogen fluoride", formula="FCN", category="Organic: nitrogen and sulfur compounds", pg="C∞v",
+     geometry=linear(("F", "C", "N"), (1.262, 1.159)), refs=[TYLER_SHERIDAN],
+     note=TYLER_SHERIDAN_NOTE * " F is placed from the centre-of-mass condition."),
+    (name="Cyanogen chloride", formula="ClCN", category="Organic: nitrogen and sulfur compounds", pg="C∞v",
+     geometry=linear(("Cl", "C", "N"), (1.631, 1.159)), refs=[TYLER_SHERIDAN], note=TYLER_SHERIDAN_NOTE),
+    (name="Cyanogen bromide", formula="BrCN", category="Organic: nitrogen and sulfur compounds", pg="C∞v",
+     geometry=linear(("Br", "C", "N"), (1.789, 1.158)), refs=[TYLER_SHERIDAN], note=TYLER_SHERIDAN_NOTE),
+    (name="Cyanogen iodide", formula="ICN", category="Organic: nitrogen and sulfur compounds", pg="C∞v",
+     geometry=linear(("I", "C", "N"), (1.994, 1.159)), refs=[TYLER_SHERIDAN],
+     note=TYLER_SHERIDAN_NOTE * " I is placed from the centre-of-mass condition."),
+    (name="Carbon suboxide", formula="C3O2", category="Inorganic: oxides and sulfides", pg="D∞h",
+     geometry=linear(("O", "C", "C", "C", "O"), (1.1632, 1.2894, 1.2894, 1.1632)),
+     refs=[("M. Tanimoto, K. Kuchitsu, Y. Morino, Molecular structure and the effect of large-amplitude vibration " *
+            "of carbon suboxide as studied by gas electron diffraction, Bull. Chem. Soc. Jpn. 43, 2776 (1970)",
+            "10.1246/bcsj.43.2776")],
+     note="Electron-diffraction r_g. Quasi-linear: the C=C=C angle bends with a very large amplitude (about " *
+          "68 cm⁻¹), so the linear chain is a model of the average."),
+    (name="Chlorine dioxide", formula="ClO2", category="Inorganic: oxides and sulfides", pg="C2v",
+     geometry=zmatrix([("Cl",), ("O", 1, 1.469839), ("O", 1, 1.469839, 2, 117.4033)]),
+     refs=[("K. Miyazaki, M. Tanoura, K. Tanaka, T. Tanaka, Microwave spectrum of chlorine dioxide in excited " *
+            "vibrational states, J. Mol. Spectrosc. 116, 435 (1986)", "10.1016/0022-2852(86)90138-4")],
+     note="Equilibrium r_e, read in the authors' abstract (CiNii). " * odd_electron_note()),
+    (name="Bromine monochloride", formula="BrCl", category="Inorganic: nonmetal halides", pg="C∞v",
+     geometry=linear(("Br", "Cl"), (2.13605328,)),
+     refs=[("H. Uehara, T. Konno, Y. Ozaki, K. Horiai, K. Nakagawa, J. W. C. Johns, The high-resolution infrared " *
+            "spectrum of BrCl, Can. J. Phys. 72, 1145 (1994)", "10.1139/p94-148")],
+     note="Equilibrium r_e."),
+    (name="Bromine trifluoride", formula="BrF3", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=zmatrix([("Br",), ("F", 1, 1.721), ("F", 1, 1.810, 2, 86.21), ("F", 1, 1.810, 2, 86.21, 3, 180.0)]),
+     refs=[("D. W. Magnuson, Microwave spectrum and molecular structure of bromine trifluoride, J. Chem. Phys. 27, " *
+            "223 (1957)", "10.1063/1.1743675")],
+     note="Planar T shape like ClF3; effective ground-state structure from the moments of inertia. The " *
+          "F–Br–F′ angle (86° 12.6′) is taken between the short bond and each long bond."),
+    (name="Iodine heptafluoride", formula="IF7", category="Inorganic: nonmetal halides", pg="D5h",
+     geometry=pentagonal_bipyramid("I", "F", 1.786, 1.858),
+     refs=[("W. J. Adams, H. B. Thompson, L. S. Bartell, Structure, pseudorotation, and vibrational mode coupling " *
+            "in IF7: an electron diffraction study, J. Chem. Phys. 53, 4040 (1970)", "10.1063/1.1673876")],
+     note="Electron diffraction, idealised D5h pentagonal bipyramid. The molecule pseudorotates: on average the " *
+          "ring puckers by 7.5° and the axial bonds bend by 4.5°."),
     # Carbon nanostructures
     (name="Buckminsterfullerene", formula="C60", category="Carbon: fullerenes", pg="Ih",
      geometry=fullerene_c60(1.458, 1.401),

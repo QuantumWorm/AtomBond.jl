@@ -483,6 +483,32 @@ doi = "10.1021/jp993189d"
 note = "Semi-experimental r_e: rotational constants with computed vibrational corrections."
 
 [[structure]]
+name = "Cyclopropene"
+kind = "molecule"
+category = "Organic: hydrocarbons"
+formula = "C3H4"
+file = "molecules/C3H4.xyz"
+description = "Experimental geometry, point group C2v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.430674"
+reference = "W. M. Stigliani, V. W. Laurie, J. C. Li, Microwave spectrum and structure of cyclopropene, J. Chem. Phys. 62, 1890 (1975)"
+doi = "10.1063/1.430674"
+note = "Microwave structure (13C species). The ring is placed from the two C–C distances, giving a C–C–C angle of 50.86° (authors: 50.84 ± 0.05°)."
+
+[[structure]]
+name = "Diacetylene"
+kind = "molecule"
+category = "Organic: hydrocarbons"
+formula = "C4H2"
+file = "molecules/C4H2.xyz"
+description = "Experimental geometry, point group D∞h"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1246/bcsj.44.386"
+reference = "M. Tanimoto, K. Kuchitsu, Y. Morino, Molecular structure of diacetylene as studied by gas electron diffraction, Bull. Chem. Soc. Jpn. 44, 386 (1971)"
+doi = "10.1246/bcsj.44.386"
+note = "Electron-diffraction r_g (thermal average)."
+
+[[structure]]
 name = "Ethane"
 kind = "molecule"
 category = "Organic: hydrocarbons"
@@ -535,6 +561,19 @@ doi = "10.1016/j.molstruc.2020.127769"
 note = "Semi-experimental r_e (Table 3, ae-CCSD(T) corrections), read in the authors' preprint arXiv:2001.11907."
 
 [[structure]]
+name = "1,1-Difluoroethylene"
+kind = "molecule"
+category = "Organic: halocarbons"
+formula = "H2CCF2"
+file = "molecules/H2CCF2.xyz"
+description = "Experimental geometry, point group C2v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.1733575"
+reference = "V. W. Laurie, D. T. Pence, Microwave spectra and structures of difluoroethylenes, J. Chem. Phys. 38, 2693 (1963)"
+doi = "10.1063/1.1733575"
+note = "Effective microwave structure (vinylidene fluoride), no uncertainties given."
+
+[[structure]]
 name = "Carbon tetrachloride"
 kind = "molecule"
 category = "Organic: halocarbons"
@@ -560,6 +599,19 @@ reference = "K. Kuchitsu (ed.), Structure of Free Polyatomic Molecules - Basic D
 doi = "10.1007/978-3-642-45748-7"
 note = ""
 use = "etch gas"
+
+[[structure]]
+name = "Chloroacetylene"
+kind = "molecule"
+category = "Organic: halocarbons"
+formula = "HCCCl"
+file = "molecules/HCCCl.xyz"
+description = "Experimental geometry, point group C∞v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1515/zna-1978-0209"
+reference = "H. Jones, M. Takami, J. Sheridan, Microwave spectrum of chloroacetylene in ground and excited vibrational states, Z. Naturforsch. A 33, 156 (1978)"
+doi = "10.1515/zna-1978-0209"
+note = "Substitution structure r_s, average over four isotopologues (consistent to 0.0005 Å)."
 
 [[structure]]
 name = "Chloroform"
@@ -589,6 +641,19 @@ doi = "10.3390/molecules30071604"
 note = "Semi-experimental r_e (Table 5): rotational constants with CCSD(T) vibrational corrections."
 
 [[structure]]
+name = "cis-1,2-Difluoroethylene"
+kind = "molecule"
+category = "Organic: halocarbons"
+formula = "CHFCHF"
+file = "molecules/CHFCHF.xyz"
+description = "Experimental geometry, point group C2v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.1733575"
+reference = "V. W. Laurie, D. T. Pence, Microwave spectra and structures of difluoroethylenes, J. Chem. Phys. 38, 2693 (1963)"
+doi = "10.1063/1.1733575"
+note = "Effective microwave structure, no uncertainties given."
+
+[[structure]]
 name = "Dichloromethane"
 kind = "molecule"
 category = "Organic: halocarbons"
@@ -601,6 +666,19 @@ reference = "R. J. Myers, W. D. Gwinn, The microwave spectra, structure, dipole 
 doi = "10.1063/1.1700773"
 note = "Effective (r_0) structure; C–H and H–C–H are the authors' values extrapolated to infinite hydrogen mass."
 use = "solvent"
+
+[[structure]]
+name = "Fluoroacetylene"
+kind = "molecule"
+category = "Organic: halocarbons"
+formula = "HCCF"
+file = "molecules/HCCF.xyz"
+description = "Experimental geometry, point group C∞v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1039/tf9635902661"
+reference = "J. K. Tyler, J. Sheridan, Structural studies of linear molecules by microwave spectroscopy, Trans. Faraday Soc. 59, 2661 (1963); values read in Table 5 of the authors' report of the same title (USAF contract AF61(052)-241, Feb. 1963, DTIC AD0409439, doi:10.21236/ad0409439)"
+doi = "10.1039/tf9635902661"
+note = "Substitution structure r_s (authors' estimate: within 0.002 Å of r_e). F is placed from the centre-of-mass condition."
 
 [[structure]]
 name = "Fluoromethane"
@@ -629,6 +707,19 @@ reference = "D. A. Swick, I. L. Karle, Structure and internal motion of C2F6 and
 doi = "10.1063/1.1742337"
 note = "Early electron-diffraction structure of low precision (C–C ± 0.03 Å, C–C–F ± 1.5°): relax before use."
 use = "etch gas"
+
+[[structure]]
+name = "Vinyl chloride"
+kind = "molecule"
+category = "Organic: halocarbons"
+formula = "C2H3Cl"
+file = "molecules/C2H3Cl.xyz"
+description = "Experimental geometry, point group Cs"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.1700901"
+reference = "D. Kivelson, E. B. Wilson, D. R. Lide, Microwave spectrum, structure, dipole moment, and nuclear quadrupole effects in vinyl chloride, J. Chem. Phys. 32, 205 (1960)"
+doi = "10.1063/1.1700901"
+note = "Microwave structure from nine isotopologues, planarity assumed; the authors give one average C–H (1.08 Å), used for all three, and angles to 1°."
 
 [[structure]]
 name = "Ethanol"
@@ -751,6 +842,84 @@ note = "Electron-diffraction r_g bond lengths (C–H longer than r_e) and r_av a
 use = "solvent"
 
 [[structure]]
+name = "Cyanoacetylene"
+kind = "molecule"
+category = "Organic: nitrogen and sulfur compounds"
+formula = "HC3N"
+file = "molecules/HC3N.xyz"
+description = "Experimental geometry, point group C∞v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1039/tf9635902661"
+reference = "J. K. Tyler, J. Sheridan, Structural studies of linear molecules by microwave spectroscopy, Trans. Faraday Soc. 59, 2661 (1963); values read in Table 5 of the authors' report of the same title (USAF contract AF61(052)-241, Feb. 1963, DTIC AD0409439, doi:10.21236/ad0409439)"
+doi = "10.1039/tf9635902661"
+note = "Substitution structure r_s (authors' estimate: within 0.002 Å of r_e)."
+
+[[structure]]
+name = "Cyanogen"
+kind = "molecule"
+category = "Organic: nitrogen and sulfur compounds"
+formula = "C2N2"
+file = "molecules/C2N2.xyz"
+description = "Experimental geometry, point group D∞h"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.1697293"
+reference = "A. G. Maki, High-resolution infrared spectra of cyanogen and cyanogen-15N2, J. Chem. Phys. 43, 3193 (1965)"
+doi = "10.1063/1.1697293"
+note = "Ground-state r_0 of low precision (3σ: C–C ± 0.030 Å, C≡N ± 0.017 Å)."
+
+[[structure]]
+name = "Cyanogen bromide"
+kind = "molecule"
+category = "Organic: nitrogen and sulfur compounds"
+formula = "BrCN"
+file = "molecules/BrCN.xyz"
+description = "Experimental geometry, point group C∞v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1039/tf9635902661"
+reference = "J. K. Tyler, J. Sheridan, Structural studies of linear molecules by microwave spectroscopy, Trans. Faraday Soc. 59, 2661 (1963); values read in Table 5 of the authors' report of the same title (USAF contract AF61(052)-241, Feb. 1963, DTIC AD0409439, doi:10.21236/ad0409439)"
+doi = "10.1039/tf9635902661"
+note = "Substitution structure r_s (authors' estimate: within 0.002 Å of r_e)."
+
+[[structure]]
+name = "Cyanogen chloride"
+kind = "molecule"
+category = "Organic: nitrogen and sulfur compounds"
+formula = "ClCN"
+file = "molecules/ClCN.xyz"
+description = "Experimental geometry, point group C∞v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1039/tf9635902661"
+reference = "J. K. Tyler, J. Sheridan, Structural studies of linear molecules by microwave spectroscopy, Trans. Faraday Soc. 59, 2661 (1963); values read in Table 5 of the authors' report of the same title (USAF contract AF61(052)-241, Feb. 1963, DTIC AD0409439, doi:10.21236/ad0409439)"
+doi = "10.1039/tf9635902661"
+note = "Substitution structure r_s (authors' estimate: within 0.002 Å of r_e)."
+
+[[structure]]
+name = "Cyanogen fluoride"
+kind = "molecule"
+category = "Organic: nitrogen and sulfur compounds"
+formula = "FCN"
+file = "molecules/FCN.xyz"
+description = "Experimental geometry, point group C∞v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1039/tf9635902661"
+reference = "J. K. Tyler, J. Sheridan, Structural studies of linear molecules by microwave spectroscopy, Trans. Faraday Soc. 59, 2661 (1963); values read in Table 5 of the authors' report of the same title (USAF contract AF61(052)-241, Feb. 1963, DTIC AD0409439, doi:10.21236/ad0409439)"
+doi = "10.1039/tf9635902661"
+note = "Substitution structure r_s (authors' estimate: within 0.002 Å of r_e). F is placed from the centre-of-mass condition."
+
+[[structure]]
+name = "Cyanogen iodide"
+kind = "molecule"
+category = "Organic: nitrogen and sulfur compounds"
+formula = "ICN"
+file = "molecules/ICN.xyz"
+description = "Experimental geometry, point group C∞v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1039/tf9635902661"
+reference = "J. K. Tyler, J. Sheridan, Structural studies of linear molecules by microwave spectroscopy, Trans. Faraday Soc. 59, 2661 (1963); values read in Table 5 of the authors' report of the same title (USAF contract AF61(052)-241, Feb. 1963, DTIC AD0409439, doi:10.21236/ad0409439)"
+doi = "10.1039/tf9635902661"
+note = "Substitution structure r_s (authors' estimate: within 0.002 Å of r_e). I is placed from the centre-of-mass condition."
+
+[[structure]]
 name = "Dimethyl sulfoxide"
 kind = "molecule"
 category = "Organic: nitrogen and sulfur compounds"
@@ -776,6 +945,19 @@ url = ""
 reference = "G. Herzberg, Molecular Spectra and Molecular Structure III. Electronic Spectra and Electronic Structure of Polyatomic Molecules, Van Nostrand (1966)"
 doi = ""
 note = ""
+
+[[structure]]
+name = "Methanimine"
+kind = "molecule"
+category = "Organic: nitrogen and sulfur compounds"
+formula = "CH2NH"
+file = "molecules/CH2NH.xyz"
+description = "Experimental geometry, point group Cs"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.434490"
+reference = "R. Pearson, F. J. Lovas, Microwave spectrum and molecular structure of methylenimine (CH2NH), J. Chem. Phys. 66, 4149 (1977)"
+doi = "10.1063/1.434490"
+note = "Pseudo-Kraitchman structure with the two C–H distances constrained equal by the authors; the C–H cis to the N–H at N=C–H 125.1°, H–C–H 117.0°."
 
 [[structure]]
 name = "Furan"
@@ -1350,6 +1532,19 @@ doi = "10.1007/978-1-4757-0961-2"
 note = ""
 
 [[structure]]
+name = "Carbon suboxide"
+kind = "molecule"
+category = "Inorganic: oxides and sulfides"
+formula = "C3O2"
+file = "molecules/C3O2.xyz"
+description = "Experimental geometry, point group D∞h"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1246/bcsj.43.2776"
+reference = "M. Tanimoto, K. Kuchitsu, Y. Morino, Molecular structure and the effect of large-amplitude vibration of carbon suboxide as studied by gas electron diffraction, Bull. Chem. Soc. Jpn. 43, 2776 (1970)"
+doi = "10.1246/bcsj.43.2776"
+note = "Electron-diffraction r_g. Quasi-linear: the C=C=C angle bends with a very large amplitude (about 68 cm⁻¹), so the linear chain is a model of the average."
+
+[[structure]]
 name = "Carbonyl sulfide"
 kind = "molecule"
 category = "Inorganic: oxides and sulfides"
@@ -1361,6 +1556,19 @@ url = "https://doi.org/10.1080/00268977500101491"
 reference = "A. Foord, J. G. Smith, D. H. Whiffen, An anharmonic force field for carbonyl sulphide, Mol. Phys. 29, 1685 (1975)"
 doi = "10.1080/00268977500101491"
 note = ""
+
+[[structure]]
+name = "Chlorine dioxide"
+kind = "molecule"
+category = "Inorganic: oxides and sulfides"
+formula = "ClO2"
+file = "molecules/ClO2.xyz"
+description = "Experimental geometry, point group C2v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1016/0022-2852(86)90138-4"
+reference = "K. Miyazaki, M. Tanoura, K. Tanaka, T. Tanaka, Microwave spectrum of chlorine dioxide in excited vibrational states, J. Mol. Spectrosc. 116, 435 (1986)"
+doi = "10.1016/0022-2852(86)90138-4"
+note = "Equilibrium r_e, read in the authors' abstract (CiNii). A radical with an odd number of electrons: the ground state is a spin doublet (open shell), use a spin-polarized calculation."
 
 [[structure]]
 name = "Dichlorine monoxide"
@@ -1628,6 +1836,32 @@ note = ""
 use = "dopant source"
 
 [[structure]]
+name = "Bromine monochloride"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "BrCl"
+file = "molecules/BrCl.xyz"
+description = "Experimental geometry, point group C∞v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1139/p94-148"
+reference = "H. Uehara, T. Konno, Y. Ozaki, K. Horiai, K. Nakagawa, J. W. C. Johns, The high-resolution infrared spectrum of BrCl, Can. J. Phys. 72, 1145 (1994)"
+doi = "10.1139/p94-148"
+note = "Equilibrium r_e."
+
+[[structure]]
+name = "Bromine trifluoride"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "BrF3"
+file = "molecules/BrF3.xyz"
+description = "Experimental geometry, point group C2v"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.1743675"
+reference = "D. W. Magnuson, Microwave spectrum and molecular structure of bromine trifluoride, J. Chem. Phys. 27, 223 (1957)"
+doi = "10.1063/1.1743675"
+note = "Planar T shape like ClF3; effective ground-state structure from the moments of inertia. The F–Br–F′ angle (86° 12.6′) is taken between the short bond and each long bond."
+
+[[structure]]
 name = "Chlorine trifluoride"
 kind = "molecule"
 category = "Inorganic: nonmetal halides"
@@ -1694,6 +1928,19 @@ reference = "D. A. Swick, I. L. Karle, Structure and internal motion of C2F6 and
 doi = "10.1063/1.1742337"
 note = "Early electron-diffraction structure of low precision (Si–Si ± 0.06 Å): relax before use."
 use = "deposition precursor"
+
+[[structure]]
+name = "Iodine heptafluoride"
+kind = "molecule"
+category = "Inorganic: nonmetal halides"
+formula = "IF7"
+file = "molecules/IF7.xyz"
+description = "Experimental geometry, point group D5h"
+source = "Experimental gas-phase structure from the literature"
+url = "https://doi.org/10.1063/1.1673876"
+reference = "W. J. Adams, H. B. Thompson, L. S. Bartell, Structure, pseudorotation, and vibrational mode coupling in IF7: an electron diffraction study, J. Chem. Phys. 53, 4040 (1970)"
+doi = "10.1063/1.1673876"
+note = "Electron diffraction, idealised D5h pentagonal bipyramid. The molecule pseudorotates: on average the ring puckers by 7.5° and the axial bonds bend by 4.5°."
 
 [[structure]]
 name = "Nitrogen trichloride"
