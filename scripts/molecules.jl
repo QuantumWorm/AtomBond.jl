@@ -325,6 +325,57 @@ function fullerene_c60(r56, r66)
     return fill("C", length(pos)), pos
 end
 
+"""
+Sulfuric acid (C2): S–O(H), S=O, O–H, the angles O1–S–O1′, O2–S–O2′ and
+H–O1–S, the angle between the O1SO1′ and O2SO2′ planes (both bisected by the
+C2 axis) and the torsion O1′–S–O1–H.
+"""
+function sulfuric_acid(rso1, rso2, roh, θ11, θ22, planes, θhos, τ)
+    pair(r, θ, φ, up) = (s = r * sind(θ / 2); z = up * r * cosd(θ / 2);
+                         ([s * cosd(φ), s * sind(φ), z], [-s * cosd(φ), -s * sind(φ), z]))
+    o1, o1p = pair(rso1, θ11, 0.0, 1)
+    o2, o2p = pair(rso2, θ22, planes, -1)
+    S = [0.0, 0, 0]
+    h = zplace(o1, S, o1p, roh, θhos, τ)
+    hp = [-h[1], -h[2], h[3]]                                   # C2 about z
+    return ["S", "O", "O", "O", "O", "H", "H"], [S, o1, o1p, o2, o2p, h, hp]
+end
+
+"""Cs XYZ2 (thionyl chloride type): X–Y, X–Z, the Y–X–Z angle (both Z) and the Z–X–Z angle."""
+function xyz2_pyramid(x, y, z, rxy, rxz, θyxz, θzxz)
+    φ = acosd((cosd(θzxz) - cosd(θyxz)^2) / sind(θyxz)^2)        # azimuth between the two Z about X–Y
+    zs = [rxz * [sind(θyxz) * cosd(s * φ / 2), sind(θyxz) * sind(s * φ / 2), cosd(θyxz)] for s in (1, -1)]
+    return [x, y, z, z], [[0.0, 0, 0], [0.0, 0, rxy], zs...]
+end
+
+"""Tetrahedral X4 (P4, Td) with edge (bond) length r."""
+function tetrahedral_x4(x, r)
+    d = r / (2sqrt(2))
+    return fill(x, 4), [[d, d, d], [d, -d, -d], [-d, d, -d], [-d, -d, d]]
+end
+
+"""
+Crown ring X_n (S8, D_{n/2 d}): atoms alternately up and down on two circles,
+from the bond length r and the bond angle θ (the torsion follows).
+"""
+function crown_ring(x, n, r, θ)
+    β = 2π / n                                                  # azimuth step
+    # Bond length and angle fix the radius R and the half-height h:
+    #   r² = 2R²(1 - cos β) + 4h²,  angle k-1, k, k+1 (neighbours at the same height)
+    #   cos θ = (2R²(cos β - cos 2β)... solved numerically below.
+    pos(R, h) = [[R * cos(β * k), R * sin(β * k), iseven(k) ? h : -h] for k in 0:n-1]
+    ang(R, h) = (p = pos(R, h); u = p[n] - p[1]; v = p[2] - p[1]; acosd(dot(u, v) / (norm(u) * norm(v))))
+    # For a given R, h follows from r; find R by bisection on the angle.
+    hof(R) = sqrt(max(r^2 - 2R^2 * (1 - cos(β)), 0.0)) / 2
+    lo, hi = 0.5r, r / sqrt(2(1 - cos(β)))                     # h > 0 needs R below hi
+    for _ in 1:200
+        mid = (lo + hi) / 2
+        ang(mid, hof(mid)) < θ ? (lo = mid) : (hi = mid)
+    end
+    R = (lo + hi) / 2
+    return fill(x, n), pos(R, hof(R))
+end
+
 # --- references --------------------------------------------------------------------------
 
 const HUBER_HERZBERG = ("K. P. Huber, G. Herzberg, Molecular Spectra and Molecular Structure IV. Constants of " *
@@ -362,9 +413,9 @@ const MOLECULES = [
      geometry=linear(("N", "N"), (1.0977,)), refs=[HUBER_HERZBERG]),
     (name="Oxygen", formula="O2", category="Inorganic: elements", pg="D∞h",
      geometry=linear(("O", "O"), (1.2075,)), refs=[HUBER_HERZBERG], note=spin_note("triplet")),
-    (name="Carbon monoxide", formula="CO", category="Inorganic: oxides", pg="C∞v",
+    (name="Carbon monoxide", formula="CO", category="Inorganic: oxides and sulfides", pg="C∞v",
      geometry=linear(("C", "O"), (1.1283,)), refs=[HUBER_HERZBERG]),
-    (name="Nitric oxide", formula="NO", category="Inorganic: oxides", pg="C∞v",
+    (name="Nitric oxide", formula="NO", category="Inorganic: oxides and sulfides", pg="C∞v",
      geometry=linear(("N", "O"), (1.1508,)), refs=[HUBER_HERZBERG], note=spin_note("doublet")),
     (name="Hydrogen fluoride", formula="HF", category="Inorganic: hydrides", use="etch gas", pg="C∞v",
      geometry=linear(("H", "F"), (0.9168,)),
@@ -398,15 +449,15 @@ const MOLECULES = [
             "10.1016/0022-2852(79)90019-5"), HERZBERG_1966]),
     (name="Ammonia", formula="NH3", category="Inorganic: hydrides", use="ALD/CVD co-reactant (oxidant, nitrogen source)", pg="C3v",
      geometry=pyramid("N", "H", 1.0124, 106.67), refs=[HERZBERG_1966]),
-    (name="Carbon dioxide", formula="CO2", category="Inorganic: oxides", pg="D∞h",
+    (name="Carbon dioxide", formula="CO2", category="Inorganic: oxides and sulfides", pg="D∞h",
      geometry=linear(("O", "C", "O"), (1.1621, 1.1621)), refs=[HERZBERG_1966]),
     (name="Hydrogen sulfide", formula="H2S", category="Inorganic: hydrides", pg="C2v",
      geometry=zmatrix([("S",), ("H", 1, 1.3356), ("H", 1, 1.3356, 2, 92.11)]),
      refs=[("R. L. Cook, F. C. De Lucia, P. Helminger, Molecular force field and structure of hydrogen sulfide: " *
             "recent microwave results, J. Mol. Struct. 28, 237 (1975)", "10.1016/0022-2860(75)80094-9")]),
-    (name="Nitrous oxide", formula="N2O", category="Inorganic: oxides", use="ALD/CVD co-reactant (oxidant, nitrogen source)", pg="C∞v",
+    (name="Nitrous oxide", formula="N2O", category="Inorganic: oxides and sulfides", use="ALD/CVD co-reactant (oxidant, nitrogen source)", pg="C∞v",
      geometry=linear(("N", "N", "O"), (1.1282, 1.1842)), refs=[HERZBERG_1966]),
-    (name="Sulfur dioxide", formula="SO2", category="Inorganic: oxides", pg="C2v",
+    (name="Sulfur dioxide", formula="SO2", category="Inorganic: oxides and sulfides", pg="C2v",
      geometry=zmatrix([("S",), ("O", 1, 1.4321), ("O", 1, 1.4321, 2, 119.5)]), refs=[HERZBERG_1966]),
     (name="Ozone", formula="O3", category="Inorganic: elements", use="ALD/CVD co-reactant (oxidant, nitrogen source)", pg="C2v",
      geometry=zmatrix([("O",), ("O", 1, 1.278), ("O", 1, 1.278, 2, 116.8)]), refs=[HERZBERG_1966]),
@@ -416,7 +467,7 @@ const MOLECULES = [
             "the internal rotation problem, J. Chem. Phys. 36, 1311 (1962)", "10.1063/1.1732733")]),
     (name="Hydrogen cyanide", formula="HCN", category="Organic: nitrogen and sulfur compounds", pg="C∞v",
      geometry=linear(("H", "C", "N"), (1.064, 1.156)), refs=[HERZBERG_1966]),
-    (name="Carbonyl sulfide", formula="OCS", category="Inorganic: oxides", pg="C∞v",
+    (name="Carbonyl sulfide", formula="OCS", category="Inorganic: oxides and sulfides", pg="C∞v",
      geometry=linear(("O", "C", "S"), (1.155386, 1.562021)),
      refs=[("A. Foord, J. G. Smith, D. H. Whiffen, An anharmonic force field for carbonyl sulphide, Mol. Phys. 29, " *
             "1685 (1975)", "10.1080/00268977500101491")]),
@@ -806,7 +857,7 @@ const MOLECULES = [
             "frequency laser and diode laser spectroscopy: the equilibrium structure of the hydroperoxyl radical, " *
             "J. Chem. Phys. 81, 4826 (1984)", "10.1063/1.447508")],
      note="Equilibrium structure r_e. " * odd_electron_note()),
-    (name="Nitrogen dioxide", formula="NO2", category="Inorganic: oxides", pg="C2v",
+    (name="Nitrogen dioxide", formula="NO2", category="Inorganic: oxides and sulfides", pg="C2v",
      geometry=zmatrix([("N",), ("O", 1, 1.1949), ("O", 1, 1.1949, 2, 133.75)]),
      refs=[("J. Demaison, J. Liévin, A. Perrin, Equilibrium structure of nitrogen dioxide revisited, Mol. Phys. 122, " *
             "e2318016 (2024)", "10.1080/00268976.2024.2318016")],
@@ -828,11 +879,118 @@ const MOLECULES = [
             "http://hdl.handle.net/1811/15452", "")],
      note="Estimated equilibrium distance (± 0.001 Å) from the authors' symposium abstract; 2Π ground state. " *
           spin_note("doublet")),
-    (name="Silicon monoxide", formula="SiO", category="Inorganic: oxides", pg="C∞v",
+    (name="Silicon monoxide", formula="SiO", category="Inorganic: oxides and sulfides", pg="C∞v",
      geometry=linear(("Si", "O"), (1.50973,)),
      refs=[("T. Törring, Das Mikrowellenrotationsspektrum des SiO, Z. Naturforsch. A 23, 777 (1968)",
             "10.1515/zna-1968-0527")],
      note="Equilibrium r_e from the microwave spectrum (Table 2)."),
+    # Oxoacids and more oxides
+    (name="Nitric acid", formula="HNO3", category="Inorganic: oxoacids", use="wet etch and cleaning", pg="Cs",
+     geometry=zmatrix([("N",), ("O", 1, 1.406), ("O", 1, 1.211, 2, 115.883), ("O", 1, 1.199, 2, 113.85, 3, 180.0),
+                       ("H", 2, 0.964, 1, 102.15, 3, 0.0)]),
+     refs=[("A. P. Cox, J. M. Riveros, Microwave spectrum and structure of nitric acid, J. Chem. Phys. 42, 3106 (1965)",
+            "10.1063/1.1696387")],
+     note="Planar substitution (r_s) structure; the O–H points towards the cis N–O."),
+    (name="Nitrous acid (trans)", formula="HONO", category="Inorganic: oxoacids", pg="Cs",
+     geometry=zmatrix([("N",), ("O", 1, 1.432), ("O", 1, 1.170, 2, 110.7), ("H", 2, 0.958, 1, 102.1, 3, 180.0)]),
+     refs=[("A. P. Cox, A. H. Brittain, D. J. Finnigan, Microwave spectrum, structure, dipole moment and quadrupole " *
+            "coupling constants of cis and trans nitrous acids, Trans. Faraday Soc. 67, 2179 (1971)",
+            "10.1039/tf9716702179")],
+     note="The planar trans isomer (H–O–N=O 180°); no uncertainties given."),
+    (name="Hypofluorous acid", formula="HOF", category="Inorganic: oxoacids", pg="Cs",
+     geometry=zmatrix([("O",), ("F", 1, 1.442), ("H", 1, 0.964, 2, 97.2)]),
+     refs=[("H. Kim, E. F. Pearson, E. H. Appelman, Millimeter-wave spectrum and structure of hypofluorous acid: HOF " *
+            "and DOF, J. Chem. Phys. 56, 1 (1972)", "10.1063/1.1676830")],
+     note="Effective (r_0) structure from HOF and DOF."),
+    (name="Sulfuric acid", formula="H2SO4", category="Inorganic: oxoacids", use="wet etch and cleaning", pg="C2",
+     geometry=sulfuric_acid(1.574, 1.422, 0.97, 101.3, 123.3, 88.4, 108.5, -90.9),
+     refs=[("R. L. Kuczkowski, R. D. Suenram, F. J. Lovas, Microwave spectrum, structure, and dipole moment of " *
+            "sulfuric acid, J. Am. Chem. Soc. 103, 2561 (1981)", "10.1021/ja00400a013")],
+     note="The C2 conformer from the microwave spectrum (structure type not stated)."),
+    (name="Sulfur trioxide", formula="SO3", category="Inorganic: oxides and sulfides", pg="D3h",
+     geometry=planar_xy3("S", "O", 1.4175),
+     refs=[("V. Meyer, D. H. Sutter, H. Dreizler, The centrifugally induced pure rotational spectrum and the structure " *
+            "of sulfur trioxide. A microwave Fourier transform study of a nonpolar molecule, Z. Naturforsch. A 46, " *
+            "710 (1991)", "10.1515/zna-1991-0811")],
+     note="Equilibrium r_e (no uncertainty given; r_0 = 1.4198 Å)."),
+    (name="Dinitrogen tetroxide", formula="N2O4", category="Inorganic: oxides and sulfides", pg="D2h",
+     geometry=zmatrix([("N",), ("N", 1, 1.782), ("O", 1, 1.190, 2, 112.3), ("O", 1, 1.190, 2, 112.3, 3, 180.0),
+                       ("O", 2, 1.190, 1, 112.3, 3, 0.0), ("O", 2, 1.190, 1, 112.3, 3, 180.0)]),
+     refs=[("B. W. McClelland, G. Gundersen, K. Hedberg, Reinvestigation of the structure of dinitrogen tetroxide, " *
+            "N2O4, by gaseous electron diffraction, J. Chem. Phys. 56, 4541 (1972)", "10.1063/1.1677901")],
+     note="Planar electron-diffraction r_a structure (O–N–O 135.4°). The N–N bond, 1.782 Å, is unusually long " *
+          "and beyond the default bond limit, so it is not drawn; ViewSettings(bond_cutoffs=Dict((:N, :N) => 1.85)) " *
+          "shows it."),
+    (name="Dichlorine monoxide", formula="Cl2O", category="Inorganic: oxides and sulfides", pg="C2v",
+     geometry=zmatrix([("O",), ("Cl", 1, 1.69587), ("Cl", 1, 1.69587, 2, 110.886)]),
+     refs=[("M. Nakata, M. Sugie, H. Takeo, C. Matsumura, T. Fukuyama, K. Kuchitsu, Structure of dichlorine monoxide " *
+            "as studied by microwave spectroscopy. Determination of equilibrium structure by a modified mass " *
+            "dependence method, J. Mol. Spectrosc. 86, 241 (1981)", "10.1016/0022-2852(81)90122-3")],
+     note="Equilibrium r_e estimated from r_m structures."),
+    (name="Carbon disulfide", formula="CS2", category="Inorganic: oxides and sulfides", use="solvent", pg="D∞h",
+     geometry=linear(("S", "C", "S"), (1.55448, 1.55448)),
+     refs=[("D. S. Kummli, H. M. Frey, S. Leutwyler, Femtosecond degenerate four-wave mixing of carbon disulfide: " *
+            "high-accuracy rotational constants, J. Chem. Phys. 124, 144307 (2006)", "10.1063/1.2186642")],
+     note="Semi-experimental r_e (measured rotational constant with ab initio corrections)."),
+    (name="Oxygen difluoride", formula="OF2", category="Inorganic: nonmetal halides", pg="C2v",
+     geometry=zmatrix([("O",), ("F", 1, 1.3896), ("F", 1, 1.3896, 2, 104.163)]),
+     refs=[("A. R. Hilton, A. W. Jache, J. B. Beal, W. D. Henderson, R. J. Robinson, Millimeter wave spectrum and " *
+            "molecular structure of oxygen difluoride, J. Chem. Phys. 34, 1137 (1961)", "10.1063/1.1731711")],
+     note="An early effective structure from one isotopologue, no uncertainties given."),
+    # Oxyhalides and molecular elements
+    (name="Phosgene", formula="COCl2", category="Inorganic: oxyhalides", pg="C2v",
+     geometry=zmatrix([("C",), ("O", 1, 1.1766), ("Cl", 1, 1.7365, 2, 180 - 111.91 / 2),
+                       ("Cl", 1, 1.7365, 2, 180 - 111.91 / 2, 3, 180.0)]),
+     refs=[("S. Yamamoto, M. Nakata, K. Kuchitsu, Equilibrium structure and anharmonic potential constants of phosgene " *
+            "derived from rotational constants and electron diffraction intensity, J. Mol. Spectrosc. 112, 173 (1985)",
+            "10.1016/0022-2852(85)90202-4")],
+     note="Equilibrium r_e. Highly toxic."),
+    (name="Carbonyl fluoride", formula="COF2", category="Inorganic: oxyhalides", pg="C2v",
+     geometry=zmatrix([("C",), ("O", 1, 1.1717), ("F", 1, 1.3157, 2, 180 - 107.71 / 2),
+                       ("F", 1, 1.3157, 2, 180 - 107.71 / 2, 3, 180.0)]),
+     refs=[("M. Nakata, K. Kohata, T. Fukuyama, K. Kuchitsu, C. J. Wilkins, Molecular structure of carbonyl fluoride " *
+            "as studied by gas electron diffraction and microwave data, J. Mol. Struct. 68, 271 (1980)",
+            "10.1016/0022-2860(80)80278-X")],
+     note="r_z structure from electron diffraction with microwave data."),
+    (name="Thionyl chloride", formula="SOCl2", category="Inorganic: oxyhalides", pg="Cs",
+     geometry=xyz2_pyramid("S", "O", "Cl", 1.435, 2.072, 108.00, 97.15),
+     refs=[("S. Suzuki, M. Yamaguchi, M. Onda, T. Sakaizumi, O. Ohashi, I. Yamaguchi, Microwave spectroscopic study on " *
+            "the molecular structure and the quadrupole coupling constants of thionyl chloride, J. Mol. Struct. 73, 41 " *
+            "(1981)", "10.1016/0022-2860(81)85044-2")],
+     note="r_0 structure derived with some assumptions (not stated in the abstract)."),
+    (name="Sulfuryl chloride", formula="SO2Cl2", category="Inorganic: oxyhalides", pg="C2v",
+     geometry=xy2z2("S", "O", "Cl", 1.41347, 123.129, 2.01124, 100.126),
+     refs=[("J. Chen, Rotational and vibrational spectroscopy of sulphuryl chloride, sulphuryl fluoride and dimethyl " *
+            "sulphone, Ph.D. thesis, Memorial University of Newfoundland (1991), " *
+            "https://hdl.handle.net/20.500.14783/6953", "")],
+     note="Ground-state average structure of 35Cl2 32S 16O2 from the thesis abstract."),
+    (name="Phosphoryl chloride", formula="POCl3", category="Inorganic: oxyhalides", use="dopant source", pg="C3v",
+     geometry=xy3z("P", "Cl", "O", 1.99, 103.6, 1.45),
+     refs=[("D. Williams, J. Sheridan, W. Gordy, Microwave spectra and molecular structures of POF3, PSF3, POCl3, and " *
+            "PSCl3, J. Chem. Phys. 20, 164 (1952)", "10.1063/1.1700162")],
+     note="Early structure of low precision (± 0.03 Å, ± 2°): relax before use."),
+    (name="Nitrosyl fluoride", formula="NOF", category="Inorganic: oxyhalides", pg="Cs",
+     geometry=zmatrix([("N",), ("O", 1, 1.136), ("F", 1, 1.512, 2, 110.083)]),
+     refs=[("K. S. Buckton, A. C. Legon, D. J. Millen, Microwave spectrum and structure of nitrosyl fluoride, Trans. " *
+            "Faraday Soc. 65, 1975 (1969)", "10.1039/tf9696501975")],
+     note="From three isotopic species (structure type not stated)."),
+    (name="White phosphorus", formula="P4", category="Inorganic: elements", pg="Td",
+     geometry=tetrahedral_x4("P", 2.1994),
+     refs=[("B. M. Cossairt, C. C. Cummins, A. R. Head, D. L. Lichtenberger, R. J. F. Berger, S. A. Hayes, " *
+            "N. W. Mitzel, G. Wu, On the molecular and electronic structures of AsP3 and P4, J. Am. Chem. Soc. 132, " *
+            "8459 (2010)", "10.1021/ja102580d")],
+     note="Gas electron diffraction (r_g)."),
+    (name="Cyclo-octasulfur", formula="S8", category="Inorganic: elements", pg="D4d",
+     geometry=crown_ring("S", 8, 2.055, 108.2),
+     refs=[("S. J. Rettig, J. Trotter, Refinement of the structure of orthorhombic sulfur, α-S8, Acta Crystallogr. C 43, " *
+            "2260 (1987)", "10.1107/S0108270187088152")],
+     note="Crown ring from the mean crystal values (S–S corrected for libration, S–S–S 108.2°); the torsion " *
+          "follows, 98.5° in the crystal."),
+    (name="Selenium dioxide", formula="SeO2", category="Inorganic: oxides and sulfides", pg="C2v",
+     geometry=zmatrix([("Se",), ("O", 1, 1.6076), ("O", 1, 1.6076, 2, 113.833)]),
+     refs=[("H. Takeo, E. Hirota, Y. Morino, Equilibrium structure and potential function of selenium dioxide by " *
+            "microwave spectroscopy, J. Mol. Spectrosc. 34, 370 (1970)", "10.1016/0022-2852(70)90020-2")],
+     note="Equilibrium r_e of the gas-phase monomer."),
     # Carbon nanostructures
     (name="Buckminsterfullerene", formula="C60", category="Carbon: fullerenes", pg="Ih",
      geometry=fullerene_c60(1.458, 1.401),

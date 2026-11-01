@@ -21,7 +21,7 @@ formula, group or use contain all the words typed (`ethane`, `WF6`,
 | Oxides | α-quartz SiO₂, corundum Al₂O₃, monoclinic HfO₂ and ZrO₂, rutile and anatase TiO₂, ZnO, MgO, β-Ga₂O₃, SrTiO₃ | COD (published refinements, listed per entry) |
 | Carbon: graphite and graphene | graphite (2H); graphene (one layer, periodic in-plane) | COD (Trucano & Chen 1975, neutron diffraction); graphene from that lattice constant |
 | Carbon: nanotubes | single-wall (5,5), (10,10), (9,0), (10,0), (6,5) | Rolled graphene sheet with graphite's C–C distance: models, periodic along the tube axis only |
-| Molecules | 99 molecules in the groups below | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
+| Molecules | 117 molecules in the groups below | Experimental gas-phase geometries from spectroscopy and electron diffraction, cited per molecule |
 
 Molecules are grouped the way chemistry textbooks classify them: first
 organic (carbon compounds), organometallic (metal–carbon bonds) or inorganic,
@@ -32,12 +32,12 @@ alphabetical order.
 |-------|-------------------|
 | Organic | hydrocarbons (CH₄, C₂H₂, propyne, cyclopropane, C₆H₆); halocarbons (CF₄, CH₂Cl₂, CHCl₃); alcohols and ethers (CH₃OH, oxirane); carbonyl compounds: aldehydes, ketones, acids, esters, amides (H₂CO, HCOOH, ketene, methyl formate, formamide); nitrogen and sulfur compounds (HCN, CH₃CN, DMSO); heterocycles (pyridine, furan, thiophene); radicals (CH, CH₂, HCO, CF₃) |
 | Organometallic | metal alkyls (Al(CH₃)₃ and its dimer, Zn(CH₃)₂, In(CH₃)₃); metal carbonyls (Ni(CO)₄, W(CO)₆) |
-| Inorganic | elements (H₂, O₂, O₃, Cl₂); hydrides (H₂O, NH₃, SiH₄, B₂H₆, HF); oxides (CO, CO₂, SO₂, NO₂, SiO); nonmetal halides (BCl₃, SiCl₄, NF₃, SF₆); metal halides (TiCl₄, WF₆, Al₂Cl₆); radicals (NH₂, SiH₂, SiH₃, HO₂, SH, ClO) |
+| Inorganic | elements (H₂, O₂, O₃, Cl₂, P₄, S₈); hydrides (H₂O, NH₃, SiH₄, B₂H₆, HF); oxides and sulfides (CO, CO₂, SO₂, SO₃, NO₂, N₂O₄, SiO, CS₂); oxoacids (HNO₃, H₂SO₄, HONO, HOF); nonmetal halides (BCl₃, SiCl₄, NF₃, SF₆, OF₂); metal halides (TiCl₄, WF₆, Al₂Cl₆); oxyhalides (COCl₂, POCl₃, SOCl₂, SO₂Cl₂); radicals (NH₂, SiH₂, SiH₃, HO₂, SH, ClO) |
 | Carbon | fullerenes (C₆₀) |
 
 Molecules used in semiconductor processing also say what for (*Used as*):
 etch gas, dopant source, deposition precursor, ALD/CVD co-reactant
-(oxidant, nitrogen source) or solvent. Search finds them by that too.
+(oxidant, nitrogen source), wet etch and cleaning, or solvent. Search finds them by that too.
 
 - **Crystals** are CIFs from the
   [Crystallography Open Database](https://www.crystallography.net), stored as
