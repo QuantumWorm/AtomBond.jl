@@ -855,6 +855,13 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             @test ntabs(v) == 2 && occursin("(DFTK)", v.crystal.title) && natoms(v.crystal) == 2
             d.state[:job] = job                                               # a failed job
             @test AtomBond.show_job!(v, d) === :failed && occursin("failed", d.progress[])
+            # A log with terminal colours (as when Julia runs with --color=yes, e.g. on CI): plain text in the tool
+            open(job.log, "a") do io
+                println(io, "\e[90m   @\e[39m \e[90mBase\e[39m \e[90m./\e[39m\e[90m\e[4mclient.jl\e[24m\e[39m\tline")
+            end
+            @test job_log(job; n=1) == ["   @ Base ./client.jl line"]
+            @test AtomBond.show_job!(v, d) === :failed && !any(iscntrl, replace(d.progress[], '\n' => ' '))
+            @test occursin("--color=no", string(AtomBond.julia_in(fake, "x.jl")))
             AtomBond.settext!(d.name, "x y")                                   # invalid name: not started
             n = length(readdir(dir))
             d.run.clicks[] += 1

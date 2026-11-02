@@ -30,9 +30,12 @@ function dftk_env_ready(env::AbstractString=default_dftk_env())
     return all(p -> haskey(deps, p), DFTK_PACKAGES)
 end
 
-"""A Julia command for a helper process: this Julia, no startup file, `env` as the project."""
+"""
+A Julia command for a helper process: this Julia, no startup file, no colours
+in its output (the log is shown as text), `env` as the project.
+"""
 function julia_in(env::AbstractString, args...; dir::AbstractString=pwd())
-    cmd = `$(Base.julia_cmd()) --startup-file=no --project=$env $args`
+    cmd = `$(Base.julia_cmd()) --startup-file=no --color=no --project=$env $args`
     # Not the caller's load path or project (e.g. the test environment of Pkg.test).
     vars = filter(((k, _),) -> !(k in ("JULIA_LOAD_PATH", "JULIA_PROJECT")), ENV)
     return Cmd(setenv(cmd, vars); dir)
@@ -127,12 +130,18 @@ function Base.wait(job::DFTKJob)
     return job_status(job)
 end
 
-"""The last `n` non-empty lines of the job's log (progress, or the error)."""
+"""
+The last `n` non-empty lines of the job's log (progress, or the error), as
+plain text: terminal colour codes and other control characters removed.
+"""
 function job_log(job::DFTKJob; n::Integer=10)
     isfile(job.log) || return String[]
-    lines = filter(!isempty ∘ strip, readlines(job.log))
+    lines = filter(!isempty ∘ strip, plain_text.(readlines(job.log)))
     return lines[max(1, end - n + 1):end]
 end
+
+"""`s` without ANSI escape sequences (colours) and other control characters."""
+plain_text(s::AbstractString) = filter(!iscntrl, replace(replace(s, r"\e\[[0-9;?]*[ -/]*[@-~]" => ""), '\t' => ' '))
 
 """
     DFTKResults
