@@ -98,8 +98,23 @@ lines of the log while it runs and, when it is done, a summary:
 - the Fermi level and the gap between the levels around it (on the k-point
   grid, so only an estimate of the true gap).
 
-*Open result structure* opens the final structure (the relaxed one after a
-relaxation) in a new tab. Every run gets its own folder,
+*Open structure* opens the final structure (the relaxed one after a
+relaxation) in a new tab. *Show DOS* opens the density of states of an SCF
+in its own window:
+
+- every computed level is broadened into a Gaussian (the *Broadening*
+  slider, 0.1 eV by default) and weighted with its k-point weight, in
+  states per eV per cell; it integrates to the number of electrons below
+  the Fermi level (dashed, at 0);
+- filled states are shaded; spin down is drawn below the axis for a
+  spin-polarized run;
+- deep (semicore) levels, separated from the valence levels by more than
+  5 eV, are hidden until *Show deep levels* is switched on;
+- *Save* writes `Name.dos.png` and `Name.dos.csv` into the run folder.
+
+DFTK computes only a few levels above the Fermi level, so the DOS above it is
+incomplete; the gap in the summary is taken on the k-point grid only, and a
+run with partly filled levels is reported as metallic instead. Every run gets its own folder,
 `Folder/dftk_<Name>_<date-time>/`, with the script (`Name.jl`), the log
 (`Name.log`) and the results (`Name.results.toml`: energies, forces,
 eigenvalues and occupations per k-point, the final structure).
@@ -121,6 +136,9 @@ job_status(job)                            # :running, then :done (or :failed, :
 wait(job)
 r = job_results(job)                       # DFTKResults: energy, forces, levels, structure
 r.energy, band_gap(r), r.structure
+d = dos(r; width=0.1)                      # energies (eV), DOS per spin, Fermi level
+write_dos("diamond.dos.csv", r)
+plot_dos(r)                                # the DOS window
 ```
 
 ## DFTK and AtomsBase

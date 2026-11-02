@@ -14,8 +14,9 @@ end
 Run DFTK tool: runs the current structure in DFTK.jl in a separate Julia
 process (see [`run_dftk`](@ref)) — an SCF, or a relaxation when the
 structure has constraints. It shows the progress from the log while it runs
-and a summary of the results when it is done; *Open result structure* opens
-the final (relaxed) structure in a new tab. *Install DFTK* creates the DFTK
+and a summary of the results when it is done; *Open structure* opens the
+final (relaxed) structure in a new tab and *Show DOS* the density of states
+of an SCF in its own window ([`plot_dos`](@ref)). *Install DFTK* creates the DFTK
 environment the first time ([`install_dftk`](@ref)).
 """
 function dftk_dialog(v::Viewer)
@@ -47,7 +48,10 @@ function dftk_dialog(v::Viewer)
     Makie.Label(f.g[nextrow!(f), 1:2], progress; halign=:left, fontsize=12, color=:gray25, justification=:left)
     summary = Makie.Observable("")
     Makie.Label(f.g[nextrow!(f), 1:2], summary; halign=:left, fontsize=13, justification=:left)
-    open_result = button!(f, "Open result structure")
+    r = nextrow!(f)
+    open_result, show_dos = (with_click_feedback!(Makie.Button(f.g[r, k]; label, width=Makie.Relative(1),
+                                                               fontsize=PANEL_FONTSIZE, padding=(6, 6, 5, 5)))
+                             for (k, label) in ((1, "Open structure"), (2, "Show DOS")))
 
     num(t) = (x = tryparse(Float64, strip(shown_text(t))); x === nothing || x <= 0 ? nothing : x)
     update_plan(_...) = (plan[] = dftk_plan(v.crystal, num(kspacing)))
@@ -61,7 +65,7 @@ function dftk_dialog(v::Viewer)
 
     state = get!(v.dialogs, :dftk_state, Dict{Symbol,Any}())    # the job outlives the tool
     controls = (; plan, env, envstate, install, folder, name, kspacing, ecut, pseudo, run, stop, progress, summary,
-                open_result, state)
+                open_result, show_dos, state)
     show_job!(v, controls)
 
     Makie.on(install.clicks) do _
@@ -108,6 +112,21 @@ function dftk_dialog(v::Viewer)
                                    title=c.title * (r.calculation == "relax" ? " (DFTK relaxed)" : " (DFTK)"))
         open_in_tab!(v, c)
         v.status[] = "Opened the $(r.calculation == "relax" ? "relaxed" : "calculated") structure (not saved yet)"
+    end
+    Makie.on(show_dos.clicks) do _
+        r = get(state, :results, nothing)
+        r === nothing && (v.status[] = "No results yet"; return)
+        isempty(r.eigenvalues) && (v.status[] = "A relaxation keeps no levels: run an SCF of the result for the DOS"; return)
+        job = state[:job]
+        try
+            d = (v.screen === nothing ? dos_figure : plot_dos)(r; dir=job.dir,
+                                                                name=splitext(basename(job.script))[1])
+            state[:dos] = d
+            v.status[] = "DOS of " * formula(r.structure) * (v.screen === nothing ? "" : " opened in a new window")
+        catch err
+            err isa InterruptException && rethrow()
+            v.status[] = "Could not show the DOS: " * sprint(showerror, err)
+        end
     end
     finish_dialog!(v, :dftk, "Run DFTK", f)
     return controls

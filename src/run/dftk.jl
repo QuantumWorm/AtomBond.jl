@@ -202,8 +202,70 @@ function job_results(job::DFTKJob)
     return read_dftk_results(job.results; title)
 end
 
-"""Band gap in eV (lowest level above the Fermi level minus highest below), or `nothing`."""
-band_gap(r::DFTKResults) = r.homo === nothing || r.lumo === nothing ? nothing : r.lumo - r.homo
+"""
+    dos(r::DFTKResults; width=0.1, step=width/10, range=nothing) -> (; energies, dos, fermi)
+
+Density of states from the levels of an SCF, each broadened into a Gaussian
+of standard deviation `width` (eV) and weighted with its k-point weight:
+`dos[i, σ]` is in states per eV per cell for spin σ (one column without spin
+polarization, where each level holds two electrons; spin up and down
+otherwise), at `energies[i]` (eV, absolute; `fermi` is the Fermi level). By
+default the energies cover all computed levels with 4 widths to spare; only
+the bands DFTK computed are included, so the DOS stops a little above the
+Fermi level.
+"""
+function dos(r::DFTKResults; width::Real=0.1, step::Real=width / 10, range=nothing)
+    isempty(r.eigenvalues) && throw(ArgumentError("no levels in these results (a relaxation keeps none)"))
+    width > 0 && step > 0 || throw(ArgumentError("width and step must be positive"))
+    nspin = r.n_spin
+    nk = length(r.eigenvalues) ÷ nspin
+    w = length(r.kweights) == length(r.eigenvalues) ? r.kweights : fill(1.0 / nk, length(r.eigenvalues))
+    lo, hi = range === nothing ? (minimum(minimum, r.eigenvalues) - 4width, maximum(maximum, r.eigenvalues) + 4width) :
+             Float64.(range)
+    E = collect(lo:step:hi)
+    D = zeros(length(E), nspin)
+    filled = 2 / nspin                                     # electrons per level and k-point
+    g = 1 / (width * sqrt(2π))
+    for σ in 1:nspin, ik in (σ - 1) * nk + 1:σ * nk, ε in r.eigenvalues[ik]
+        @. D[:, σ] += filled * w[ik] * g * exp(-((E - ε) / width)^2 / 2)
+    end
+    return (; energies=E, dos=D, fermi=r.fermi)
+end
+
+"""
+    write_dos(path, r; width=0.1) -> path
+
+The DOS ([`dos`](@ref)) as CSV: energy (eV), energy relative to the Fermi
+level, and the DOS (states/eV per cell) per spin.
+"""
+function write_dos(path::AbstractString, r::DFTKResults; kw...)
+    d = dos(r; kw...)
+    ef = something(d.fermi, 0.0)
+    open(path, "w") do io
+        println(io, "energy_eV,energy_minus_fermi_eV,", size(d.dos, 2) == 1 ? "dos_per_eV" : "dos_up_per_eV,dos_down_per_eV")
+        for (i, e) in enumerate(d.energies)
+            println(io, @sprintf("%.5f,%.5f,", e, e - ef), join((@sprintf("%.6f", x) for x in d.dos[i, :]), ","))
+        end
+    end
+    return path
+end
+
+"""
+Whether the SCF found partly filled levels (occupation between 1 % and 99 %
+of a full level): a metal, or a system whose levels cross the Fermi level.
+"""
+function is_metallic(r::DFTKResults)
+    full = 2 / r.n_spin
+    return any(o -> 0.01full < o < 0.99full, Iterators.flatten(r.occupations))
+end
+
+"""
+Band gap in eV (lowest level above the Fermi level minus highest below), or
+`nothing` when it is not known or the levels are partly filled
+([`is_metallic`](@ref)). Only the k-points of the grid count, so it can be
+larger than the true gap.
+"""
+band_gap(r::DFTKResults) = r.homo === nothing || r.lumo === nothing || is_metallic(r) ? nothing : r.lumo - r.homo
 
 """Largest force on any atom (eV/Å)."""
 max_force(r::DFTKResults) = isempty(r.forces) ? 0.0 : maximum(norm, r.forces)
@@ -217,7 +279,11 @@ function summarize(r::DFTKResults)
              @sprintf("Largest force %.4f eV/Å", max_force(r))]
     r.fermi === nothing || push!(lines, @sprintf("Fermi level %.4f eV", r.fermi))
     gap = band_gap(r)
-    gap === nothing || push!(lines, @sprintf("Gap %.4f eV (on the k-point grid)", gap))
+    if is_metallic(r)
+        push!(lines, "Metallic: partly filled levels at the Fermi level")
+    elseif gap !== nothing
+        push!(lines, @sprintf("Gap %.4f eV (on the k-point grid)", gap))
+    end
     return join(lines, "\n")
 end
 

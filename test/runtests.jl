@@ -766,6 +766,46 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
             @test r.structure.species == [:H, :H] && cartesian_positions(r.structure) ≈ pos
             @test occursin("SCF converged (9 iterations)", AtomBond.summarize(r)) && occursin("Gap 9.", AtomBond.summarize(r))
             @test occursin("DFTK results for H2", sprint(show, MIME"text/plain"(), r))
+            # DOS: two electrons below the Fermi level; spin-polarized with one level per spin
+            dd = dos(r; width=0.05)
+            de = dd.energies[2] - dd.energies[1]
+            @test size(dd.dos, 2) == 1
+            @test sum(dd.dos[dd.energies .<= dd.fermi]) * de ≈ 2 atol=1e-3
+            @test sum(dd.dos) * de ≈ 6 atol=1e-3                              # three levels, two electrons each
+            write(joinpath(dir, "spin.toml"), replace(toml, "n_spin = 1" => "n_spin = 2",
+                  "kpoint_weights = [1.0]" => "kpoint_weights = [1.0, 1.0]",
+                  "eigenvalues_Ha = [[-0.3635426618843136, -0.01722241231680253, 0.03424307647279534]]" =>
+                  "eigenvalues_Ha = [[-0.40], [-0.30]]",
+                  "occupations = [[2.0, 0.0, 0.0]]" => "occupations = [[1.0], [1.0]]"))
+            rs = read_dftk_results(joinpath(dir, "spin.toml"))
+            ds = dos(rs; width=0.05)
+            @test size(ds.dos, 2) == 2 && all(x -> isapprox(x, 1; atol=1e-3), sum(ds.dos; dims=1) .* (ds.energies[2] - ds.energies[1]))
+            @test ds.energies[argmax(ds.dos[:, 1])] ≈ -0.40 * AtomBond.HARTREE_EV atol=0.01
+            csv = readlines(write_dos(joinpath(dir, "spin.dos.csv"), rs))
+            @test csv[1] == "energy_eV,energy_minus_fermi_eV,dos_up_per_eV,dos_down_per_eV" && length(split(csv[2], ",")) == 4
+            fd = dos_figure(rs; dir, name="spin")
+            @test fd.axis.ylabel[] == "DOS (states/eV per cell)" && fd.axis.limits[][2][1] < 0     # spin down below the axis
+            fd.width.value[] = 0.2
+            @test fd.data[].energies[2] - fd.data[].energies[1] ≈ 0.02
+            fd.save.clicks[] += 1
+            @test isfile(joinpath(dir, "spin.dos.png")) && isfile(joinpath(dir, "spin.dos.csv"))
+            relaxed = replace(toml, "calculation = \"scf\"" => "calculation = \"relax\"")
+            relaxed = join(filter(l -> !startswith(l, "eigenvalues_Ha") && !startswith(l, "occupations"),
+                                  split(relaxed, "\n")), "\n")
+            write(joinpath(dir, "relax.toml"), relaxed)
+            @test_throws ArgumentError dos(read_dftk_results(joinpath(dir, "relax.toml")))
+            # Metals: partly filled levels → no gap; deep (semicore) levels below a wide empty range are hidden
+            @test !is_metallic(r) && AtomBond.deep_levels_edge(r) === nothing && AtomBond.deep_levels_edge(rs) === nothing
+            write(joinpath(dir, "metal.toml"), replace(toml,
+                  "eigenvalues_Ha = [[-0.3635426618843136, -0.01722241231680253, 0.03424307647279534]]" =>
+                  "eigenvalues_Ha = [[-2.5, -0.3, -0.19, 0.03]]", "occupations = [[2.0, 0.0, 0.0]]" => "occupations = [[2.0, 2.0, 1.0, 0.0]]"))
+            rm_ = read_dftk_results(joinpath(dir, "metal.toml"))
+            @test is_metallic(rm_) && band_gap(rm_) === nothing && occursin("Metallic", AtomBond.summarize(rm_))
+            @test AtomBond.deep_levels_edge(rm_) ≈ -0.3 * AtomBond.HARTREE_EV            # the -2.5 Ha level is deep
+            fm = dos_figure(rm_)
+            @test fm.axis.limits[][1][1] > (-2.5 + 0.19) * AtomBond.HARTREE_EV               # hidden by default
+            fm.showdeep[] = true
+            @test fm.axis.limits[][1][1] < (-2.5 + 0.19) * AtomBond.HARTREE_EV
 
             # No DFTK environment → refused; an environment without the packages installed → the run fails.
             @test !dftk_env_ready(joinpath(dir, "none"))
@@ -791,6 +831,8 @@ const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
             d.state[:job] = done
             @test AtomBond.show_job!(v, d) === :done
             @test occursin("done", d.progress[]) && occursin("Total energy", d.summary[])
+            d.show_dos.clicks[] += 1                                           # no window here: the figure only
+            @test haskey(d.state, :dos) && startswith(v.status[], "DOS of H2")
             d.open_result.clicks[] += 1
             @test ntabs(v) == 2 && occursin("(DFTK)", v.crystal.title) && natoms(v.crystal) == 2
             d.state[:job] = job                                               # a failed job

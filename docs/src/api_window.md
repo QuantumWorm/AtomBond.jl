@@ -13,5 +13,5 @@ Pages = ["render/atoms.jl", "render/bonds.jl", "render/camera.jl", "render/cell.
 ```@autodocs
 Modules = [AtomBond]
 Private = false
-Pages = ["gui/app.jl", "gui/contextmenu.jl", "gui/dialogs.jl", "gui/feedback.jl", "gui/filebrowser.jl", "gui/history.jl", "gui/menubar.jl", "gui/panel.jl", "gui/picking.jl", "gui/tabs.jl"]
+Pages = ["gui/app.jl", "gui/contextmenu.jl", "gui/dialogs.jl", "gui/dos.jl", "gui/feedback.jl", "gui/filebrowser.jl", "gui/history.jl", "gui/menubar.jl", "gui/panel.jl", "gui/picking.jl", "gui/tabs.jl"]
 ```
