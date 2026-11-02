@@ -77,6 +77,7 @@ include("gui/dialogs.jl")
 include("gui/run.jl")
 include("gui/dos.jl")
 include("gui/convergence.jl")
+include("gui/relax.jl")
 include("gui/filebrowser.jl")
 include("gui/tabs.jl")
 
@@ -97,8 +98,8 @@ export kpoint_grid, write_kpoints, write_vasp_inputs, write_qe, write_abinit, wr
 export to_atomsbase, from_atomsbase
 export run_dftk, install_dftk, default_dftk_env, dftk_env_ready, dftk_cutoff_hints, recommended_ecut, DFTKJob, job_status, job_log, job_results, stop_job!
 export run_dftk_convergence, read_convergence, job_convergence, converged_settings, ConvergenceResults, ConvergenceStep
-export convergence_figure, plot_convergence
-export DFTKResults, DenseLevels, BandPath, read_dftk_results, band_gap, band_edges, is_metallic, dos, write_dos, dos_figure, plot_dos, write_bands, bands_figure, plot_bands
+export convergence_figure, plot_convergence, relax_figure, plot_relaxation, show_forces!
+export DFTKResults, DenseLevels, BandPath, RelaxHistory, read_dftk_results, band_gap, band_edges, is_metallic, dos, write_dos, dos_figure, plot_dos, write_bands, bands_figure, plot_bands
 # analysis
 export Bond, find_bonds, coordination, neighbor_pairs, bond_cutoff
 export spacegroup, symmetry_dataset, primitive_cell, conventional_cell

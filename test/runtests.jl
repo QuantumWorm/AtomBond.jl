@@ -899,13 +899,13 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             @test AtomBond.show_job!(v, d) === :done
             @test occursin("done", d.progress[]) && occursin("Total energy", d.summary[])
             d.show_dos.clicks[] += 1                                           # no window here: the figure only
-            @test haskey(d.state, :dos) && startswith(v.status[], "DOS of H2")
+            @test haskey(d.state, :levels) && startswith(v.status[], "DOS of H2")
             previous = d.state[:results]
             d.state[:results] = rb                                             # with a band path: bands + DOS
             d.show_dos.clicks[] += 1
-            @test startswith(v.status[], "Band structure and DOS of") && haskey(d.state[:dos], :bands_axis)
+            @test startswith(v.status[], "Band structure and DOS of") && haskey(d.state[:levels], :bands_axis)
             d.state[:results] = previous
-            @test occursin("bands along the path", AtomBond.dftk_plan(primitive_cell(load_library("Diamond")), 0.3, :bands))
+            @test occursin("and bands", AtomBond.dftk_plan(primitive_cell(load_library("Diamond")), 0.3, :bands))
             @test occursin("no band path", AtomBond.dftk_plan(h2, 0.3, :bands))
             @test occursin("compute_bands", sprint(io -> write_dftk(io, h2; results="a.toml", bands="b.toml")))
             d.open_result.clicks[] += 1
@@ -1015,8 +1015,7 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             d.task.i_selected[] = 3
             @test startswith(d.plan[], "Convergence check")
             d.state[:hints][] = Dict{Symbol,Any}(:H => parsed[("fam", :H)])
-            @test d.hint[] == "⚠ below the low 64 Ry\nRecommended 72 Ry"           # the form still has 40 Ry
-            AtomBond.settext!(d.ecut, "80")
+            @test AtomBond.shown_text(d.ecut) == "72"                               # the default cutoff follows the hint
             @test d.hint[] == "Recommended 72 Ry\n(low 64, high 84)"
             AtomBond.settext!(d.ecut, "40")
             @test occursin("below the low", d.hint[])
@@ -1032,6 +1031,57 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             @test AtomBond.shown_text(d.ecut) == "30" && startswith(v.status[], "Converged values in the form: cutoff 30 Ry")
             d.show_dos.clicks[] += 1
             @test haskey(d.state[:dos], :settings) && startswith(v.status[], "Convergence plot")
+
+            # A relaxation: three steps of H2 with atom 1 clamped (its force is left out of the largest force)
+            L = h2.lattice.matrix
+            frac(p) = repr(collect(cart_to_frac(h2.lattice, AtomBond.Vec3(p...))))
+            p1 = cartesian_positions(h2)[1]
+            steps = [(-1.150, 0.80, 0.020), (-1.158, 0.76, 0.006), (-1.159, 0.75, 0.0004)]
+            hist = "clamped = [true, false]\n" * join(["""
+                [[steps]]
+                step = $(k - 1)
+                energy_Ha = $E
+                cell_A = $(repr([collect(x) for x in cell_vectors(h2.lattice)]))
+                positions_frac = [$(frac(p1)), $(frac(p1 .+ [d, 0, 0]))]
+                forces_Ha_per_bohr = [[0.5, 0.0, 0.0], [$f, 0.0, 0.0]]
+                """ for (k, (E, d, f)) in enumerate(steps)], "")
+            write(joinpath(dir, "R.relax.toml"), hist)
+            write(joinpath(dir, "R.results.toml"), relaxed)
+            rr = read_dftk_results(joinpath(dir, "R.results.toml"); title="H2")
+            hh = rr.history
+            @test hh isa RelaxHistory && length(hh) == 3 && hh.clamped == [true, false]
+            @test hh.energies[1] ≈ -1.150 * AtomBond.HARTREE_EV
+            @test hh.max_forces ≈ [0.020, 0.006, 0.0004] .* AtomBond.HARTREE_EV ./ AtomBond.BOHR   # atom 1 left out
+            @test norm(cartesian_positions(hh.structures[2])[2] - cartesian_positions(hh.structures[2])[1]) ≈ 0.76
+            @test AtomBond.max_force(rr) ≈ norm(rr.forces[2])                       # free atoms only
+            @test occursin("over 2 steps", AtomBond.summarize(rr))
+            rf = relax_figure(rr; dir, name="R")
+            @test rf.step.value[] == 2 && rf.bands === nothing
+            rf.save.clicks[] += 1
+            @test isfile(joinpath(dir, "R.relax.png"))
+            vr = visualize(h2; show=false, panel=false)
+            AtomBond.show_relax_step!(vr, hh, 1; arrows=false)                       # opens a tab with step 0
+            @test ntabs(vr) == 2 && occursin("(DFTK relaxation, step 0)", vr.crystal.title) && vr.crystal.fixed[1] == (true, true, true)
+            nplots = length(vr.plots)
+            AtomBond.show_relax_step!(vr, hh, 2; arrows=true)                        # same tab, next step, arrows
+            @test ntabs(vr) == 2 && occursin("step 1)", vr.crystal.title) && length(vr.plots) == nplots + 1
+            switch_tab!(vr, 1)
+            AtomBond.show_relax_step!(vr, hh, 3; arrows=false)                       # back to the relaxation tab
+            @test active_tab(vr) == 2 && occursin("step 2)", vr.crystal.title)
+            @test show_forces!(vr, [AtomBond.Vec3(0, 0, 0), AtomBond.Vec3(0.5, 0, 0)]) ≈ 4.0           # the largest force gets 2 Å
+            @test_throws ArgumentError show_forces!(vr, [AtomBond.Vec3(0, 0, 0)])
+            # the tool: a finished relaxation → Show relaxation, the step slider drives the main window
+            rjob = AtomBond.DFTKJob(h2, dir, joinpath(dir, "R.jl"), joinpath(dir, "none.log"), joinpath(dir, "R.results.toml"),
+                                    run(`$(Base.julia_cmd()) --startup-file=no -e 0`), time(), false)
+            d.state[:job] = rjob; d.state[:results] = nothing
+            @test AtomBond.show_job!(v, d) === :done && d.show_dos.label[] == "Show relaxation"
+            d.show_dos.clicks[] += 1
+            @test haskey(d.state[:dos], :step) && occursin("Relaxation steps", v.status[])
+            n0 = ntabs(v)
+            Makie_set = d.state[:dos].step
+            Makie_set.value[] = 0
+            @test ntabs(v) == n0 + 1 && occursin("step 0)", v.crystal.title)
+            @test occursin("Then an SCF of the result", AtomBond.dftk_plan(fix_atoms(si2, [1]), 0.3, :bands))
         end
     end
 

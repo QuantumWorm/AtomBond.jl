@@ -235,7 +235,9 @@ after a relaxation), `calculation` `"scf"` or `"relax"`, `converged`,
 With the extra non-self-consistent step (`run_dftk(…; bands=true)`):
 `dense`, the levels on a denser k-grid ([`DenseLevels`](@ref)), and `path`,
 the band structure along the high-symmetry path ([`BandPath`](@ref));
-`nothing` otherwise.
+`nothing` otherwise. After a relaxation, `history` holds every step
+([`RelaxHistory`](@ref)); with `bands=true` the levels (and `dense`, `path`)
+are those of an SCF of the relaxed structure.
 """
 struct DFTKResults
     calculation::String
@@ -255,6 +257,44 @@ struct DFTKResults
     version::String
     dense::Any                # Union{Nothing,DenseLevels}
     path::Any                 # Union{Nothing,BandPath}
+    history::Any              # Union{Nothing,RelaxHistory}
+end
+
+"""
+    RelaxHistory
+
+The steps of a relaxation: `energies` (eV), the largest force on an atom
+that may move (`max_forces`, eV/Å; clamped atoms keep their forces and are
+left out), the structure of each step (`structures`) and the force on every
+atom (`forces`, eV/Å), and which atoms were `clamped`.
+"""
+struct RelaxHistory
+    energies::Vector{Float64}
+    max_forces::Vector{Float64}
+    structures::Vector{Crystal}
+    forces::Vector{Vector{Vec3}}
+    clamped::Vector{Bool}
+end
+
+Base.length(h::RelaxHistory) = length(h.energies)
+
+"""The relaxation steps from `<name>.relax.toml` (species and periodicity from `like`), or `nothing`."""
+function read_relax_history(path::AbstractString, like::Crystal)
+    isfile(path) || return nothing
+    d = TOML.parsefile(path)
+    steps = get(d, "steps", Any[])
+    isempty(steps) && return nothing
+    n = natoms(like)
+    clamped = Bool.(get(d, "clamped", fill(false, n)))
+    structures = map(enumerate(steps)) do (k, s)
+        L = Lattice((Float64.(v) for v in s["cell_A"])...)
+        Crystal(L, like.species, [Vec3(Float64.(f)) for f in s["positions_frac"]]; pbc=like.pbc,
+                title=like.title * " (DFTK step $(s["step"]))")
+    end
+    forces = [[Vec3(HA_PER_BOHR_EV_PER_A .* Float64.(f)) for f in s["forces_Ha_per_bohr"]] for s in steps]
+    free = findall(!, clamped)
+    maxf = [isempty(free) ? 0.0 : maximum(norm, f[free]) for f in forces]
+    return RelaxHistory([HARTREE_EV * s["energy_Ha"] for s in steps], maxf, structures, forces, clamped)
 end
 
 """
@@ -300,7 +340,8 @@ with `results=…` (as [`run_dftk`](@ref) does), and the band file next to it
 SCF level below the Fermi level and the lowest above it.
 """
 function read_dftk_results(path::AbstractString; title::AbstractString="",
-                           bands::AbstractString=replace(path, r"\.results\.toml$" => ".bands.toml"))
+                           bands::AbstractString=replace(path, r"\.results\.toml$" => ".bands.toml"),
+                           history::AbstractString=replace(path, r"\.results\.toml$" => ".relax.toml"))
     d = TOML.parsefile(path)
     L = Lattice((Float64.(v) for v in d["cell_A"])...)
     pos = [Vec3(Float64.(p)) for p in d["positions_A"]]
@@ -321,7 +362,7 @@ function read_dftk_results(path::AbstractString; title::AbstractString="",
                        [Vec3(HA_PER_BOHR_EV_PER_A .* Float64.(f)) for f in d["forces_Ha_per_bohr"]], c,
                        eigs, [Float64.(o) for o in get(d, "occupations", Any[])],
                        Float64.(get(d, "kpoint_weights", Float64[])), get(d, "n_spin", 1), get(d, "version", ""),
-                       read_bands_file(bands)...)
+                       read_bands_file(bands)..., read_relax_history(history, c))
 end
 
 """The dense levels and the band path from a `<name>.bands.toml` file, or `nothing`s."""
@@ -487,8 +528,11 @@ gap; the band path finds the edges between grid points.
 """
 band_gap(r::DFTKResults) = (e = band_edges(r); e === nothing ? nothing : e.gap)
 
-"""Largest force on any atom (eV/Å)."""
-max_force(r::DFTKResults) = isempty(r.forces) ? 0.0 : maximum(norm, r.forces)
+"""Largest force on an atom (eV/Å), leaving out atoms clamped in a relaxation."""
+function max_force(r::DFTKResults)
+    free = r.history === nothing ? eachindex(r.forces) : findall(!, r.history.clamped)
+    return isempty(r.forces) || isempty(free) ? 0.0 : maximum(norm, r.forces[free])
+end
 
 """A few lines summarising the results."""
 function summarize(r::DFTKResults)
@@ -497,6 +541,11 @@ function summarize(r::DFTKResults)
                       r.calculation == "scf" ? "iterations" : "steps"),
              @sprintf("Total energy %.6f eV (%.8f Ha)", r.energy, r.energy / HARTREE_EV),
              @sprintf("Largest force %.4f eV/Å", max_force(r))]
+    h = r.history
+    if h !== nothing && length(h) > 1
+        push!(lines, @sprintf("Energy change %.4f eV over %d steps; largest force on a free atom %.3f → %.3f eV/Å",
+                              last(h.energies) - first(h.energies), length(h) - 1, first(h.max_forces), last(h.max_forces)))
+    end
     r.fermi === nothing || push!(lines, @sprintf("Fermi level %.4f eV", r.fermi))
     e = band_edges(r)
     if is_metallic(r)

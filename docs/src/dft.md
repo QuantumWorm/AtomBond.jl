@@ -103,13 +103,27 @@ lines of the log while it runs and, when it is done, a summary:
   k-point grid, an estimate; a run with partly filled levels is reported
   as metallic.
 
-**Band structure and dense DOS** (on by default; SCF only): after the SCF
+**Band structure and dense DOS** (task *SCF + band structure*, the default): after the SCF
 the script also computes, non-self-consistently from the SCF density, the
 levels on a k-grid twice as dense, with more empty bands (for the DOS),
 and, for a crystal without vacuum, the bands along the standard
 high-symmetry path of its Brillouin zone (DFTK's `irrfbz_path`; for a
 supercell, the path of the primitive cell). They go into `Name.bands.toml`;
-a molecule or slab gets the dense DOS only.
+a molecule or slab gets the dense DOS only. After a relaxation the same
+task first runs an SCF of the relaxed structure (with the symmetries it
+has), so its levels, DOS and band structure are those of the result.
+
+**Relaxation steps.** A relaxation records every step in `Name.relax.toml`
+(energy, the force on each atom, cell and positions). *Show relaxation*
+opens a window with the energy and the largest force on an atom that may
+move (clamped atoms keep their forces and are left out; DFTK's target,
+1 meV/Å, dashed) against the step, and a *Step* slider: it shows that step
+in a tab of the main window — *(DFTK relaxation, step k)* — with the forces
+as red arrows (*Force arrows*; the largest force of the relaxation gets a
+2 Å arrow, the same scale for every step). *Band structure / DOS of the
+result* opens those plots when they were computed. In code:
+[`relax_figure`](@ref), [`plot_relaxation`](@ref), [`show_forces!`](@ref)
+(arrows for any forces, e.g. those of an SCF).
 
 *Open structure* opens the final structure (the relaxed one after a
 relaxation) in a new tab. *Show DOS / bands* opens the band structure next
@@ -140,7 +154,9 @@ Unitful, UnitfulAtomic, GeometryOptimization; several minutes, mostly
 compiling). The PseudoDojo pseudopotentials are downloaded by
 PseudoPotentialData on the first run.
 
-**Cutoff.** The cutoff line of the tool shows what the pseudopotential
+**Cutoff.** The cutoff starts at the value the pseudopotentials recommend
+for the elements of the structure, as soon as that is known (unless a
+value was typed in). The cutoff line of the tool shows what the pseudopotential
 family recommends for the elements of the structure — PseudoDojo gives a
 low, normal and high cutoff per element; the structure needs the largest
 of its elements — e.g. "Recommended 84 Ry (low 76, high 96)" for GaAs, and

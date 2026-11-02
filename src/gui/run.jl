@@ -16,9 +16,10 @@ function dftk_plan(c::Crystal, kspacing, task::Symbol=:scf)
     relax = has_constraints(c)
     what = relax ? "Relaxation (the structure has constraints)" : "SCF (energies, forces, levels)"
     k = kspacing === nothing ? "" : ", k-grid " * join(kpoint_grid(c; kspacing), " × ")
-    extra = !bands ? "" : relax ? "\nNo band structure after a relaxation" :
-            "\nThen DOS on a " * (kspacing === nothing ? "denser grid" : join(kpoint_grid(c; kspacing=kspacing / 2), " × ")) *
-            (any(vacuum_axes(c)) || !all(c.pbc) ? " (no band path: the cell has vacuum)" : " and bands along the path")
+    extra = !bands ? "" :
+            (relax ? "\nThen an SCF of the result with " : "\nThen ") * "DOS on a " *
+            (kspacing === nothing ? "denser grid" : join(kpoint_grid(c; kspacing=kspacing / 2), " × ")) *
+            (any(vacuum_axes(c)) || !all(c.pbc) ? " (no band path: vacuum)" : " and bands")
     return what * "\n" * plural(natoms(c), "atom") * k * extra
 end
 
@@ -41,11 +42,13 @@ process. *Task*: an SCF with or without the band structure and dense DOS
 ([`run_dftk`](@ref); a relaxation when the structure has constraints), or a
 convergence check of the cutoff and k-grid ([`run_dftk_convergence`](@ref)).
 The cutoff line shows what the pseudopotentials recommend for the elements
-of the structure ([`recommended_ecut`](@ref)) and *Use recommended* puts it
-in. While a job runs the tool shows the end of its log; when it is done, a
+of the structure ([`recommended_ecut`](@ref)); the cutoff starts at that
+value once it is known (unless one was typed in), and *Use recommended*
+puts it back. While a job runs the tool shows the end of its log; when it is done, a
 summary. For an SCF, *Open structure* opens the final (relaxed) structure in
 a new tab and *Show DOS / bands* the DOS or band structure in its own
-window; for a convergence check, *Use converged values* puts the converged
+window; for a relaxation, *Show relaxation* shows energy and forces per step
+([`relax_figure`](@ref)) and each step, with force arrows, in a tab; for a convergence check, *Use converged values* puts the converged
 cutoff and k-spacing in the form and *Show plot* plots the check.
 *Install DFTK* creates the DFTK environment the first time
 ([`install_dftk`](@ref)).
@@ -119,6 +122,16 @@ function dftk_dialog(v::Viewer)
     end
     Makie.on(update_hint, hints)
     Makie.on(update_hint, ecut.displayed_string)
+    # The cutoff starts at the recommended value as soon as it is known (unless one was typed in).
+    auto_ecut = Ref(strip(shown_text(ecut)))
+    Makie.on(hints) do h
+        els = species_list(v.crystal)
+        (isempty(els) || !all(e -> haskey(h, e), els)) && return
+        rec = @sprintf("%g", 2 * maximum(h[e].normal for e in els))
+        strip(shown_text(ecut)) == auto_ecut[] || return
+        settext!(ecut, rec)
+        auto_ecut[] = rec
+    end
     foreach(o -> Makie.on(fetch_hints, o), (env.stored_string, pseudo.stored_string, v.header))
     update_hint()
     fetch_hints()
@@ -205,13 +218,16 @@ function dftk_dialog(v::Viewer)
                 v.status[] = "Convergence plot" * (v.screen === nothing ? "" : " opened in a new window")
                 return
             end
+            if r.history !== nothing                                   # a relaxation: its steps, and bands if computed
+                on_bands = isempty(r.eigenvalues) ? nothing : () -> show_levels!(v, r, job.dir, base)
+                state[:dos] = (v.screen === nothing ? relax_figure : plot_relaxation)(r; dir=job.dir, name=base, on_bands,
+                    on_step=(k, arrows) -> show_relax_step!(v, r.history, k; arrows))
+                v.status[] = "Relaxation steps" * (v.screen === nothing ? "" : " opened in a new window") *
+                             ": the Step slider shows each step in a tab"
+                return
+            end
             isempty(r.eigenvalues) && (v.status[] = "A relaxation keeps no levels: run an SCF of the result for the DOS"; return)
-            withbands = r.path !== nothing
-            show = withbands ? (v.screen === nothing ? bands_figure : plot_bands) :
-                               (v.screen === nothing ? dos_figure : plot_dos)
-            state[:dos] = show(r; dir=job.dir, name=base)
-            v.status[] = (withbands ? "Band structure and DOS of " : "DOS of ") * formula(r.structure) *
-                         (v.screen === nothing ? "" : " opened in a new window")
+            show_levels!(v, r, job.dir, base)
         catch err
             err isa InterruptException && rethrow()
             v.status[] = "Could not show the plot: " * sprint(showerror, err)
@@ -219,6 +235,16 @@ function dftk_dialog(v::Viewer)
     end
     finish_dialog!(v, :dftk, "Run DFTK", f)
     return controls
+end
+
+"""Open the band structure and DOS (or the DOS alone) of `r` in its own window (a figure only without a window)."""
+function show_levels!(v::Viewer, r::DFTKResults, dir, base)
+    state = v.dialogs[:dftk_state]
+    withbands = r.path !== nothing
+    show = withbands ? (v.screen === nothing ? bands_figure : plot_bands) : (v.screen === nothing ? dos_figure : plot_dos)
+    state[:levels] = show(r; dir, name=base)
+    v.status[] = (withbands ? "Band structure and DOS of " : "DOS of ") * formula(r.structure) *
+                 (v.screen === nothing ? "" : " opened in a new window")
 end
 
 busy(state) = (job = get(state, :job, nothing); job !== nothing && job_status(job) === :running)
@@ -236,8 +262,9 @@ function show_job!(v::Viewer, t)
     tail = job_log(job; n=2)
     log = isempty(tail) ? "" : "\n" * join((first(strip(l), 60) for l in tail), "\n")
     conv = job.crystal !== nothing && is_convergence_job(job)
+    relaxed = !conv && get(t.state, :results, nothing) isa DFTKResults && t.state[:results].history !== nothing
     t.open_result.label[] = conv ? "Use converged values" : "Open structure"
-    t.show_dos.label[] = conv ? "Show plot" : "Show DOS / bands"
+    t.show_dos.label[] = conv ? "Show plot" : relaxed ? "Show relaxation" : "Show DOS / bands"
     if st === :running
         t.progress[] = "$what: running ($secs s)$log"
         if conv                                                     # partial results as they come
@@ -253,6 +280,7 @@ function show_job!(v::Viewer, t)
             r === nothing && (r = t.state[:results] = conv ? job_convergence(job) : job_results(job))
             t.progress[] = "$what: done ($secs s), files in " * basename(job.dir) * "/"
             t.summary[] = summarize(r)
+            r isa DFTKResults && r.history !== nothing && (t.show_dos.label[] = "Show relaxation")
         end
     else
         t.progress[] = "$what: $(st === :stopped ? "stopped" : "failed, see " * basename(job.log))$log"

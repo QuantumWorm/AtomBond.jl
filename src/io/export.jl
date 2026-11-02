@@ -401,13 +401,60 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
         println(io, "model_kwargs = (; model_kwargs..., symmetries=false)")
     end
     println(io, "calc = DFTKCalculator(; model_kwargs, basis_kwargs, scf_kwargs=(; tol=1e-8))")
-    println(io, "results = minimize_energy!(system, calc; variablecell=", variable,
-            ", tol_forces=1e-3u\"eV/Å\", maxiters=100, verbosity=1)")
+    history = results === nothing ? nothing : replace(results, r"\.results\.toml$" => "") * ".relax.toml"
+    if history === nothing
+        println(io, "results = minimize_energy!(system, calc; variablecell=", variable,
+                ", tol_forces=1e-3u\"eV/Å\", maxiters=100, verbosity=1)")
+    else
+        print(io, """
+
+        # Every step (energy, forces, cell, positions) for AtomBond, written as the relaxation goes
+        import TOML
+        relax_steps = Dict{String,Any}[]
+        clamped = [get(system[i], :clamp, false) === true for i in 1:length(system)]
+        print_step = GeometryOptimization.GeoOptDefaultCallback(1; show_virial=$variable)
+        function record_step(optim_state, geoopt_state)
+            model = geoopt_state.calc_state.basis.model
+            bohr_in_A = ustrip(u"Å", 1u"bohr")
+            push!(relax_steps, Dict{String,Any}(
+                "step" => geoopt_state.n_iter,
+                "energy_Ha" => austrip(geoopt_state.history_energy[end]),
+                "cell_A" => [collect(model.lattice[:, i]) .* bohr_in_A for i in 1:3],
+                "positions_frac" => [collect(p) for p in model.positions],
+                "forces_Ha_per_bohr" => [collect(austrip.(f)) for f in geoopt_state.forces]))
+            open(io -> TOML.print(io, Dict("clamped" => clamped, "steps" => relax_steps)),
+                 joinpath(@__DIR__, $(repr(String(history)))), "w")
+            print_step(optim_state, geoopt_state)
+        end
+        results = minimize_energy!(system, calc; variablecell=$variable, tol_forces=1e-3u"eV/Å", maxiters=100,
+                                   verbosity=1, callback=record_step)
+        """)
+    end
     println(io, "relaxed = results.system")
     println(io, "println(relaxed)")
     println(io, "# To open the relaxed structure in AtomBond:")
     println(io, "#   using AtomBond; save_structure(\"relaxed.xyz\", from_atomsbase(relaxed))")
     results === nothing || write_dftk_results_code(io, results, :relax)
+    if results !== nothing && bands !== nothing
+        print(io, """
+
+        # SCF of the relaxed structure (with the symmetries it has), for its levels and band structure
+        system = relaxed
+        final_model_kwargs = (; (k => v for (k, v) in pairs(model_kwargs) if k != :symmetries)...)
+        model = model_DFT(system; final_model_kwargs...)
+        basis = PlaneWaveBasis(model; basis_kwargs...)
+        scfres = self_consistent_field(basis; ρ=guess_density(basis, system), tol=1e-8)
+        merge!(out, Dict{String,Any}(
+            "fermi_level_Ha" => scfres.εF,
+            "n_spin" => scfres.basis.model.n_spin_components,
+            "kpoint_weights" => collect(scfres.basis.kweights),
+            "eigenvalues_Ha" => [collect(e) for e in scfres.eigenvalues],
+            "occupations" => [collect(o) for o in scfres.occupation]))
+        open(io -> TOML.print(io, out), joinpath(@__DIR__, $(repr(String(results)))), "w")
+        println("AtomBond levels of the relaxed structure added to ", $(repr(String(results))))
+        """)
+        write_dftk_bands_code(io, bands, c, kspacing)
+    end
 end
 
 """
