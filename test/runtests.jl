@@ -1375,7 +1375,7 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
                 # Where the programs are: PATH, then an environment variable, then the settings file
                 @test find_engine(:castep).command == [joinpath(bin, "castep.serial")] && find_engine(:castep).source == "PATH"
                 @test occursin("castep.serial\n(from the PATH)", engine_status(:castep))
-                withenv("PATH" => "/usr/bin:/bin") do
+                withenv("PATH" => joinpath(dir, "fixtures")) do                    # no programs there
                     @test find_engine(:qe) === nothing && startswith(engine_status(:qe), "Quantum ESPRESSO not found")
                 end
                 withenv("ATOMBOND_QE_COMMAND" => "$bin/pw.x -nk 1") do
@@ -1392,6 +1392,8 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
                 @test occursin("[qe]", read(engine_settings_file(), String))
                 set_engine_setting!(:qe, "pseudo_dir", nothing)
                 @test AtomBond.engine_pseudo_default(dft_engine(:castep)) == "on the fly"
+                @test AtomBond.engine_pseudo_default(dft_engine(:qe)) in (AtomBond.QE_DOJO, joinpath("~", "espresso", "pseudo"))
+                @test_throws ArgumentError AtomBond.dftk_pseudo_folder("no.such.family"; env=joinpath(dir, "none"))
 
                 # Quantum ESPRESSO: pseudopotential files by element, input, results from the XML and the output
                 pp = joinpath(dir, "pp"); mkpath(pp)
@@ -1423,6 +1425,15 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
                 @test h.max_forces[1] ≈ 0.002 * AtomBond.RY_EV / AtomBond.BOHR
                 @test h.structures[1].frac[2] ≈ si2.frac[2] && h.structures[2].frac[2] ≈ AtomBond.Vec3(0.249, 0.25, 0.25)
                 @test lattice_parameters(h.structures[2].lattice)[1] ≈ sqrt(2) * 0.51 * 10.2612 * AtomBond.BOHR
+                # after the run the steps still start from the starting structure (not the final one in the XML)
+                rr = job_results(jr)
+                @test rr.history.structures[1].frac[2] ≈ si2.frac[2] && length(rr.history) == 2
+                # a fixed-cell relax: pw.x prints a stress too, but the cell does not move → no cell steps
+                fixedlog = joinpath(dir, "fixed.log")
+                write(fixedlog, join(filter(l -> !occursin(r"CELL_PARAMETERS|^\s+0\.5", l),
+                                            readlines(joinpath(fixtures, "qe.log"))), "\n"))
+                hf = AtomBond.read_qe_history(fixedlog, si2)
+                @test length(hf) == 2 && !variable_cell(hf)
                 @test occursin("calculation = 'relax'", sprint(io -> write_qe(io, si2; calculation="relax")))
                 @test_throws ArgumentError run_dft(si2; engine=:qe, dir=joinpath(dir, "qe3"), pseudo=joinpath(dir, "none"))
 

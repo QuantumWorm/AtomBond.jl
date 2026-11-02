@@ -5,12 +5,38 @@
 """
 Quantum ESPRESSO's pw.x. Found as `pw.x` on the PATH, or by the `command`
 in the settings file (e.g. `"mpirun -np 4 pw.x"`). Pseudopotentials: the
-*Pseudopotentials* field is a folder of UPF files (default: `pseudo_dir` in
-the settings file, else `\$ESPRESSO_PSEUDO`, else `~/espresso/pseudo`); for
-each element the file whose name starts with the element symbol followed by
-`.`, `_` or `-` (e.g. `Si.pbe-n-rrkjus_psl.1.0.0.UPF`, `si_pbe_v1.uspp.F.UPF`).
+*Pseudopotentials* field is a folder of UPF files, or `"PseudoDojo (as DFTK)"`:
+the PseudoDojo files DFTK uses ([`dftk_pseudo_folder`](@ref)), so that the
+two codes can be compared and the recommended cutoffs apply. The default is
+`pseudo_dir` in the settings file, else `\$ESPRESSO_PSEUDO`, else
+`~/espresso/pseudo` when it exists, else the PseudoDojo files. In a folder,
+each element's file is the one whose name starts with the element symbol
+followed by `.`, `_` or `-` (e.g. `Si.pbe-n-rrkjus_psl.1.0.0.UPF`,
+`si_pbe_v1.uspp.F.UPF`).
 """
 struct QEEngine <: DFTEngine end
+
+"""The *Pseudopotentials* text that means DFTK's PseudoDojo files (for Quantum ESPRESSO)."""
+const QE_DOJO = "PseudoDojo (as DFTK)"
+
+const DFTK_PSEUDO_FOLDERS = Dict{String,String}()
+
+"""
+    dftk_pseudo_folder(family=DFTK_PSEUDO_FAMILY; env=default_dftk_env()) -> String
+
+The folder of the UPF files of a PseudoPotentialData family, as DFTK
+uses them (asked once per session from the DFTK environment, which
+downloads the family the first time). Throws when DFTK is not installed.
+"""
+function dftk_pseudo_folder(family::AbstractString=DFTK_PSEUDO_FAMILY; env::AbstractString=default_dftk_env())
+    haskey(DFTK_PSEUDO_FOLDERS, family) && return DFTK_PSEUDO_FOLDERS[family]
+    dftk_env_ready(env) || throw(ArgumentError("the PseudoDojo files come with DFTK: install it (Run with DFTK once, " *
+                                               "or install_dftk()), or give a folder of UPF files"))
+    code = "using PseudoPotentialData; print(dirname(first(values(PseudoFamily(ARGS[1])))))"
+    dir = strip(read(pipeline(julia_in(env, "-e", code, family); stderr=devnull), String))
+    isdir(dir) || throw(ArgumentError("could not find the files of $family in $env"))
+    return DFTK_PSEUDO_FOLDERS[family] = dir
+end
 engine_id(::QEEngine) = :qe
 engine_name(::QEEngine) = "Quantum ESPRESSO"
 engine_executables(::QEEngine) = ["pw.x"]
@@ -19,7 +45,9 @@ engine_command(::QEEngine, command::Vector{String}, dir, name, input) = `$comman
 function engine_pseudo_default(e::QEEngine)
     s = engine_setting(e, "pseudo_dir")
     s isa AbstractString && !isempty(s) && return s
-    return get(ENV, "ESPRESSO_PSEUDO", joinpath("~", "espresso", "pseudo"))
+    haskey(ENV, "ESPRESSO_PSEUDO") && !isempty(ENV["ESPRESSO_PSEUDO"]) && return ENV["ESPRESSO_PSEUDO"]
+    isdir(joinpath(homedir(), "espresso", "pseudo")) && return joinpath("~", "espresso", "pseudo")
+    return QE_DOJO
 end
 
 """
@@ -42,7 +70,7 @@ function qe_pseudo_files(dir::AbstractString, elements)
 end
 
 function write_engine_inputs(::QEEngine, dir, name, c::Crystal; relax::Symbol, kspacing, ecutwfc, pseudo)
-    pdir = abspath(expanduser(pseudo))
+    pdir = strip(pseudo) == QE_DOJO ? dftk_pseudo_folder() : abspath(expanduser(pseudo))
     files = qe_pseudo_files(pdir, species_list(c))
     calc = relax === :none ? "scf" : relax === :atoms ? "relax" : "vc-relax"
     cc = relax === :atoms ? with_constraints(c; cell=(0, 0, 0, 0, 0, 0)) :
@@ -65,14 +93,17 @@ end
 xml_numbers(s) = s === nothing ? Float64[] : parse.(Float64, split(s))
 
 """
-    read_qe_results(xml; log="", title="", order=nothing) -> DFTResults
+    read_qe_results(xml; log="", title="", clamped=nothing, start=nothing) -> DFTResults
 
 The results of a pw.x run from its XML file (`outdir/prefix.xml`): final
 structure, total energy, forces, Fermi level and the levels (eigenvalues,
 occupations and weights per k-point and spin), with the relaxation steps
-from the pw.x output `log` when it has several.
+from the pw.x output `log` when it has several (starting from `start`, the
+structure as written to the input; the step count is then theirs, which
+includes the final SCF pw.x runs after a vc-relax).
 """
-function read_qe_results(path::AbstractString; log::AbstractString="", title::AbstractString="", clamped=nothing)
+function read_qe_results(path::AbstractString; log::AbstractString="", title::AbstractString="", clamped=nothing,
+                         start::Union{Nothing,Crystal}=nothing)
     xml = read(path, String)
     out = something(xml_text(xml, "output"), xml)
     st = xml_text(out, "atomic_structure")
@@ -113,10 +144,11 @@ function read_qe_results(path::AbstractString; log::AbstractString="", title::Ab
     nscf = conv === nothing ? 0 : parse(Int, strip(something(xml_text(xml_text(conv, "scf_conv"), "n_scf_steps"), "0")))
     nopt = opt === nothing ? 0 : parse(Int, strip(something(xml_text(opt, "n_opt_steps"), "0")))
     creator = match(r"<creator\s+NAME=\"[^\"]*\"\s+VERSION=\"([^\"]+)\"", xml)
-    history = isempty(log) || !isfile(log) ? nothing : read_qe_history(log, c; clamped)
+    # the steps start from the structure the run started with (`start`, as written to the input), not the final one
+    history = isempty(log) || !isfile(log) ? nothing : read_qe_history(log, something(start, c); clamped)
     history !== nothing && length(history) < 2 && (history = nothing)
     return DFTResults(; calculation=opt === nothing ? "scf" : "relax", converged=scf_ok && opt_ok,
-                      iterations=opt === nothing ? nscf : nopt, energy, structure=c, fermi, forces,
+                      iterations=opt === nothing ? nscf : history === nothing ? nopt : length(history) - 1, energy, structure=c, fermi, forces,
                       eigenvalues=eigs, occupations=occs, kweights=weights, n_spin=nspin,
                       version=creator === nothing ? "" : creator[1], history, program="Quantum ESPRESSO")
 end
@@ -178,6 +210,9 @@ function read_qe_history(path::AbstractString, like::Crystal; clamped=nothing)
         end
     end
     steps = filter(s -> length(s.forces) == n, steps)
+    # pw.x prints the stress of every SCF with tstress; it is the cell's only when the cell moves (vc-relax prints CELL_PARAMETERS)
+    cell_moves = any(l -> startswith(strip(l), "CELL_PARAMETERS"), lines)
+    cell_moves || (steps = [merge(s, (; stress=nothing)) for s in steps])
     isempty(steps) && return nothing
     cl = clamped === nothing ? fill(false, n) : collect(Bool, clamped)
     free = findall(!, cl)
@@ -196,7 +231,7 @@ end
 
 function read_engine_results(::QEEngine, job)
     like, clamped = grouped_like(job.crystal)
-    return read_qe_results(job.results; log=job.log, title=like.title, clamped)
+    return read_qe_results(job.results; log=job.log, title=like.title, clamped, start=like)
 end
 
 function engine_history(::QEEngine, job)

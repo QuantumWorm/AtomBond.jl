@@ -16,7 +16,7 @@ for licensed codes such as CASTEP and VASP: everyone uses their own copy.
 | Engine | Tasks | Results read back | Pseudopotentials |
 |:-------|:------|:------------------|:-----------------|
 | DFTK | SCF, band structure, relaxations, convergence check | everything (levels, DOS, bands, projections, steps) | PseudoDojo, downloaded automatically |
-| Quantum ESPRESSO | SCF, relax, vc-relax (cell constraints as `cell_dofree`) | energy, forces, Fermi level, levels (DOS), every relaxation step with the stress | a folder of UPF files |
+| Quantum ESPRESSO | SCF, relax, vc-relax (cell constraints as `cell_dofree`) | energy, forces, Fermi level, levels (DOS), every relaxation step with the stress | DFTK's PseudoDojo files (default), or a folder of UPF files |
 | CASTEP | SinglePoint, GeometryOptimization (all cell constraints) | energy, forces, Fermi level, levels from `.bands` (DOS), steps from `.geom` with the stress | on the fly (default), or a folder |
 
 All engines use PBE with a little Gaussian smearing (1 mHa), the cutoff
@@ -61,18 +61,31 @@ PATH)*. AtomBond adds the input file to the command (`pw.x -input Si.in`,
 distributions and on conda-forge (`conda install -c conda-forge qe`, which
 also has ABINIT and SIESTA). AtomBond does not install them.
 
-**Pseudopotentials.** Quantum ESPRESSO needs a folder of UPF files. The
-*Pseudopotentials* field holds the folder. By default this is `pseudo_dir`
-from the settings file, then `$ESPRESSO_PSEUDO`, then `~/espresso/pseudo`.
-For each element AtomBond takes the file whose name starts with the
-element symbol followed by `.`, `_` or `-` (`Si.pbe-n-kjpaw_psl.1.0.0.UPF`,
-`si_pbe_v1.uspp.F.UPF`). The PseudoDojo or SSSP sets work. CASTEP
+**Pseudopotentials.** Quantum ESPRESSO reads UPF files. By default
+(*PseudoDojo (as DFTK)* in the *Pseudopotentials* field) it uses the
+PseudoDojo files that DFTK downloaded, so the two codes can be compared
+directly and the tool's recommended cutoff applies. This needs DFTK
+installed. To use other files, put a folder in the field, or set
+`pseudo_dir` in the settings file or `$ESPRESSO_PSEUDO`; `~/espresso/pseudo`
+is used when it exists. In a folder, each element's file is the one whose
+name starts with the element symbol followed by `.`, `_` or `-`
+(`Si.pbe-n-kjpaw_psl.1.0.0.UPF`, `si_pbe_v1.uspp.F.UPF`); the SSSP set
+works too. CASTEP
 generates its pseudopotentials on the fly unless the field names a folder
 of `.usp`/`.recpot` files, which are then copied next to the input.
 
-**Cutoff.** The recommended cutoff in the tool is for DFTK's PseudoDojo
-pseudopotentials. With the other engines, use the cutoff your
-pseudopotentials need.
+**Cutoff.** The recommended cutoff in the tool is for the PseudoDojo
+pseudopotentials (DFTK, and Quantum ESPRESSO with the same files). With
+other pseudopotentials, use the cutoff they need.
+
+**Checked.** These runs used silicon from the library at 36 Ry with a
+9×9×9 k-grid:
+
+| Engine | Total energy | Gap on the k-grid | Relaxed a | Pressure before relaxing |
+|:-------|:-------------|:------------------|:----------|:-------------------------|
+| DFTK 0.8.1 | −230.2722 eV | 0.582 eV | 5.469 Å | +1.92 GPa |
+| Quantum ESPRESSO 7.5 (same PseudoDojo files) | −230.2727 eV | 0.582 eV | 5.468 Å | +1.91 GPa |
+| CASTEP 9.0 (on-the-fly pseudopotentials, 30 Ry) | (different pseudopotentials) | 0.588 eV | 5.469 Å | +1.95 GPa |
 
 ## Adding a DFT engine
 

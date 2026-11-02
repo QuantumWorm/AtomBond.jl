@@ -158,12 +158,14 @@ function dftk_dialog(v::Viewer)
 
     # Cutoff hints: from the DFTK environment, fetched in the background (a helper process the first time).
     hints = Makie.Observable(Dict{Symbol,Any}())
-    update_hint(_...) = (hint[] = eng() === :dftk ? cutoff_hint_text(v.crystal, hints[], num(ecut)) :
+    # cutoff hints: for DFTK's pseudopotentials (also Quantum ESPRESSO's when it uses the same files)
+    dojo() = eng() === :dftk || (eng() === :qe && strip(shown_text(pseudo)) == QE_DOJO)
+    update_hint(_...) = (hint[] = dojo() ? cutoff_hint_text(v.crystal, hints[], num(ecut)) :
                                   "No cutoff hints for\n" * engine_name(dft_engine(eng())) * ": check the pseudos")
     function fetch_hints(_...)
-        eng() === :dftk || return
+        dojo() || (update_hint(); return)
         ccall(:jl_generating_output, Cint, ()) == 1 && return     # no helper process while precompiling
-        e, ps = strip(shown_text(env)), strip(shown_text(pseudo))
+        e, ps = eng() === :dftk ? (strip(shown_text(env)), strip(shown_text(pseudo))) : (default_dftk_env(), DFTK_PSEUDO_FAMILY)
         dftk_env_ready(e) || (hints[] = Dict{Symbol,Any}(); return)
         @async try
             hints[] = Dict{Symbol,Any}(dftk_cutoff_hints(species_list(v.crystal); family=ps, env=e))
@@ -212,6 +214,8 @@ function dftk_dialog(v::Viewer)
     show_job!(v, controls)
 
     Makie.on(use_hint.clicks) do _
+        dojo() || (v.status[] = "No cutoff recommendation for " * engine_name(dft_engine(eng())) *
+                                " with these pseudopotentials"; return)
         rec = let h = hints[], els = species_list(v.crystal)
             all(e -> haskey(h, e), els) ? 2 * maximum(h[e].normal for e in els) : nothing
         end
