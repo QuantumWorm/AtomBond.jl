@@ -244,6 +244,16 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
         @test cell_volume(p.lattice) ≈ cell_volume(si.lattice) / 4
         @test natoms(conventional_cell(p)) == 8
         @test spacegroup(load_structure(joinpath(STRUCTS, "water.xyz"))) === nothing
+        # symmetrize: small displacements go, the cell and order stay; quartz CIF → exact P3_221
+        noisy = with_positions(si, [f .+ 2e-5 .* AtomBond.Vec3(sin(7i), cos(5i), sin(3i)) for (i, f) in enumerate(si.frac)])
+        sy = symmetrize(noisy)
+        @test sy.lattice.matrix == si.lattice.matrix && sy.species == si.species
+        @test maximum(norm(si.lattice.matrix * (sy.frac[i] - si.frac[i] .- round.(sy.frac[i] - si.frac[i]))) for i in 1:natoms(si)) < 5e-4
+        @test spacegroup(sy; symprec=1e-8) == (227, "Fd-3m")                  # exact now
+        q = load_library("Quartz (alpha-SiO2)")
+        @test spacegroup(q; symprec=1e-5) != (154, "P3_221") && spacegroup(symmetrize(q); symprec=1e-6) == (154, "P3_221")
+        w = load_structure(joinpath(STRUCTS, "water.xyz"))
+        @test symmetrize(w) === w                                                # not periodic: unchanged
 
         s = supercell(si, 2, 1, 3)
         @test natoms(s) == 48
@@ -873,6 +883,42 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             xs, ys = AtomBond.band_lines(rb.path, rb.path.eigenvalues[1], 0.0)
             @test count(isnan, xs) == 4 && length(xs) == 2 * (5 + 2)          # 2 bands × 2 pieces, NaN-separated
             @test_throws ArgumentError AtomBond.bands_figure(r)                # no path
+            # Orbital projections of the dense levels: two H atoms, one 1S group each
+            write(joinpath(dir, "B.pdos.toml"), """
+            levels = "dense"
+            atoms = [1, 2]
+            species = ["H", "H"]
+            orbitals = ["1S", "1S"]
+            weights = [[[0.5, 0.4], [0.3, 0.6], [0.0, 0.0], [1.0, 0.0]], [[0.45, 0.45], [0.2, 0.7], [0.1, 0.1], [0.0, 1.0]]]
+            """)
+            rp = read_dftk_results(joinpath(dir, "B.results.toml"))
+            @test rp.projections isa OrbitalWeights && rp.projections.levels === :dense && size(rp.projections.weights[1]) == (4, 2)
+            pe = pdos(rp; by=:element, width=0.05)
+            @test first.(pe.curves) == ["H"]
+            de = pe.energies[2] - pe.energies[1]
+            # Σ_k w_k · 2 · Σ_bands weight: k1 (0.9+0.9+0+1.0), k2 (0.9+0.9+0.2+1.0), w = 0.5 each
+            @test sum(last(pe.curves[1])) * de ≈ 2 * 0.5 * (2.8 + 3.0) atol=1e-3
+            @test first.(pdos(rp; by=:atom).curves) == ["H1", "H2"] && first.(pdos(rp; by=:orbital).curves) == ["s"]
+            @test first.(pdos(rp; by=:element_orbital).curves) == ["H 1s"]
+            @test first.(pdos(rp; by=:atom_orbital, atoms=[2]).curves) == ["H2 1s"]
+            @test_throws ArgumentError pdos(rp; by=:shell)
+            @test_throws ArgumentError pdos(r)                                  # no projections
+            pf = dos_figure(rp)
+            @test pf.projection[] === :element_orbital && length(pf.pdos_plots) == 1
+            pf.projection[] = :atom
+            @test length(pf.pdos_plots) == 2
+            pf.projection[] = :none
+            @test isempty(pf.pdos_plots)
+            pb = AtomBond.bands_figure(rp; projection=:element)
+            @test pb.projection[] === :element && length(pb.pdos_plots) == 1
+            @test AtomBond.pdos_choices(r) == AtomBond.PDOS_GROUPINGS[1:1]          # no projections: no menu
+            @test isempty(dos_figure(r).pdos_plots)
+            sp = sprint(io -> write_dftk(io, h2; results="P.results.toml", bands="P.bands.toml"))
+            @test occursin("Dense-grid step failed", sp) && !occursin("Band path step", sp)    # a molecule: no path
+            spc = sprint(io -> write_dftk(io, primitive_cell(load_library("Silicon")); results="Q.results.toml", bands="Q.bands.toml"))
+            @test occursin("Band path step failed", spc) && occursin("Dense-grid step failed", spc)   # separate steps
+            @test occursin("atombond_pdos(scfres, \"scf\", \"P.pdos.toml\")", sp) &&
+                  occursin("atombond_pdos(dense, \"dense\", \"P.pdos.toml\")", sp)
 
             # No DFTK environment → refused; an environment without the packages installed → the run fails.
             @test !dftk_env_ready(joinpath(dir, "none"))

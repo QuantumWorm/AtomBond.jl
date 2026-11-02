@@ -33,6 +33,34 @@ function symmetry_dataset(c::Crystal; symprec::Real=1e-3)
 end
 
 """
+    symmetrize(c; symprec=1e-3) -> Crystal
+
+The same structure with the atoms moved onto exactly symmetric positions:
+each atom becomes the average of the images of its equivalent atoms under
+the space-group operations found within `symprec` (Å), in the same cell and
+order (the cell itself is kept). Atoms move by at most about `symprec`. Use
+it when a program with a tighter tolerance should see the full symmetry
+(e.g. CIF coordinates rounded to four digits). A structure that is not
+periodic in all directions is returned unchanged.
+"""
+function symmetrize(c::Crystal; symprec::Real=1e-3)
+    d = symmetry_dataset(c; symprec)
+    (d === nothing || natoms(c) == 0) && return c
+    n = natoms(c)
+    wrapd(x) = x .- round.(x)
+    acc, cnt = [zeros(3) for _ in 1:n], zeros(Int, n)
+    for (R, t) in zip(d.rotations, d.translations), i in 1:n
+        y = R * Vector(c.frac[i]) .+ t
+        cands = [j for j in 1:n if c.species[j] == c.species[i]]
+        j = cands[argmin([norm(c.lattice.matrix * wrapd(y .- c.frac[j])) for j in cands])]
+        acc[j] .+= c.frac[j] .+ wrapd(y .- c.frac[j])
+        cnt[j] += 1
+    end
+    frac = [cnt[j] == 0 ? c.frac[j] : Vec3(acc[j] ./ cnt[j]) for j in 1:n]
+    return with_positions(c, frac)
+end
+
+"""
     spacegroup(c; symprec=1e-3) -> (number, symbol) or nothing
 
 e.g. `(227, "Fd-3m")` for silicon. `symprec` is the position tolerance in Å.

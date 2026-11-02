@@ -99,10 +99,10 @@ export to_atomsbase, from_atomsbase
 export run_dftk, install_dftk, default_dftk_env, dftk_env_ready, dftk_cutoff_hints, recommended_ecut, DFTKJob, job_status, job_log, job_results, stop_job!
 export run_dftk_convergence, read_convergence, job_convergence, converged_settings, ConvergenceResults, ConvergenceStep
 export convergence_figure, plot_convergence, relax_figure, plot_relaxation, show_forces!
-export DFTKResults, DenseLevels, BandPath, RelaxHistory, read_dftk_results, band_gap, band_edges, is_metallic, dos, write_dos, dos_figure, plot_dos, write_bands, bands_figure, plot_bands
+export DFTKResults, DenseLevels, BandPath, RelaxHistory, OrbitalWeights, pdos, read_dftk_results, band_gap, band_edges, is_metallic, dos, write_dos, dos_figure, plot_dos, write_bands, bands_figure, plot_bands
 # analysis
 export Bond, find_bonds, coordination, neighbor_pairs, bond_cutoff
-export spacegroup, symmetry_dataset, primitive_cell, conventional_cell
+export spacegroup, symmetry_dataset, symmetrize, primitive_cell, conventional_cell
 export distance, bond_angle, dihedral, measure, min_image_distance
 # build
 export supercell, delete_atoms, substitute, add_atom, move_atoms, translate_atoms, rotate_atoms, rotation_matrix, closest_contact, set_position, replace_species

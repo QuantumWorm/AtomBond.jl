@@ -502,39 +502,72 @@ function write_dftk_bands_code(io::IO, file::AbstractString, c::Crystal, kspacin
     path = !any(vacuum_axes(c)) && all(c.pbc)
     moments = any(!isnan, c.magmoms) ? "[" * join((@sprintf("%.4f", isnan(m) ? 0.0 : m) for m in c.magmoms), ", ") * "]" :
               "[]"
+    pdos = replace(file, r"\.bands\.toml$" => "") * ".pdos.toml"
+    out = repr(String(file))
+    print(io, "\n", DFTK_PDOS_FUNCTION)
     print(io, """
 
-    # Levels on a denser k-grid (DOS)$(path ? " and the band structure along the high-symmetry path" : ""),
-    # non-self-consistent from the SCF density; written for AtomBond
+    # Levels on a denser k-grid (DOS), non-self-consistent from the SCF density; written for AtomBond
+    bands_out = Dict{String,Any}()
     try
         dense = compute_bands(scfres, MonkhorstPack([$(join(dense, ", "))]))
-        bands_out = Dict{String,Any}(
+        merge!(bands_out, Dict{String,Any}(
             "dos_kgrid" => [$(join(dense, ", "))],
             "dos_kpoint_weights" => collect(dense.basis.kweights),
-            "dos_eigenvalues_Ha" => [collect(e) for e in dense.eigenvalues])
-    """)
-    if path
-        print(io, """
-            path = compute_bands(scfres; magnetic_moments=$moments)
-            plotdata = DFTK.data_for_plotting(path)
-            bohr_in_A = ustrip(u"Å", 1u"bohr")
-            merge!(bands_out, Dict{String,Any}(
-                "path_distances_inv_A" => collect(plotdata.kdistances) ./ bohr_in_A,
-                "path_branch_starts" => [first(b) for b in plotdata.kbranches],
-                "path_tick_distances_inv_A" => collect(plotdata.ticks.distances) ./ bohr_in_A,
-                "path_tick_labels" => collect(String.(plotdata.ticks.labels)),
-                "path_eigenvalues_Ha" => [[collect(plotdata.eigenvalues[ik, :, σ]) for ik in 1:plotdata.n_kcoord]
-                                          for σ in 1:plotdata.n_spin]))
-        """)
-    end
-    print(io, """
-        open(io -> TOML.print(io, bands_out), joinpath(@__DIR__, $(repr(String(file)))), "w")
-        println("AtomBond bands written to ", $(repr(String(file))))
+            "dos_eigenvalues_Ha" => [collect(e) for e in dense.eigenvalues]))
+        open(io -> TOML.print(io, bands_out), joinpath(@__DIR__, $out), "w")
+        println("AtomBond dense-grid levels written to ", $out)
+        try                                   # projections of the dense-grid states (projected DOS)
+            atombond_pdos(dense, "dense", $(repr(pdos)))
+        catch err
+            println("Projections failed: ", sprint(showerror, err))
+        end
     catch err
-        println("Band structure / DOS step failed: ", sprint(showerror, err))
+        println("Dense-grid step failed: ", sprint(showerror, err))
+    end
+    """)
+    path || return
+    print(io, """
+
+    # Band structure along the high-symmetry path (its own step: a failure here keeps the DOS)
+    try
+        path = compute_bands(scfres; magnetic_moments=$moments)
+        plotdata = DFTK.data_for_plotting(path)
+        bohr_in_A = ustrip(u"Å", 1u"bohr")
+        merge!(bands_out, Dict{String,Any}(
+            "path_distances_inv_A" => collect(plotdata.kdistances) ./ bohr_in_A,
+            "path_branch_starts" => [first(b) for b in plotdata.kbranches],
+            "path_tick_distances_inv_A" => collect(plotdata.ticks.distances) ./ bohr_in_A,
+            "path_tick_labels" => collect(String.(plotdata.ticks.labels)),
+            "path_eigenvalues_Ha" => [[collect(plotdata.eigenvalues[ik, :, σ]) for ik in 1:plotdata.n_kcoord]
+                                      for σ in 1:plotdata.n_spin]))
+        open(io -> TOML.print(io, bands_out), joinpath(@__DIR__, $out), "w")
+        println("AtomBond bands written to ", $out)
+    catch err
+        println("Band path step failed: ", sprint(showerror, err))
     end
     """)
 end
+
+"""
+DFTK code that projects the states of `res` (an SCF or band result with
+`basis` and `ψ`) onto the pseudo-atomic orbitals of the pseudopotentials and
+writes, per k-point and band, the weight on each (atom, orbital) — summed
+over m — for AtomBond's projected DOS (TOML).
+"""
+const DFTK_PDOS_FUNCTION = """
+function atombond_pdos(res, levels, file)
+    projections, labels = DFTK.atomic_orbital_projections(res.basis, res.ψ)
+    keys = [(l.iatom, string(l.species), string(l.label)) for l in labels]
+    groups = unique(keys)
+    members = [findall(==(g), keys) for g in groups]
+    weights = [[[sum(p[ib, members[g]]) for g in eachindex(groups)] for ib in axes(p, 1)] for p in projections]
+    open(io -> TOML.print(io, Dict("levels" => levels, "atoms" => first.(groups),
+                                   "species" => [g[2] for g in groups], "orbitals" => last.(groups),
+                                   "weights" => weights)), joinpath(@__DIR__, file), "w")
+    println("AtomBond projections written to ", file)
+end
+"""
 
 """The end of a DFTK script that writes its results for AtomBond (TOML)."""
 function write_dftk_results_code(io::IO, file::AbstractString, kind::Symbol)
@@ -575,6 +608,16 @@ function write_dftk_results_code(io::IO, file::AbstractString, kind::Symbol)
     open(io -> TOML.print(io, out), joinpath(@__DIR__, $(repr(String(file)))), "w")
     println("AtomBond results written to ", $(repr(String(file))))
     """)
+    if kind === :scf
+        pdos = replace(file, r"\.results\.toml$" => "") * ".pdos.toml"
+        print(io, "\n# Projections on atomic orbitals (projected DOS)\n", DFTK_PDOS_FUNCTION, """
+        try
+            atombond_pdos(scfres, "scf", $(repr(pdos)))
+        catch err
+            println("Projections failed: ", sprint(showerror, err))
+        end
+        """)
+    end
 end
 
 # ---------------------------------------------------------------------------

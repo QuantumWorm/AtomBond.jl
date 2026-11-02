@@ -89,19 +89,24 @@ finishes, `name.results.toml` holds the results ([`job_results`](@ref)).
 With `bands=true` an SCF is followed by a non-self-consistent step: the
 levels on a k-grid twice as dense (a fuller DOS) and, for a crystal without
 vacuum, the band structure along the high-symmetry path, in
-`name.bands.toml` ([`read_dftk_results`](@ref) reads it too).
+`name.bands.toml` ([`read_dftk_results`](@ref) reads it too). With
+`symmetrize` (default: when `bands`) the atoms are first put on exactly
+symmetric positions ([`symmetrize`](@ref), within 0.001 Å), so that DFTK and
+the k-path code, whose symmetry tolerance is much tighter, see the crystal's
+full symmetry (CIF coordinates are often rounded).
 """
 function run_dftk(c::Crystal; name::AbstractString=formula(c),
                   dir::AbstractString=joinpath(pwd(), "dftk_" * name * "_" * Dates.format(Dates.now(), "yyyymmdd-HHMMSS")),
                   env::AbstractString=default_dftk_env(), kspacing::Real=0.25, ecutwfc::Real=40,
-                  pseudo::AbstractString=DFTK_PSEUDO_FAMILY, bands::Bool=false)
+                  pseudo::AbstractString=DFTK_PSEUDO_FAMILY, bands::Bool=false, symmetrize::Bool=bands)
     dftk_env_ready(env) || throw(ArgumentError("no DFTK environment at $env; create it with install_dftk()"))
     occursin(r"^[\w.+-]+$", name) || throw(ArgumentError("use letters, digits, . + - _ in the name"))
     mkpath(dir)
     script, log, results = (joinpath(dir, name * ext) for ext in (".jl", ".log", ".results.toml"))
     bandsfile = joinpath(dir, name * ".bands.toml")
-    foreach(f -> isfile(f) && rm(f), (results, bandsfile))
-    write_dftk(script, c; kspacing, ecutwfc, pseudo, results=basename(results),
+    foreach(f -> isfile(f) && rm(f), (results, bandsfile, joinpath(dir, name * ".pdos.toml"), joinpath(dir, name * ".relax.toml")))
+    run_c = symmetrize ? AtomBond.symmetrize(c) : c
+    write_dftk(script, run_c; kspacing, ecutwfc, pseudo, results=basename(results),
                bands=bands ? basename(bandsfile) : nothing)
     proc = open(log, "w") do io
         run(pipeline(julia_in(env, script; dir); stdout=io, stderr=io); wait=false)
@@ -258,6 +263,33 @@ struct DFTKResults
     dense::Any                # Union{Nothing,DenseLevels}
     path::Any                 # Union{Nothing,BandPath}
     history::Any              # Union{Nothing,RelaxHistory}
+    projections::Any          # Union{Nothing,OrbitalWeights}
+end
+
+"""
+    OrbitalWeights
+
+Projections of the states on the pseudo-atomic orbitals (orthonormalized,
+as DFTK's `atomic_orbital_projections`), summed over m: for each (atom,
+orbital) group `g` — `atoms[g]`, `species[g]`, `orbitals[g]` (the
+pseudopotential's label, e.g. "3S") — `weights[k][band, g]`, for the levels
+`levels` (`:dense` or `:scf`) of the same results. What the orbitals do not
+capture (the spilling) is missing from their sum. [`pdos`](@ref) uses them.
+"""
+struct OrbitalWeights
+    levels::Symbol
+    atoms::Vector{Int}
+    species::Vector{Symbol}
+    orbitals::Vector{String}
+    weights::Vector{Matrix{Float64}}
+end
+
+"""The orbital projections from `<name>.pdos.toml`, or `nothing`."""
+function read_projections(path::AbstractString)
+    isfile(path) || return nothing
+    d = TOML.parsefile(path)
+    w = [permutedims(reduce(hcat, [Float64.(b) for b in k])) for k in d["weights"]]
+    return OrbitalWeights(Symbol(d["levels"]), Int.(d["atoms"]), Symbol.(d["species"]), String.(d["orbitals"]), w)
 end
 
 """
@@ -340,8 +372,9 @@ with `results=…` (as [`run_dftk`](@ref) does), and the band file next to it
 SCF level below the Fermi level and the lowest above it.
 """
 function read_dftk_results(path::AbstractString; title::AbstractString="",
-                           bands::AbstractString=replace(path, r"\.results\.toml$" => ".bands.toml"),
-                           history::AbstractString=replace(path, r"\.results\.toml$" => ".relax.toml"))
+                           bands::AbstractString=companion_file(path, ".bands.toml"),
+                           history::AbstractString=companion_file(path, ".relax.toml"),
+                           projections::AbstractString=companion_file(path, ".pdos.toml"))
     d = TOML.parsefile(path)
     L = Lattice((Float64.(v) for v in d["cell_A"])...)
     pos = [Vec3(Float64.(p)) for p in d["positions_A"]]
@@ -362,8 +395,12 @@ function read_dftk_results(path::AbstractString; title::AbstractString="",
                        [Vec3(HA_PER_BOHR_EV_PER_A .* Float64.(f)) for f in d["forces_Ha_per_bohr"]], c,
                        eigs, [Float64.(o) for o in get(d, "occupations", Any[])],
                        Float64.(get(d, "kpoint_weights", Float64[])), get(d, "n_spin", 1), get(d, "version", ""),
-                       read_bands_file(bands)..., read_relax_history(history, c))
+                       read_bands_file(bands)..., read_relax_history(history, c), read_projections(projections))
 end
+
+"""`<name><ext>` next to `<name>.results.toml`; "" (no file) for a results file named otherwise."""
+companion_file(path::AbstractString, ext::AbstractString) =
+    endswith(path, ".results.toml") ? path[1:end-length(".results.toml")] * ext : ""
 
 """The dense levels and the band path from a `<name>.bands.toml` file, or `nothing`s."""
 function read_bands_file(path::AbstractString)
@@ -419,6 +456,60 @@ function dos(r::DFTKResults; width::Real=0.1, step::Real=width / 10, range=nothi
         @. D[:, σ] += filled * w[ik] * g * exp(-((E - ε) / width)^2 / 2)
     end
     return (; energies=E, dos=D, fermi=r.fermi)
+end
+
+"""Short orbital name from a pseudopotential label: "3S" → "3s"."""
+orbital_name(label::AbstractString) = lowercase(label)
+
+"""The group name of projection group `g` for `by` (see [`pdos`](@ref))."""
+function projection_group(p::OrbitalWeights, g::Integer, by::Symbol)
+    el, orb, at = string(p.species[g]), orbital_name(p.orbitals[g]), p.atoms[g]
+    by === :element && return el
+    by === :orbital && return string(orb[end])                     # s, p, d, f
+    by === :element_orbital && return el * " " * orb
+    by === :atom && return el * string(at)
+    by === :atom_orbital && return el * string(at) * " " * orb
+    throw(ArgumentError("by must be :element, :orbital, :element_orbital, :atom or :atom_orbital"))
+end
+
+"""
+    pdos(r; by=:element_orbital, atoms=nothing, width=0.1, step=width/10, range=nothing) -> (; energies, curves, fermi)
+
+Projected density of states: as [`dos`](@ref), but each level weighted with
+its projection on the atomic orbitals ([`OrbitalWeights`](@ref)) and summed
+into curves by `by` — `:element` ("Si", "O"), `:orbital` ("s", "p", "d"),
+`:element_orbital` ("Si 3s", "O 2p"), `:atom` ("Si1") or `:atom_orbital`
+("O17 2p") — optionally only for the atoms numbered in `atoms`. `curves` is
+a vector of `name => matrix` (energy × spin, states/eV per cell), in the
+order of first appearance. The curves add up to a little less than the DOS
+(the spilling of the projections).
+"""
+function pdos(r::DFTKResults; by::Symbol=:element_orbital, atoms=nothing, width::Real=0.1, step::Real=width / 10,
+              range=nothing)
+    p = r.projections
+    p === nothing && throw(ArgumentError("no orbital projections in these results"))
+    eigs, kw = dos_levels(r, p.levels === :dense ? :dense : :scf)
+    length(eigs) == length(p.weights) || throw(ArgumentError("projections do not match the levels"))
+    width > 0 && step > 0 || throw(ArgumentError("width and step must be positive"))
+    groups = [g for g in eachindex(p.atoms) if atoms === nothing || p.atoms[g] in atoms]
+    names = unique(projection_group(p, g, by) for g in groups)
+    cols = [[g for g in groups if projection_group(p, g, by) == n] for n in names]
+    nspin = r.n_spin
+    nk = length(eigs) ÷ nspin
+    w = length(kw) == length(eigs) ? kw : fill(1.0 / nk, length(eigs))
+    lo, hi = range === nothing ? (minimum(minimum, eigs) - 4width, maximum(maximum, eigs) + 4width) : Float64.(range)
+    E = collect(lo:step:hi)
+    curves = [zeros(length(E), nspin) for _ in names]
+    filled, norm_ = 2 / nspin, 1 / (width * sqrt(2π))
+    gauss = similar(E)
+    for σ in 1:nspin, ik in (σ - 1) * nk + 1:σ * nk, (ib, ε) in enumerate(eigs[ik])
+        @. gauss = filled * w[ik] * norm_ * exp(-((E - ε) / width)^2 / 2)
+        for (c, cs) in enumerate(cols)
+            s = sum(p.weights[ik][ib, g] for g in cs; init=0.0)
+            s > 1e-6 && (@views curves[c][:, σ] .+= s .* gauss)
+        end
+    end
+    return (; energies=E, curves=[n => m for (n, m) in zip(names, curves)], fermi=r.fermi)
 end
 
 """The levels and k-weights the DOS uses: `:auto` (dense when there), `:dense` or `:scf`."""

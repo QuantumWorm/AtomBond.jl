@@ -28,6 +28,7 @@ makedocs(;
             "Structures and files" => "api_structures.md",
             "Analysis and building" => "api_building.md",
             "Rendering and window" => "api_window.md",
+            "Running DFTK" => "api_dftk.md",
         ],
     ],
     checkdocs=:exports,

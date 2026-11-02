@@ -109,9 +109,25 @@ levels on a k-grid twice as dense, with more empty bands (for the DOS),
 and, for a crystal without vacuum, the bands along the standard
 high-symmetry path of its Brillouin zone (DFTK's `irrfbz_path`; for a
 supercell, the path of the primitive cell). They go into `Name.bands.toml`;
-a molecule or slab gets the dense DOS only. After a relaxation the same
+a molecule or slab gets the dense DOS only. Before a band run the atoms
+are put on exactly symmetric positions ([`symmetrize`](@ref), moves within
+0.001 Å): DFTK and the k-path code use a much tighter symmetry tolerance
+than AtomBond, and coordinates rounded in a CIF otherwise look like P1 to
+them (α-quartz did; with the full symmetry it also ran twice as fast). After a relaxation the same
 task first runs an SCF of the relaxed structure (with the symmetries it
 has), so its levels, DOS and band structure are those of the result.
+
+**Projected DOS.** Every SCF also projects its states on the pseudo-atomic
+orbitals of the pseudopotentials (DFTK's orthonormalized
+`atomic_orbital_projections`, the same idea as Quantum ESPRESSO's
+`projwfc.x`), for the dense k-grid when the band step runs, into
+`Name.pdos.toml`. The DOS and band-structure windows then draw the projected
+DOS as coloured curves over the total DOS; *Projected DOS* chooses the
+grouping: element and orbital ("Si 3s", "O 2p"), element, orbital type (s,
+p, d), each atom (up to 12 atoms), or none. The curves add up to slightly
+less than the total: the orbitals do not capture all of every state (the
+"spilling", about 1 % for silicon). In code, [`pdos`](@ref) with `by` and
+`atoms` (e.g. only the atoms around a defect).
 
 **Relaxation steps.** A relaxation records every step in `Name.relax.toml`
 (energy, the force on each atom, cell and positions). *Show relaxation*
@@ -195,6 +211,7 @@ plot_dos(r)                                # the DOS window
 band_edges(r)                              # VBM, CBM, gap, direct?, where (from the band path)
 write_bands("diamond.bands.csv", r)
 plot_bands(r)                              # bands + DOS window
+p = pdos(r; by=:element_orbital)           # projected DOS: "Si 3s" => …, "Si 3p" => …
 
 c = primitive_cell(load_library("Silicon"))
 recommended_ecut(c)                        # 36.0 Ry (PseudoDojo normal)

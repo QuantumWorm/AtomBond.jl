@@ -5,12 +5,48 @@ const DOS_LINE = RGBf(0.12, 0.30, 0.55)
 const DOS_DOWN_FILL = RGBAf(0.80, 0.35, 0.20, 0.30)
 const DOS_DOWN_LINE = RGBf(0.60, 0.22, 0.10)
 
+"""Ways to split the DOS into projected curves (menu label, `by` of [`pdos`](@ref))."""
+const PDOS_GROUPINGS = [("No projection", :none), ("Element and orbital", :element_orbital), ("Element", :element),
+                        ("Orbital (s, p, d)", :orbital), ("Each atom", :atom)]
+
+"""The projection choices for `r` (each atom only for up to 12 atoms)."""
+pdos_choices(r::DFTKResults) = r.projections === nothing ? PDOS_GROUPINGS[1:1] :
+                               filter(o -> o[2] !== :atom || natoms(r.structure) <= 12, PDOS_GROUPINGS)
+
+"""
+Draw the projected DOS of `r` grouped `by` on `ax` (energies relative to
+`ef`; `horizontal`: DOS along x), replacing the earlier curves in `plots`
+and the legend in `legend`.
+"""
+function draw_pdos!(ax, plots, legend, r::DFTKResults, by::Symbol, width::Real, ef; horizontal::Bool=false)
+    foreach(p -> delete!(ax, p), plots)
+    empty!(plots)
+    legend[] === nothing || delete!(legend[])
+    legend[] = nothing
+    if by !== :none
+        pd = pdos(r; by, width)
+        colors = Makie.wong_colors()
+        for (i, (n, m)) in enumerate(pd.curves), σ in axes(m, 2)
+            x, y = pd.energies .- ef, (σ == 1 ? 1 : -1) .* m[:, σ]
+            push!(plots, Makie.lines!(ax, horizontal ? y : x, horizontal ? x : y; color=colors[mod1(i, length(colors))],
+                                      linewidth=1.4, label=σ == 1 ? n : nothing))
+        end
+    end
+    if by !== :none || (r.n_spin == 2 && !horizontal)
+        legend[] = Makie.axislegend(ax; position=:rt, framevisible=false, labelsize=12, rowgap=0,
+                                    backgroundcolor=RGBAf(1, 1, 1, 0.85))
+    end
+    return plots
+end
+
 """
     dos_figure(r::DFTKResults; width=0.1, title="", dir=nothing, name="dos") -> (; figure, axis, width, save, ...)
 
 A figure with the density of states of `r` ([`dos`](@ref)) against the
 energy relative to the Fermi level: the filled states (below the Fermi
-level) shaded, the Fermi level dashed, spin down mirrored below the axis
+level) shaded, the projected DOS ([`pdos`](@ref)) as coloured curves when the
+run has orbital projections (*Projected DOS* menu; `projection` is the
+initial grouping, `:element_orbital` by default), the Fermi level dashed, spin down mirrored below the axis
 for a spin-polarized run. A slider sets the Gaussian broadening (eV) and the
 plot follows it. Deep levels (semicore states, separated from the valence
 levels by an empty range of more than `deep_gap` eV, 5 by default) are left
@@ -18,12 +54,12 @@ out of the view unless *Show deep levels* is on; the CSV always has them. With `
 and `name.dos.csv` there. The figure is not displayed; see [`plot_dos`](@ref).
 """
 function dos_figure(r::DFTKResults; width::Real=0.1, title::AbstractString="", dir=nothing, name::AbstractString="dos",
-                    deep_gap::Real=5)
+                    deep_gap::Real=5, projection::Symbol=:element_orbital)
     isempty(r.eigenvalues) && throw(ArgumentError("no levels in these results (a relaxation keeps none)"))
     fig = Makie.Figure(; size=(760, 520), backgroundcolor=:white)
     ef = something(r.fermi, 0.0)
     head = !isempty(title) ? title : !isempty(r.structure.title) ? r.structure.title : formula(r.structure)
-    nk = length(r.eigenvalues) ÷ r.n_spin
+    nk = length(first(dos_levels(r))) ÷ r.n_spin
     sub = "DFTK $(r.version), $(nk) k-point$(nk == 1 ? "" : "s")" * (r.n_spin == 2 ? ", spin-polarized" : "") *
           (r.fermi === nothing ? "" : ", energies relative to the Fermi level")
     ax = Makie.Axis(fig[1, 1:3]; title=head, subtitle=sub, xlabel=r.fermi === nothing ? "E (eV)" : "E − E_F (eV)",
@@ -41,6 +77,17 @@ function dos_figure(r::DFTKResults; width::Real=0.1, title::AbstractString="", d
         Makie.connect!(showdeep, tg.active)
     end
     row = valence_bottom === nothing ? 3 : 4
+    choices = pdos_choices(r)
+    proj = Makie.Observable(:none)
+    if length(choices) > 1
+        gp = Makie.GridLayout(fig[row, 1:3]; tellwidth=false, halign=:left)
+        Makie.Label(gp[1, 1], "Projected DOS"; halign=:left)
+        start = something(findfirst(o -> o[2] === projection, choices), 1)
+        menu = Makie.Menu(gp[1, 2]; options=choices, default=choices[start][1], width=200)
+        Makie.connect!(proj, menu.selection)
+        proj[] = choices[start][2]
+        row += 1
+    end
     save = dir === nothing ? nothing : Makie.Button(fig[row, 1:3]; label="Save PNG and CSV to " * basename(dir) * "/")
     data = Makie.lift(w -> dos(r; width=w), slider.value)
     x = Makie.lift(d -> d.energies .- ef, data)
@@ -54,13 +101,18 @@ function dos_figure(r::DFTKResults; width::Real=0.1, title::AbstractString="", d
     end
     r.n_spin == 2 && Makie.hlines!(ax, [0.0]; color=:gray50, linewidth=0.8)
     r.fermi === nothing || Makie.vlines!(ax, [0.0]; color=:gray30, linestyle=:dash, linewidth=1)
-    r.n_spin == 2 && Makie.axislegend(ax; position=:rt, framevisible=false)
+    pplots, legend = Any[], Ref{Any}(nothing)
+    redraw_pdos(_...) = draw_pdos!(ax, pplots, legend, r, proj[], slider.value[], ef)
+    Makie.on(redraw_pdos, proj)
+    Makie.on(redraw_pdos, slider.value)
+    redraw_pdos()
     function fit!(_...)                   # limits from the data in view (autolimits needs a displayed figure)
         d = data[]
         xs = d.energies .- ef
         lo = showdeep[] || valence_bottom === nothing ? first(xs) : valence_bottom - ef - 4 * slider.value[]
-        top = maximum(d.dos[xs .>= lo, :]) * 1.08
-        Makie.limits!(ax, lo, last(xs), r.n_spin == 2 ? -top : 0.0, top)
+        hi = min(last(xs), 10.0)                     # the highest computed bands are not reliable
+        top = maximum(d.dos[(xs .>= lo) .& (xs .<= hi), :]) * 1.08
+        Makie.limits!(ax, lo, hi, r.n_spin == 2 ? -top : 0.0, top)
     end
     Makie.on(fit!, data)
     Makie.on(fit!, showdeep)
@@ -73,7 +125,7 @@ function dos_figure(r::DFTKResults; width::Real=0.1, title::AbstractString="", d
             save.label[] = "Saved " * basename(png) * " and " * basename(csv)
         end
     end
-    return (; figure=fig, axis=ax, width=slider, save, data, showdeep)
+    return (; figure=fig, axis=ax, width=slider, save, data, showdeep, projection=proj, pdos_plots=pplots)
 end
 
 """
@@ -148,10 +200,12 @@ levels left out) to 8 eV. The valence-band maximum
 and conduction-band minimum are marked and the gap is given in the subtitle
 ([`band_edges`](@ref)). A slider sets the DOS broadening; with `dir`, a Save
 button writes `name.bands.png`, `name.bands.csv` and `name.dos.csv` there.
+The DOS panel shows the projected DOS ([`pdos`](@ref)) as coloured curves when
+the run has orbital projections (*Projected DOS* menu, `projection`).
 Not displayed; see [`plot_bands`](@ref).
 """
 function bands_figure(r::DFTKResults; width::Real=0.1, window=nothing, title::AbstractString="", dir=nothing,
-                      name::AbstractString="bands")
+                      name::AbstractString="bands", projection::Symbol=:element_orbital)
     p = r.path
     p === nothing && throw(ArgumentError("no band structure in these results (run with bands=true)"))
     ef = something(r.fermi, 0.0)
@@ -217,7 +271,24 @@ function bands_figure(r::DFTKResults; width::Real=0.1, window=nothing, title::Ab
     end
     Makie.on(fit!, data)
     fit!(data[])
-    save = dir === nothing ? nothing : Makie.Button(fig[3, 1:2]; label="Save PNG and CSV to " * basename(dir) * "/")
+    choices = pdos_choices(r)
+    proj = Makie.Observable(:none)
+    row = 3
+    if length(choices) > 1
+        gp = Makie.GridLayout(fig[row, 1:2]; tellwidth=false, halign=:left)
+        Makie.Label(gp[1, 1], "Projected DOS"; halign=:left)
+        start = something(findfirst(o -> o[2] === projection, choices), 1)
+        menu = Makie.Menu(gp[1, 2]; options=choices, default=choices[start][1], width=200)
+        Makie.connect!(proj, menu.selection)
+        proj[] = choices[start][2]
+        row += 1
+    end
+    pplots, legend = Any[], Ref{Any}(nothing)
+    redraw_pdos(_...) = draw_pdos!(axd, pplots, legend, r, proj[], slider.value[], ef; horizontal=true)
+    Makie.on(redraw_pdos, proj)
+    Makie.on(redraw_pdos, slider.value)
+    redraw_pdos()
+    save = dir === nothing ? nothing : Makie.Button(fig[row, 1:2]; label="Save PNG and CSV to " * basename(dir) * "/")
     if save !== nothing
         Makie.on(save.clicks) do _
             write_bands(joinpath(dir, name * ".bands.csv"), r)
@@ -226,7 +297,8 @@ function bands_figure(r::DFTKResults; width::Real=0.1, window=nothing, title::Ab
             save.label[] = "Saved $name.bands.png, $name.bands.csv and $name.dos.csv"
         end
     end
-    return (; figure=fig, bands_axis=axb, dos_axis=axd, width=slider, save, data, edges=e)
+    return (; figure=fig, bands_axis=axb, dos_axis=axd, width=slider, save, data, edges=e, projection=proj,
+            pdos_plots=pplots)
 end
 
 """
