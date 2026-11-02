@@ -195,9 +195,11 @@ eigenvalues and occupations per k-point, the final structure).
 
 DFTK is large and is not a dependency of AtomBond: it is installed once into
 its own Julia environment, by default `~/.julia/environments/atombond-dftk`.
-*Install DFTK* in the tool does this (DFTK, PseudoPotentialData, AtomsBase,
+The first *Run* does this by itself (DFTK, PseudoPotentialData, AtomsBase,
 Unitful, UnitfulAtomic, GeometryOptimization; several minutes, mostly
-compiling). The PseudoDojo pseudopotentials are downloaded by
+compiling) and then starts the calculation, with the recommended cutoff
+once the pseudopotentials are known; later runs start at once. *Install
+DFTK* installs it without running anything. The PseudoDojo pseudopotentials are downloaded by
 PseudoPotentialData on the first run.
 
 **Cutoff.** The cutoff starts at the value the pseudopotentials recommend

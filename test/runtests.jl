@@ -951,6 +951,20 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             @test startswith(d.plan[], "SCF") && occursin("2 atoms", d.plan[])
             AtomBond.settext!(d.env, fake)
             @test d.envstate[] == "DFTK is installed there"
+            # Run without DFTK installs it first: when the installation is done the waiting calculation starts
+            inst = AtomBond.DFTKJob(nothing, fake, "", joinpath(dir, "none.log"), "",
+                                    run(`$(Base.julia_cmd()) --startup-file=no -e 0`; wait=true), time(), false)
+            started = Ref(false)
+            d.state[:job] = inst; d.state[:after_install] = () -> (started[] = true)
+            AtomBond.follow_job!(v, d)
+            tick = AtomBond.Makie.events(v.figure.scene).tick
+            tick[] = AtomBond.Makie.Tick(AtomBond.Makie.UnknownTickState, 1, 0.0, 0.0)
+            sleep(1.1)
+            tick[] = AtomBond.Makie.Tick(AtomBond.Makie.UnknownTickState, 2, 1.1, 1.1)
+            @test started[] && !haskey(d.state, :after_install) && occursin("DFTK installed", d.progress[])
+            AtomBond.settext!(d.env, joinpath(dir, "none"))
+            @test startswith(d.envstate[], "No DFTK there yet: Run installs")
+            AtomBond.settext!(d.env, fake)
             done = AtomBond.DFTKJob(h2, dir, joinpath(dir, "H2.jl"), joinpath(dir, "none.log"), path,
                                     run(`$(Base.julia_cmd()) --startup-file=no -e 0`; wait=true), time(), false)
             @test job_status(done) === :done

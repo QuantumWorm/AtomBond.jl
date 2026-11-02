@@ -65,8 +65,9 @@ a new tab and *Show DOS / bands* the DOS or band structure in its own
 window; for a relaxation, *Show relaxation* shows energy and forces per step
 ([`relax_figure`](@ref)) and each step, with force arrows, in a tab; for a convergence check, *Use converged values* puts the converged
 cutoff and k-spacing in the form and *Show plot* plots the check.
-*Install DFTK* creates the DFTK environment the first time
-([`install_dftk`](@ref)).
+When the environment has no DFTK yet, *Run* installs it first
+([`install_dftk`](@ref), minutes, once) and then starts the calculation;
+*Install DFTK* only installs it.
 """
 function dftk_dialog(v::Viewer)
     f = new_dialog(v, :dftk, "Run DFTK")
@@ -115,7 +116,7 @@ function dftk_dialog(v::Viewer)
     Makie.on(update_plan, v.header)                  # the structure changed
     update_plan()
     update_env(_...) = (envstate[] = dftk_env_ready(strip(shown_text(env))) ? "DFTK is installed there" :
-                                     "No DFTK there yet:\ninstall it (minutes, once)")
+                                     "No DFTK there yet: Run installs\nit first (minutes, once)")
     Makie.on(update_env, env.displayed_string)
     update_env()
 
@@ -178,23 +179,46 @@ function dftk_dialog(v::Viewer)
         any(isnothing, vals) && return
         busy(state) && (v.status[] = "A DFTK job is still running: stop it first"; return)
         e, dir, nm, ks, ec, ps = vals
-        try
-            stamp = Dates.format(Dates.now(), "yyyymmdd-HHMMSS")
-            t = task.selection[]
-            state[:job] = t === :convergence ?
-                run_dftk_convergence(v.crystal; env=e, name=nm, dir=joinpath(expanduser(dir), "dftk_$(nm)_conv_$stamp"),
-                                     kspacing=parse(Float64, ks), ecutwfc=parse(Float64, ec), pseudo=ps) :
-                run_dftk(v.crystal; env=e, name=nm, dir=joinpath(expanduser(dir), "dftk_$(nm)_$stamp"),
-                         kspacing=parse(Float64, ks), ecutwfc=parse(Float64, ec), pseudo=ps, bands=t === :bands,
-                         relax=dftk_relax_mode(t))
+        c, t = v.crystal, task.selection[]
+        typed_ecut = strip(shown_text(ecut)) != auto_ecut[]
+        function start()
+            try
+                stamp = Dates.format(Dates.now(), "yyyymmdd-HHMMSS")
+                ec = typed_ecut ? ec : something(num(ecut), parse(Float64, ec))     # the recommended one, once known
+                state[:job] = t === :convergence ?
+                    run_dftk_convergence(c; env=e, name=nm, dir=joinpath(expanduser(dir), "dftk_$(nm)_conv_$stamp"),
+                                         kspacing=parse(Float64, ks), ecutwfc=Float64(ec), pseudo=ps) :
+                    run_dftk(c; env=e, name=nm, dir=joinpath(expanduser(dir), "dftk_$(nm)_$stamp"),
+                             kspacing=parse(Float64, ks), ecutwfc=Float64(ec), pseudo=ps, bands=t === :bands,
+                             relax=dftk_relax_mode(t))
+                state[:results] = nothing
+                delete!(state, :live); delete!(state, :live_state)
+                summary[] = ""
+                v.status[] = "DFTK started in " * state[:job].dir
+                follow_job!(v, controls)
+            catch err
+                err isa InterruptException && rethrow()
+                v.status[] = "Could not start DFTK: " * sprint(showerror, err)
+            end
+        end
+        if dftk_env_ready(e)
+            start()
+        else                       # DFTK first (once), then the calculation; the cutoff hints come with it
+            state[:job] = install_dftk(e)
             state[:results] = nothing
-            delete!(state, :live); delete!(state, :live_state)
-            summary[] = ""
-            v.status[] = "DFTK started in " * state[:job].dir
+            state[:after_install] = function ()
+                @async begin
+                    try
+                        hints[] = Dict{Symbol,Any}(dftk_cutoff_hints(species_list(c); family=ps, env=e))
+                    catch err
+                        err isa InterruptException && rethrow()
+                    end
+                    start()
+                end
+            end
+            summary[] = "DFTK is not installed in $(basename(e)) yet:\ninstalling it first (a few minutes, once),\nthen the calculation starts by itself"
+            v.status[] = "Installing DFTK into $e, then running $nm"
             follow_job!(v, controls)
-        catch err
-            err isa InterruptException && rethrow()
-            v.status[] = "Could not start DFTK: " * sprint(showerror, err)
         end
     end
     Makie.on(stop.clicks) do _
@@ -351,6 +375,10 @@ function follow_job!(v::Viewer, t)
         st = show_job!(v, t)
         st === :running && return false
         job = t.state[:job]
+        after = pop!(t.state, :after_install, nothing)              # a calculation waiting for the installation
+        if job.crystal === nothing && after !== nothing
+            st === :done ? after() : (t.summary[] = "")
+        end
         lines = split(t.summary[], "\n")
         v.status[] = st === :done ? (job.crystal === nothing ? "DFTK is installed" :
                                      "DFTK finished: " * lines[min(2, end)]) :
