@@ -108,7 +108,8 @@ end
 # Quantum ESPRESSO
 
 """
-    write_qe(path, c; kspacing=0.25, ecutwfc=40, pseudo="{El}.UPF", calculation=automatic)
+    write_qe(path, c; kspacing=0.25, ecutwfc=40, pseudo="{El}.UPF", calculation=automatic, prefix, pseudo_dir="./",
+             outdir="./tmp", pseudo_files=nothing, run=false)
 
 pw.x input with `ibrav = 0`, the cell in Å and positions in crystal
 coordinates. `pseudo` is a file-name pattern in which `{El}` becomes the
@@ -119,16 +120,23 @@ Cartesian force components, which equals fixing fractional coordinates only
 when the cell axes are along x, y, z; a fully fixed atom is always exact).
 `calculation` is by default 'scf' without constraints, 'relax' for a fixed
 cell and 'vc-relax' with `cell_dofree` otherwise (see `cell_constraints_qe`).
+
+`pseudo_files` (element => file name) replaces the pattern. `run=true` adds
+what [`run_dft`](@ref) needs to read the results back: forces and stress,
+Gaussian smearing of 0.002 Ry (as DFTK's 1 mHa) and a force threshold of
+1 meV/Å.
 """
 write_qe(path::AbstractString, c::Crystal; kw...) = open(io -> write_qe(io, c; kw...), path, "w")
 
 function write_qe(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
-                  pseudo::AbstractString="{El}.UPF", calculation::Union{Nothing,AbstractString}=nothing)
+                  pseudo::AbstractString="{El}.UPF", calculation::Union{Nothing,AbstractString}=nothing,
+                  prefix::AbstractString=formula(c), pseudo_dir::AbstractString="./", outdir::AbstractString="./tmp",
+                  pseudo_files::Union{Nothing,AbstractDict}=nothing, run::Bool=false)
     spc = species_list(c)
     n = kpoint_grid(c; kspacing)
-    prefix = formula(c)
     auto, dofree, note = has_constraints(c) ? cell_constraints_qe(c) : ("scf", nothing, "")
     calculation = something(calculation, auto)
+    calculation == "vc-relax" && c.cell_constraints in (FREE_CELL, (0, 0, 0, 0, 0, 0)) && (dofree = nothing)
     println(io, "! ", isempty(c.title) ? prefix : c.title, " — written by AtomBond")
     isempty(note) || println(io, "! Constraints: ", describe_cell_constraints(c.cell_constraints), "; ", note)
     # if_pos acts on Cartesian force components: fixing fractional coordinate k
@@ -137,10 +145,14 @@ function write_qe(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
     exact(k) = (n = normalize(Vec3(B[k, :])); abs(abs(n[k]) - 1) < 1e-8)
     any(f -> any(f) && !all(f) && any(k -> f[k] && !exact(k), 1:3), c.fixed) &&
         println(io, "! Note: if_pos fixes Cartesian force components; some partly fixed atoms are approximate in this cell")
+    # run: settings for a calculation AtomBond reads back (forces, stress, a little Gaussian smearing as DFTK's,
+    # DFTK's force target of 1 meV/Å = 3.9e-5 Ry/bohr)
     println(io, "&CONTROL\n  calculation = '$calculation'\n  prefix = '$prefix'\n",
-                "  pseudo_dir = './'\n  outdir = './tmp'\n/")
+                "  pseudo_dir = '$pseudo_dir'\n  outdir = '$outdir'",
+                run ? "\n  tprnfor = .true.\n  tstress = .true.\n  forc_conv_thr = 3.9d-5\n  etot_conv_thr = 1.0d-6" : "", "\n/")
     println(io, "&SYSTEM\n  ibrav = 0\n  nat = $(natoms(c))\n  ntyp = $(length(spc))\n",
-                "  ecutwfc = $(Float64(ecutwfc))\n/")
+                "  ecutwfc = $(Float64(ecutwfc))",
+                run ? "\n  occupations = 'smearing'\n  smearing = 'gaussian'\n  degauss = 0.002" : "", "\n/")
     println(io, "&ELECTRONS\n  conv_thr = 1.0d-8\n/")
     calculation in ("relax", "vc-relax", "md", "vc-md") && println(io, "&IONS\n/")
     if calculation in ("vc-relax", "vc-md")
@@ -148,7 +160,8 @@ function write_qe(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
     end
     println(io, "ATOMIC_SPECIES")
     for s in spc
-        @printf(io, "  %-3s %10.4f  %s\n", s, atomic_mass(s), replace(pseudo, "{El}" => string(s)))
+        @printf(io, "  %-3s %10.4f  %s\n", s, atomic_mass(s),
+                pseudo_files === nothing ? replace(pseudo, "{El}" => string(s)) : pseudo_files[s])
     end
     println(io, "CELL_PARAMETERS angstrom")
     for v in cell_vectors(c.lattice)

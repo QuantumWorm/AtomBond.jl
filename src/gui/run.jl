@@ -1,15 +1,19 @@
-# Run DFTK tool: start a DFTK calculation of the current structure, follow its
-# progress and show the results when it is done (src/run/dftk.jl does the work).
+# Run calculation tool: start a calculation of the current structure with a DFT
+# engine (DFTK by default; Quantum ESPRESSO, CASTEP, …), follow its progress and
+# show the results when it is done (src/run/ does the work).
 
-"""Tasks of the Run DFTK tool."""
+"""Tasks of the Run calculation tool (each engine offers some, see `engine_tasks`)."""
 const DFTK_TASKS = [("SCF + band structure", :bands), ("SCF only", :scf), ("Relax atoms", :relax_atoms),
                     ("Relax atoms and cell", :relax_cell), ("Convergence check", :convergence)]
 
 """The `relax` setting of [`run_dftk`](@ref) for a task of the tool."""
 dftk_relax_mode(task::Symbol) = task === :relax_atoms ? :atoms : task === :relax_cell ? :cell : :auto
 
+"""The tasks of the tool `engine` can do, as menu options."""
+engine_task_options(engine) = filter(t -> t[2] in engine_tasks(dft_engine(engine)), DFTK_TASKS)
+
 """The calculation the tool will set up for `c`, in words."""
-function dftk_plan(c::Crystal, kspacing, task::Symbol=:scf)
+function dftk_plan(c::Crystal, kspacing, task::Symbol=:scf; engine::Symbol=:dftk)
     if task === :convergence
         k = kspacing === nothing ? "" : " (k-grid " * join(kpoint_grid(c; kspacing), "×") * ")"
         nk = length(convergence_kspacings(c))
@@ -23,8 +27,10 @@ function dftk_plan(c::Crystal, kspacing, task::Symbol=:scf)
                (nfix > 0 ? "\n" * plural(nfix, "atom") * " kept fixed" : "")
     elseif task === :relax_cell
         warn = any(vacuum_axes(c)) || !all(c.pbc) ? "\n⚠ vacuum in the cell: it would shrink" :
-               c.cell_constraints != FREE_CELL ? "\nWhole cell relaxes (cell constraints not applied)" :
-               "\nStress needs a converged cutoff (use high)"
+               c.cell_constraints != FREE_CELL && c.cell_constraints != (0, 0, 0, 0, 0, 0) ?
+                   (engine === :dftk ? "\nWhole cell relaxes (cell constraints not applied)" :
+                    "\nCell: " * describe_cell_constraints(c.cell_constraints)) :
+               engine === :dftk ? "\nStress needs a converged cutoff (use high)" : "\nStress needs a converged cutoff"
         return "Relaxation of the atoms and the cell\n" * plural(natoms(c), "atom") * k * warn
     end
     bands = task === :bands
@@ -51,8 +57,13 @@ end
 """
     dftk_dialog(viewer) -> NamedTuple of the tool's controls
 
-Run DFTK tool: runs the current structure in DFTK.jl in a separate Julia
-process. *Task*: an SCF with or without the band structure and dense DOS
+Run calculation tool: runs the current structure with a DFT engine in a
+separate process. *Engine*: DFTK.jl (the default, in its own Julia
+environment) or another registered engine ([`dft_engines`](@ref): Quantum
+ESPRESSO, CASTEP, or one you add); for those the *Command* field shows
+the command found ([`find_engine`](@ref)) and *Save settings* stores it,
+with the pseudopotential folder, in the settings file
+([`engine_settings_file`](@ref)). *Task*: an SCF with or without the band structure and dense DOS
 ([`run_dftk`](@ref); a relaxation when the structure has constraints), a
 relaxation of the atoms or of the atoms and the cell, or a
 convergence check of the cutoff and k-grid ([`run_dftk_convergence`](@ref)).
@@ -70,16 +81,25 @@ When the environment has no DFTK yet, *Run* installs it first
 *Install DFTK* only installs it.
 """
 function dftk_dialog(v::Viewer)
-    f = new_dialog(v, :dftk, "Run DFTK")
+    f = new_dialog(v, :dftk, "Run calculation")
     f === nothing && return nothing
-    heading!(f, "DFTK.jl calculation")
+    heading!(f, "DFT calculation")
     plan = Makie.Observable("")
     Makie.Label(f.g[nextrow!(f), 1:2], plan; halign=:left, fontsize=13, color=:gray25, justification=:left)
 
     small_button(r, k, label) = with_click_feedback!(Makie.Button(f.g[r, k]; label, width=Makie.Relative(1),
                                                                   fontsize=PANEL_FONTSIZE, padding=(6, 6, 5, 5)))
-    heading!(f, "Environment")
-    env = field!(f, "Julia environment", default_dftk_env(), s -> !isempty(strip(s)))
+    state = get!(v.dialogs, :dftk_state, Dict{Symbol,Any}())    # the job outlives the tool
+    heading!(f, "Program")
+    r = nextrow!(f)
+    Makie.Label(f.g[r, 1], "Engine"; halign=:left, fontsize=PANEL_FONTSIZE)
+    engines = [(engine_name(e), engine_id(e)) for e in dft_engines()]
+    chosen = get(state, :engine, :dftk)
+    engine = Makie.Menu(f.g[r, 2]; options=engines, i_selected=something(findfirst(e -> e[2] === chosen, engines), 1),
+                        fontsize=PANEL_FONTSIZE, width=Makie.Relative(1))
+    eng() = engine.selection[]
+    envlabel = Makie.Observable("Julia environment")
+    env = field!(f, envlabel, default_dftk_env(), s -> !isempty(strip(s)))
     envstate = Makie.Observable("")
     r = nextrow!(f)
     Makie.Label(f.g[r, 1], envstate; halign=:left, fontsize=12, color=:gray25, justification=:left)
@@ -88,7 +108,8 @@ function dftk_dialog(v::Viewer)
     heading!(f, "Calculation")
     r = nextrow!(f)
     Makie.Label(f.g[r, 1], "Task"; halign=:left, fontsize=PANEL_FONTSIZE)
-    task = Makie.Menu(f.g[r, 2]; options=DFTK_TASKS, i_selected=1, fontsize=PANEL_FONTSIZE, width=Makie.Relative(1))
+    task = Makie.Menu(f.g[r, 2]; options=engine_task_options(eng()), i_selected=1, fontsize=PANEL_FONTSIZE,
+                      width=Makie.Relative(1))
     folder = field!(f, "Folder", pwd(), s -> !isempty(strip(s)))
     name = field!(f, "Name", formula(v.crystal), s -> occursin(r"^[\w.+-]+$", strip(s)))
     kspacing = field!(f, "k-spacing (1/Å, incl. 2π)", "0.25", s -> isnum(s) && parse(Float64, s) > 0)
@@ -97,7 +118,8 @@ function dftk_dialog(v::Viewer)
     r = nextrow!(f)
     Makie.Label(f.g[r, 1], hint; halign=:left, fontsize=12, color=:gray25, justification=:left)
     use_hint = small_button(r, 2, "Use recommended")
-    pseudo = field!(f, "Pseudopotentials", DFTK_PSEUDO_FAMILY, s -> occursin("{El}", s) || occursin(r"^[\w.+-]+$", s))
+    pseudo = field!(f, "Pseudopotentials", engine_pseudo_default(dft_engine(eng())),
+                    s -> eng() !== :dftk ? !isempty(strip(s)) : occursin("{El}", s) || occursin(r"^[\w.+-]+$", s))
     r = nextrow!(f)
     run, stop = small_button(r, 1, "Run"), small_button(r, 2, "Stop")
 
@@ -110,24 +132,37 @@ function dftk_dialog(v::Viewer)
     open_result, show_dos = small_button(r, 1, "Open structure"), small_button(r, 2, "Show DOS / bands")
 
     num(t) = (x = tryparse(Float64, strip(shown_text(t))); x === nothing || x <= 0 ? nothing : x)
-    update_plan(_...) = (plan[] = dftk_plan(v.crystal, num(kspacing), task.selection[]))
+    update_plan(_...) = (plan[] = (eng() === :dftk ? "" : engine_name(dft_engine(eng())) * ": ") *
+                                  dftk_plan(v.crystal, num(kspacing), something(task.selection[], :scf); engine=eng()))
     Makie.on(update_plan, kspacing.displayed_string)
     Makie.on(update_plan, task.selection)
     Makie.on(update_plan, v.header)                  # the structure changed
     update_plan()
-    update_env(_...) = (envstate[] = dftk_env_ready(strip(shown_text(env))) ? "DFTK is installed there" :
-                                     "No DFTK there yet: Run installs\nit first (minutes, once)")
+    function update_env(_...)
+        if eng() === :dftk
+            envstate[] = engine_status(DFTKEngine(); env=strip(shown_text(env)))
+        else
+            typed = strip(shown_text(env))
+            f = find_engine(eng())
+            envstate[] = isempty(typed) ? engine_status(eng()) :
+                         f !== nothing && typed == join(f.command, " ") ? engine_status(eng()) :
+                         (command_info(typed, "").found ? "Command typed in\n(Save settings keeps it)" :
+                          "⚠ program not found:\ncheck the command")
+        end
+    end
     Makie.on(update_env, env.displayed_string)
     update_env()
 
-    state = get!(v.dialogs, :dftk_state, Dict{Symbol,Any}())    # the job outlives the tool
-    controls = (; plan, env, envstate, install, task, folder, name, kspacing, ecut, hint, use_hint, pseudo, run, stop,
+    controls = (; plan, engine, env, envlabel, envstate, install, task, folder, name, kspacing, ecut, hint, use_hint, pseudo, run, stop,
                 progress, summary, open_result, show_dos, state)
 
     # Cutoff hints: from the DFTK environment, fetched in the background (a helper process the first time).
     hints = Makie.Observable(Dict{Symbol,Any}())
-    update_hint(_...) = (hint[] = cutoff_hint_text(v.crystal, hints[], num(ecut)))
+    update_hint(_...) = (hint[] = eng() === :dftk ? cutoff_hint_text(v.crystal, hints[], num(ecut)) :
+                                  "No cutoff hints for\n" * engine_name(dft_engine(eng())) * ": check the pseudos")
     function fetch_hints(_...)
+        eng() === :dftk || return
+        ccall(:jl_generating_output, Cint, ()) == 1 && return     # no helper process while precompiling
         e, ps = strip(shown_text(env)), strip(shown_text(pseudo))
         dftk_env_ready(e) || (hints[] = Dict{Symbol,Any}(); return)
         @async try
@@ -152,6 +187,28 @@ function dftk_dialog(v::Viewer)
     update_hint()
     fetch_hints()
     state[:hints] = hints
+    # Another engine: its command (or DFTK's environment), tasks and pseudopotentials.
+    function engine_changed(id)
+        state[:engine] = id
+        if id === :dftk
+            envlabel[] = "Julia environment"
+            settext!(env, default_dftk_env())
+            install.label[] = "Install DFTK"
+        else
+            envlabel[] = "Command"
+            fnd = find_engine(id)
+            settext!(env, fnd === nothing ? "" : join(fnd.command, " "))
+            install.label[] = "Save settings"
+        end
+        settext!(pseudo, engine_pseudo_default(dft_engine(id)))
+        current = task.selection[]
+        task.options[] = engine_task_options(id)
+        k = findfirst(o -> o[2] === current, task.options[])
+        task.i_selected[] = something(k, 1)
+        update_env(); update_hint(); update_plan(); fetch_hints()
+    end
+    Makie.on(engine_changed, engine.selection)
+    eng() === :dftk || engine_changed(eng())
     show_job!(v, controls)
 
     Makie.on(use_hint.clicks) do _
@@ -163,6 +220,16 @@ function dftk_dialog(v::Viewer)
         v.status[] = @sprintf("Cutoff set to the recommended %g Ry", rec)
     end
     Makie.on(install.clicks) do _
+        if eng() !== :dftk                         # Save settings: the command and the pseudopotentials
+            cmd = form_value(v, env, "the command that runs $(engine_name(dft_engine(eng())))")
+            cmd === nothing && return
+            set_engine_setting!(eng(), "command", cmd)
+            ps = strip(shown_text(pseudo))
+            isempty(ps) || set_engine_setting!(eng(), "pseudo_dir", ps)
+            update_env()
+            v.status[] = "Saved the $(engine_name(dft_engine(eng()))) settings in " * engine_settings_file()
+            return
+        end
         e = form_value(v, env, "an environment folder")
         e === nothing && return
         busy(state) && (v.status[] = "Wait for the running job to end, or stop it"; return)
@@ -173,13 +240,33 @@ function dftk_dialog(v::Viewer)
         follow_job!(v, controls)
     end
     Makie.on(run.clicks) do _
-        vals = (form_value(v, env, "an environment folder"), form_value(v, folder, "a folder"),
+        id = eng()
+        vals = (form_value(v, env, id === :dftk ? "an environment folder" : "the command that runs the program"),
+                form_value(v, folder, "a folder"),
                 form_value(v, name, "a name"), form_value(v, kspacing, "a k-point spacing"),
                 form_value(v, ecut, "a cutoff"), form_value(v, pseudo, "pseudopotentials"))
         any(isnothing, vals) && return
-        busy(state) && (v.status[] = "A DFTK job is still running: stop it first"; return)
+        busy(state) && (v.status[] = "A calculation is still running: stop it first"; return)
         e, dir, nm, ks, ec, ps = vals
         c, t = v.crystal, task.selection[]
+        if id !== :dftk
+            ename = engine_name(dft_engine(id))
+            try
+                stamp = Dates.format(Dates.now(), "yyyymmdd-HHMMSS")
+                state[:job] = run_dft(c; engine=id, command=e, name=nm, dir=joinpath(expanduser(dir), "$(id)_$(nm)_$stamp"),
+                                      kspacing=parse(Float64, ks), ecutwfc=parse(Float64, ec), pseudo=ps,
+                                      relax=dftk_relax_mode(t))
+                state[:results] = nothing
+                delete!(state, :live); delete!(state, :live_state)
+                summary[] = ""
+                v.status[] = "$ename started in " * state[:job].dir
+                follow_job!(v, controls)
+            catch err
+                err isa InterruptException && rethrow()
+                v.status[] = "Could not start $ename: " * sprint(showerror, err)
+            end
+            return
+        end
         typed_ecut = strip(shown_text(ecut)) != auto_ecut[]
         function start()
             try
@@ -223,10 +310,10 @@ function dftk_dialog(v::Viewer)
     end
     Makie.on(stop.clicks) do _
         job = get(state, :job, nothing)
-        job !== nothing && job_status(job) === :running || (v.status[] = "No DFTK job is running"; return)
+        job !== nothing && job_status(job) === :running || (v.status[] = "No calculation is running"; return)
         stop_job!(job)
         show_job!(v, controls)
-        v.status[] = "DFTK job stopped"
+        v.status[] = "Calculation stopped"
     end
     Makie.on(open_result.clicks) do _
         r = get(state, :results, nothing)
@@ -244,7 +331,8 @@ function dftk_dialog(v::Viewer)
         end
         c = r.structure
         c = crystal_from_cartesian(c.lattice, c.species, cartesian_positions(c); pbc=c.pbc,
-                                   title=c.title * (r.calculation == "relax" ? " (DFTK relaxed)" : " (DFTK)"))
+                                   title=c.title * " (" * (isempty(r.program) ? "DFTK" : r.program) *
+                                         (r.calculation == "relax" ? " relaxed)" : ")"))
         open_in_tab!(v, c)
         v.status[] = "Opened the $(r.calculation == "relax" ? "relaxed" : "calculated") structure (not saved yet)"
     end
@@ -286,12 +374,12 @@ function dftk_dialog(v::Viewer)
             v.status[] = "Could not show the plot: " * sprint(showerror, err)
         end
     end
-    finish_dialog!(v, :dftk, "Run DFTK", f)
+    finish_dialog!(v, :dftk, "Run calculation", f)
     return controls
 end
 
 """Open the band structure and DOS (or the DOS alone) of `r` in its own window (a figure only without a window)."""
-function show_levels!(v::Viewer, r::DFTKResults, dir, base)
+function show_levels!(v::Viewer, r::DFTResults, dir, base)
     state = v.dialogs[:dftk_state]
     withbands = r.path !== nothing
     show = withbands ? (v.screen === nothing ? bands_figure : plot_bands) : (v.screen === nothing ? dos_figure : plot_dos)
@@ -303,16 +391,16 @@ end
 busy(state) = (job = get(state, :job, nothing); job !== nothing && job_status(job) === :running)
 
 """Whether `job` is a relaxation (not a convergence check)."""
-is_relax_job(job::DFTKJob) = job.crystal !== nothing && job.relax && !is_convergence_job(job)
+is_relax_job(job::DFTJob) = job.crystal !== nothing && job.relax && !is_convergence_job(job)
 
 """Whether the main window shows the relaxation tab of `h`."""
 function relax_tab_active(v::Viewer, h::RelaxHistory)
-    base = replace(h.structures[1].title, r" \(DFTK step .*\)$" => "")
+    base = replace(h.structures[1].title, r" \(\w+ step \d+\)$" => "")
     return relax_tab(v, base) == v.active
 end
 
 """Whether `job` is a convergence check."""
-is_convergence_job(job::DFTKJob) = endswith(job.results, ".convergence.toml")
+is_convergence_job(job::DFTJob) = endswith(job.results, ".convergence.toml")
 
 """Show the state of the tool's job: progress from the log, or the results when done."""
 function show_job!(v::Viewer, t)
@@ -320,11 +408,11 @@ function show_job!(v::Viewer, t)
     job === nothing && return :none
     st = job_status(job)
     secs = round(Int, time() - job.started)
-    what = job.crystal === nothing ? "Installing DFTK" : "DFTK " * basename(job.script)
+    what = job.crystal === nothing ? "Installing DFTK" : engine_name(dft_engine(job.engine)) * " " * basename(job.script)
     tail = job_log(job; n=2)
     log = isempty(tail) ? "" : "\n" * join((first(strip(l), 60) for l in tail), "\n")
     conv = job.crystal !== nothing && is_convergence_job(job)
-    relaxed = !conv && get(t.state, :results, nothing) isa DFTKResults && t.state[:results].history !== nothing
+    relaxed = !conv && get(t.state, :results, nothing) isa DFTResults && t.state[:results].history !== nothing
     t.open_result.label[] = conv ? "Use converged values" : "Open structure"
     t.show_dos.label[] = conv ? "Show plot" : relaxed ? "Show relaxation" : "Show DOS / bands"
     if st === :running
@@ -349,13 +437,13 @@ function show_job!(v::Viewer, t)
         else
             r = get(t.state, :results, nothing)
             r === nothing && (r = t.state[:results] = conv ? job_convergence(job) : job_results(job))
-            if r isa DFTKResults && r.history !== nothing && haskey(t.state, :live)   # a live window: the final steps
+            if r isa DFTResults && r.history !== nothing && haskey(t.state, :live)   # a live window: the final steps
                 length(r.history) != length(t.state[:live][]) && (t.state[:live][] = r.history)
                 t.state[:live_state][] = r.converged ? "converged" : "NOT converged"
             end
             t.progress[] = "$what: done ($secs s), files in " * basename(job.dir) * "/"
             t.summary[] = summarize(r)
-            r isa DFTKResults && r.history !== nothing && (t.show_dos.label[] = "Show relaxation")
+            r isa DFTResults && r.history !== nothing && (t.show_dos.label[] = "Show relaxation")
         end
     else
         t.progress[] = "$what: $(st === :stopped ? "stopped" : "failed, see " * basename(job.log))$log"
@@ -380,9 +468,10 @@ function follow_job!(v::Viewer, t)
             st === :done ? after() : (t.summary[] = "")
         end
         lines = split(t.summary[], "\n")
+        ename = job.crystal === nothing ? "DFTK" : engine_name(dft_engine(job.engine))
         v.status[] = st === :done ? (job.crystal === nothing ? "DFTK is installed" :
-                                     "DFTK finished: " * lines[min(2, end)]) :
-                     st === :failed ? "DFTK job failed; see " * job.log : v.status[]
+                                     "$ename finished: " * lines[min(2, end)]) :
+                     st === :failed ? "$ename failed; see " * job.log : v.status[]
         return true
     end
     return t

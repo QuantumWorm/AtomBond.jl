@@ -21,6 +21,10 @@ SIESTA and DFTK.jl.
 - Labels bond lengths, angles, dihedrals, coordinates, charges and magnetic
   moments, and detects space groups (spglib).
 - Writes DFT inputs with k-point meshes, fixed atoms and cell constraints.
+- Runs calculations and shows their results (DOS, band structure,
+  relaxation steps): DFTK.jl by default, installed on first use; Quantum
+  ESPRESSO, CASTEP or your own codes from your own installation (the
+  programs are never part of AtomBond; see *DFT engines* in the manual).
 
 ## Installation
 

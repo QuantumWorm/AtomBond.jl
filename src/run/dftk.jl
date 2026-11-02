@@ -42,13 +42,13 @@ function julia_in(env::AbstractString, args...; dir::AbstractString=pwd())
 end
 
 """
-    DFTKJob
+    DFTJob
 
 A DFTK calculation started by [`run_dftk`](@ref) (or the DFTK installation
 started by [`install_dftk`](@ref)): the process, its folder, script, log and
 results files, and the structure it was started from.
 """
-mutable struct DFTKJob
+mutable struct DFTJob
     crystal::Union{Nothing,Crystal}
     dir::String
     script::String
@@ -57,14 +57,20 @@ mutable struct DFTKJob
     process::Base.Process
     started::Float64
     stopped::Bool
-    relax::Bool              # a relaxation (it writes `name.relax.toml` step by step)
+    relax::Bool              # a relaxation (its steps can be read while it runs)
+    engine::Symbol           # :dftk, :qe, :castep, … (see `dft_engines`)
 end
 
-DFTKJob(c, dir, script, log, results, process, started, stopped) =
-    DFTKJob(c, dir, script, log, results, process, started, stopped, c !== nothing && has_constraints(c))
+DFTJob(c, dir, script, log, results, process, started, stopped) =
+    DFTJob(c, dir, script, log, results, process, started, stopped, c !== nothing && has_constraints(c))
+DFTJob(c, dir, script, log, results, process, started, stopped, relax) =
+    DFTJob(c, dir, script, log, results, process, started, stopped, relax, :dftk)
+
+"""The name `DFTJob` had before AtomBond ran other codes than DFTK."""
+const DFTKJob = DFTJob
 
 """
-    install_dftk(env=default_dftk_env()) -> DFTKJob
+    install_dftk(env=default_dftk_env()) -> DFTJob
 
 Create the DFTK environment (adds DFTK, PseudoPotentialData, AtomsBase,
 Unitful, UnitfulAtomic and GeometryOptimization, and precompiles them) in a
@@ -79,11 +85,11 @@ function install_dftk(env::AbstractString=default_dftk_env())
     proc = open(log, "w") do io
         run(pipeline(julia_in(env, "-e", code; dir=env); stdout=io, stderr=io); wait=false)
     end
-    return DFTKJob(nothing, env, "", log, "", proc, time(), false)
+    return DFTJob(nothing, env, "", log, "", proc, time(), false)
 end
 
 """
-    run_dftk(c; dir, name, env=default_dftk_env(), kspacing=0.25, ecutwfc=40, pseudo, relax=:auto) -> DFTKJob
+    run_dftk(c; dir, name, env=default_dftk_env(), kspacing=0.25, ecutwfc=40, pseudo, relax=:auto) -> DFTJob
 
 Start a DFTK calculation of `c` in the background: writes `name.jl` (see
 [`write_dftk`](@ref): an SCF, or a relaxation when `c` has constraints;
@@ -120,7 +126,7 @@ function run_dftk(c::Crystal; name::AbstractString=formula(c),
         run(pipeline(julia_in(env, script; dir); stdout=io, stderr=io); wait=false)
     end
     relaxing = relax === :auto ? has_constraints(c) : relax !== :none
-    return DFTKJob(c, dir, script, log, results, proc, time(), false, relaxing)
+    return DFTJob(c, dir, script, log, results, proc, time(), false, relaxing)
 end
 
 """
@@ -129,10 +135,10 @@ end
 `:running`, `:done` (finished and, for a calculation, wrote its results),
 `:failed` (see the log) or `:stopped` ([`stop_job!`](@ref)).
 """
-function job_status(job::DFTKJob)
+function job_status(job::DFTJob)
     process_running(job.process) && return :running
     job.stopped && return :stopped
-    ok = success(job.process) && (isempty(job.results) || isfile(job.results))
+    ok = success(job.process) && (isempty(job.results) || engine_finished(dft_engine(job.engine), job))
     return ok ? :done : :failed
 end
 
@@ -211,7 +217,7 @@ function recommended_ecut(c::Crystal; precision::Symbol=:normal, family::Abstrac
 end
 
 """Stop a running job."""
-function stop_job!(job::DFTKJob)
+function stop_job!(job::DFTJob)
     process_running(job.process) || return job
     job.stopped = true
     kill(job.process)
@@ -219,7 +225,7 @@ function stop_job!(job::DFTKJob)
 end
 
 """Wait for the job to end; returns its [`job_status`](@ref)."""
-function Base.wait(job::DFTKJob)
+function Base.wait(job::DFTJob)
     wait(job.process)
     return job_status(job)
 end
@@ -228,7 +234,7 @@ end
 The last `n` non-empty lines of the job's log (progress, or the error), as
 plain text: terminal colour codes and other control characters removed.
 """
-function job_log(job::DFTKJob; n::Integer=10)
+function job_log(job::DFTJob; n::Integer=10)
     isfile(job.log) || return String[]
     lines = filter(!isempty ∘ strip, plain_text.(readlines(job.log)))
     return lines[max(1, end - n + 1):end]
@@ -238,7 +244,7 @@ end
 plain_text(s::AbstractString) = filter(!iscntrl, replace(replace(s, r"\e\[[0-9;?]*[ -/]*[@-~]" => ""), '\t' => ' '))
 
 """
-    DFTKResults
+    DFTResults
 
 What a finished DFTK run reports (from `<name>.results.toml`). Energies in
 eV (`energy`, `terms`, `fermi`, `homo`, `lumo`; `nothing` where not known),
@@ -253,7 +259,7 @@ the band structure along the high-symmetry path ([`BandPath`](@ref));
 ([`RelaxHistory`](@ref)); with `bands=true` the levels (and `dense`, `path`)
 are those of an SCF of the relaxed structure.
 """
-struct DFTKResults
+struct DFTResults
     calculation::String
     converged::Bool
     iterations::Int
@@ -273,6 +279,32 @@ struct DFTKResults
     path::Any                 # Union{Nothing,BandPath}
     history::Any              # Union{Nothing,RelaxHistory}
     projections::Any          # Union{Nothing,OrbitalWeights}
+    program::String           # "DFTK", "Quantum ESPRESSO", "CASTEP", …
+end
+
+"""The name `DFTResults` had before AtomBond ran other codes than DFTK."""
+const DFTKResults = DFTResults
+
+"""
+    DFTResults(; calculation, converged, energy, structure, kw...)
+
+Results with only some of the fields known (what an engine's output
+gives): the rest default to empty (no levels, no forces, no history).
+"""
+function DFTResults(; calculation::AbstractString, converged::Bool, energy::Real, structure::Crystal,
+                    iterations::Integer=0, terms=Pair{String,Float64}[], fermi=nothing,
+                    forces=Vec3[], eigenvalues=Vector{Float64}[], occupations=Vector{Float64}[],
+                    kweights=Float64[], n_spin::Integer=1, version::AbstractString="", dense=nothing, path=nothing,
+                    history=nothing, projections=nothing, program::AbstractString="")
+    all_e = reduce(vcat, eigenvalues; init=Float64[])
+    below = fermi === nothing ? Float64[] : filter(<=(fermi), all_e)
+    above = fermi === nothing ? Float64[] : filter(>(fermi), all_e)
+    return DFTResults(String(calculation), converged, Int(iterations), Float64(energy), collect(terms),
+                      fermi === nothing ? nothing : Float64(fermi), isempty(below) ? nothing : maximum(below),
+                      isempty(above) ? nothing : minimum(above), collect(Vec3, forces), structure,
+                      collect(Vector{Float64}, eigenvalues), collect(Vector{Float64}, occupations),
+                      collect(Float64, kweights), Int(n_spin), String(version), dense, path, history, projections,
+                      String(program))
 end
 
 """
@@ -418,7 +450,7 @@ const HARTREE_EV = 27.211386245981          # eV (CODATA 2022)
 const HA_PER_BOHR_EV_PER_A = HARTREE_EV / BOHR
 
 """
-    read_dftk_results(path; title="") -> DFTKResults
+    read_dftk_results(path; title="") -> DFTResults
 
 Read the results file written by a DFTK script from [`write_dftk`](@ref)
 with `results=…` (as [`run_dftk`](@ref) does), and the band file next to it
@@ -443,13 +475,14 @@ function read_dftk_results(path::AbstractString; title::AbstractString="",
     terms = [k => HARTREE_EV * Float64(x) for (k, x) in get(d, "energy_terms_Ha", Dict())]
     order = ["Kinetic", "AtomicLocal", "AtomicNonlocal", "Ewald", "PspCorrection", "Hartree", "Xc", "Entropy"]
     sort!(filter!(p -> p.first != "total", terms); by=p -> something(findfirst(==(p.first), order), 100))
-    return DFTKResults(d["calculation"], d["converged"], get(d, "scf_iterations", get(d, "steps", 0)),
+    return DFTResults(d["calculation"], d["converged"], get(d, "scf_iterations", get(d, "steps", 0)),
                        HARTREE_EV * d["energy_Ha"], terms, fermi,
                        isempty(below) ? nothing : maximum(below), isempty(above) ? nothing : minimum(above),
                        [Vec3(HA_PER_BOHR_EV_PER_A .* Float64.(f)) for f in d["forces_Ha_per_bohr"]], c,
                        eigs, [Float64.(o) for o in get(d, "occupations", Any[])],
                        Float64.(get(d, "kpoint_weights", Float64[])), get(d, "n_spin", 1), get(d, "version", ""),
-                       read_bands_file(bands)..., read_relax_history(history, c), read_projections(projections))
+                       read_bands_file(bands)..., read_relax_history(history, c), read_projections(projections),
+                       "DFTK")
 end
 
 """`<name><ext>` next to `<name>.results.toml`; "" (no file) for a results file named otherwise."""
@@ -478,8 +511,12 @@ The relaxation steps a relaxation job has written so far (`name.relax.toml`
 is rewritten after every step), also while it is still running; `nothing`
 before the first step or for a job that is not a relaxation.
 """
-function job_history(job::DFTKJob)
+function job_history(job::DFTJob)
     (job.crystal === nothing || isempty(job.results)) && return nothing
+    return engine_history(dft_engine(job.engine), job)
+end
+
+function engine_history(::DFTKEngine, job)
     path = companion_file(job.results, ".relax.toml")
     isempty(path) && return nothing
     title = isempty(job.crystal.title) ? formula(job.crystal) : job.crystal.title
@@ -500,14 +537,13 @@ function relax_progress(h::RelaxHistory)
 end
 
 """The results of a finished job, or `nothing` while it runs or when it failed."""
-function job_results(job::DFTKJob)
+function job_results(job::DFTJob)
     job_status(job) === :done && isfile(job.results) || return nothing
-    title = job.crystal === nothing ? "" : (isempty(job.crystal.title) ? formula(job.crystal) : job.crystal.title)
-    return read_dftk_results(job.results; title)
+    return read_engine_results(dft_engine(job.engine), job)
 end
 
 """
-    dos(r::DFTKResults; width=0.1, step=width/10, range=nothing) -> (; energies, dos, fermi)
+    dos(r::DFTResults; width=0.1, step=width/10, range=nothing) -> (; energies, dos, fermi)
 
 Density of states from the levels of an SCF, each broadened into a Gaussian
 of standard deviation `width` (eV) and weighted with its k-point weight:
@@ -521,7 +557,7 @@ run computed them (`levels=:dense`, the default `:auto`), which also include
 more empty bands; otherwise (`:scf`) those of the SCF, whose few empty bands
 make the DOS stop a little above the Fermi level.
 """
-function dos(r::DFTKResults; width::Real=0.1, step::Real=width / 10, range=nothing, levels::Symbol=:auto)
+function dos(r::DFTResults; width::Real=0.1, step::Real=width / 10, range=nothing, levels::Symbol=:auto)
     eigs, kw = dos_levels(r, levels)
     isempty(eigs) && throw(ArgumentError("no levels in these results (a relaxation keeps none)"))
     width > 0 && step > 0 || throw(ArgumentError("width and step must be positive"))
@@ -566,7 +602,7 @@ a vector of `name => matrix` (energy × spin, states/eV per cell), in the
 order of first appearance. The curves add up to a little less than the DOS
 (the spilling of the projections).
 """
-function pdos(r::DFTKResults; by::Symbol=:element_orbital, atoms=nothing, width::Real=0.1, step::Real=width / 10,
+function pdos(r::DFTResults; by::Symbol=:element_orbital, atoms=nothing, width::Real=0.1, step::Real=width / 10,
               range=nothing)
     p = r.projections
     p === nothing && throw(ArgumentError("no orbital projections in these results"))
@@ -595,7 +631,7 @@ function pdos(r::DFTKResults; by::Symbol=:element_orbital, atoms=nothing, width:
 end
 
 """The levels and k-weights the DOS uses: `:auto` (dense when there), `:dense` or `:scf`."""
-function dos_levels(r::DFTKResults, which::Symbol=:auto)
+function dos_levels(r::DFTResults, which::Symbol=:auto)
     which in (:auto, :dense, :scf) || throw(ArgumentError("levels must be :auto, :dense or :scf"))
     which === :dense && r.dense === nothing && throw(ArgumentError("no dense-grid levels in these results"))
     use_dense = which === :dense || (which === :auto && r.dense !== nothing)
@@ -608,7 +644,7 @@ end
 The DOS ([`dos`](@ref)) as CSV: energy (eV), energy relative to the Fermi
 level, and the DOS (states/eV per cell) per spin.
 """
-function write_dos(path::AbstractString, r::DFTKResults; kw...)
+function write_dos(path::AbstractString, r::DFTResults; kw...)
     d = dos(r; kw...)
     ef = something(d.fermi, 0.0)
     open(path, "w") do io
@@ -631,7 +667,7 @@ k-grid), or an SCF level within `tol` of the Fermi level is partly filled
 enough: with smearing, the Fermi level of an insulator can sit at the top of
 the valence band and leave it slightly empty (GaAs at Γ).
 """
-function is_metallic(r::DFTKResults; tol::Real=0.003)
+function is_metallic(r::DFTResults; tol::Real=0.003)
     r.fermi === nothing && return false
     ef, full = r.fermi, 2 / r.n_spin
     for (eigs, _) in (dos_levels(r, :scf), r.dense === nothing ? (Vector{Float64}[], Float64[]) : dos_levels(r, :dense))
@@ -660,7 +696,7 @@ whether both lie at the same point of the path and `vbm_at`/`cbm_at` where
 which levels were available. `nothing` for a metal ([`is_metallic`](@ref))
 or without levels above or below the Fermi level.
 """
-function band_edges(r::DFTKResults)
+function band_edges(r::DFTResults)
     (r.fermi === nothing || is_metallic(r)) && return nothing
     ef = r.fermi
     sets = Vector{Float64}[collect(Iterators.flatten(r.eigenvalues))]
@@ -699,16 +735,16 @@ Band gap in eV ([`band_edges`](@ref): over all computed k-points), or
 ([`is_metallic`](@ref)). On a k-grid alone it can be larger than the true
 gap; the band path finds the edges between grid points.
 """
-band_gap(r::DFTKResults) = (e = band_edges(r); e === nothing ? nothing : e.gap)
+band_gap(r::DFTResults) = (e = band_edges(r); e === nothing ? nothing : e.gap)
 
 """Largest force on an atom (eV/Å), leaving out atoms clamped in a relaxation."""
-function max_force(r::DFTKResults)
+function max_force(r::DFTResults)
     free = r.history === nothing ? eachindex(r.forces) : findall(!, r.history.clamped)
     return isempty(r.forces) || isempty(free) ? 0.0 : maximum(norm, r.forces[free])
 end
 
 """A few lines summarising the results."""
-function summarize(r::DFTKResults)
+function summarize(r::DFTResults)
     lines = [@sprintf("%s %s (%s)", r.calculation == "scf" ? "SCF" : "Relaxation",
                       r.converged ? "converged" : "NOT converged",
                       plural(r.iterations, r.calculation == "scf" ? "iteration" : "step")),
@@ -743,8 +779,9 @@ function summarize(r::DFTKResults)
     return join(lines, "\n")
 end
 
-function Base.show(io::IO, ::MIME"text/plain", r::DFTKResults)
-    println(io, "DFTK results for ", formula(r.structure), " (DFTK ", r.version, ")")
+function Base.show(io::IO, ::MIME"text/plain", r::DFTResults)
+    prog = isempty(r.program) ? "DFTK" : r.program
+    println(io, prog, " results for ", formula(r.structure), " (", strip(prog * " " * r.version), ")")
     print(io, summarize(r))
 end
 
@@ -817,7 +854,7 @@ function write_dftk_convergence(io::IO, c::Crystal; ecuts, kspacings, ecutwfc::R
 end
 
 """
-    run_dftk_convergence(c; ecuts=auto, kspacings=auto, ecutwfc=auto, kspacing=0.25, dir, name, env, pseudo) -> DFTKJob
+    run_dftk_convergence(c; ecuts=auto, kspacings=auto, ecutwfc=auto, kspacing=0.25, dir, name, env, pseudo) -> DFTJob
 
 Start a convergence check of `c` in DFTK (script from `write_dftk_convergence`):
 SCF total energies for a series of cutoffs (by default around the cutoff the
@@ -847,7 +884,7 @@ function run_dftk_convergence(c::Crystal; name::AbstractString=formula(c),
     proc = open(log, "w") do io
         run(pipeline(julia_in(env, script; dir); stdout=io, stderr=io); wait=false)
     end
-    return DFTKJob(c, dir, script, log, results, proc, time(), false)
+    return DFTJob(c, dir, script, log, results, proc, time(), false)
 end
 
 """One SCF of a convergence check: cutoff (Ry), k-spacing (1/Å), k-grid, energy (eV), gap (eV) or nothing."""
@@ -889,7 +926,7 @@ function read_convergence(path::AbstractString)
 end
 
 """The convergence results of a job so far (`nothing` before the first step)."""
-job_convergence(job::DFTKJob) = isfile(job.results) && endswith(job.results, ".convergence.toml") ?
+job_convergence(job::DFTJob) = isfile(job.results) && endswith(job.results, ".convergence.toml") ?
                                 read_convergence(job.results) : nothing
 
 """

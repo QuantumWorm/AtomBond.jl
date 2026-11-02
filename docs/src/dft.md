@@ -88,8 +88,10 @@ repeat them. In code: [`fix_atoms`](@ref), [`free_atoms`](@ref),
 
 ## Running DFTK from AtomBond
 
-File → *Run DFTK…* runs the current structure in
-[DFTK.jl](https://dftk.org) (PBE, 1 mHa Gaussian smearing). *Task*: an SCF
+File → *Run calculation…* runs the current structure in
+[DFTK.jl](https://dftk.org) (PBE, 1 mHa Gaussian smearing), the default
+engine; Quantum ESPRESSO, CASTEP or a code you add run from the same tool
+(see [DFT engines](engines.md)). *Task*: an SCF
 with or without the band structure, a relaxation of the atoms (*Relax
 atoms*) or of the atoms and the cell (*Relax atoms and cell*, below), or a
 convergence check (below); an SCF becomes a relaxation when the structure
@@ -235,7 +237,7 @@ install_dftk() |> wait                     # once
 job = run_dftk(primitive_cell(load_library("Diamond")); ecutwfc=40, bands=true)
 job_status(job)                            # :running, then :done (or :failed, :stopped)
 wait(job)
-r = job_results(job)                       # DFTKResults: energy, forces, levels, structure
+r = job_results(job)                       # DFTResults: energy, forces, levels, structure
 r.energy, band_gap(r), r.structure
 d = dos(r; width=0.1)                      # energies (eV), DOS per spin, Fermi level
 write_dos("diamond.dos.csv", r)

@@ -48,7 +48,7 @@ every step (the largest force of the whole relaxation gets 2 Å).
 """
 function show_relax_step!(v::Viewer, h::RelaxHistory, k::Integer; arrows::Bool=true)
     c0 = h.structures[k]
-    base = replace(c0.title, r" \(DFTK step .*\)$" => "")
+    base = replace(c0.title, r" \(\w+ step \d+\)$" => "")
     c = Crystal(c0.lattice, c0.species, c0.frac; pbc=c0.pbc,
                 fixed=[(x, x, x) for x in h.clamped], title=base * RELAX_TAB_MARK * "$(k - 1))")
     t = relax_tab(v, base)
@@ -66,7 +66,7 @@ function show_relax_step!(v::Viewer, h::RelaxHistory, k::Integer; arrows::Bool=t
 end
 
 """
-    relax_figure(r::DFTKResults; on_step=nothing, on_bands=nothing, dir=nothing, name="relax") -> NamedTuple
+    relax_figure(r::DFTResults; on_step=nothing, on_bands=nothing, dir=nothing, name="relax") -> NamedTuple
     relax_figure(history::Observable{RelaxHistory}; state=Observable("running"), kw...) -> NamedTuple
 
 The steps of a relaxation ([`RelaxHistory`](@ref)): the energy relative to
@@ -74,7 +74,7 @@ the last step (meV) and the largest force on a free atom (eV/Å, log scale,
 DFTK's 1 meV/Å target dashed) against the step; for a cell relaxation also
 the volume change (%) and the pressure (GPa). The *Step* slider marks a
 step; `on_step(k, arrows)` is called when it or the *Force arrows* switch
-changes (the Run DFTK tool shows that step in the main window). With
+changes (the Run calculation tool shows that step in the main window). With
 `on_bands` (called without arguments) a *Band structure / DOS* button is
 added, for a run that computed them for the relaxed structure. With `dir`,
 Save writes `name.relax.png` there.
@@ -85,7 +85,7 @@ moves on to the newest step when it was on the last one; such automatic
 moves call `on_new_step(k, arrows)` instead of `on_step`. `state` is shown in
 the subtitle ("running", "converged", …).
 """
-function relax_figure(r::DFTKResults; kw...)
+function relax_figure(r::DFTResults; kw...)
     r.history === nothing && throw(ArgumentError("no relaxation steps in these results"))
     return relax_figure(Makie.Observable(r.history); state=Makie.Observable(r.converged ? "converged" : "NOT converged"),
                         kw...)
@@ -96,7 +96,7 @@ function relax_figure(history::Makie.Observable{RelaxHistory}; state=Makie.Obser
     h0 = history[]
     fig = Makie.Figure(; size=(760, variable_cell(h0) ? 760 : 600), backgroundcolor=:white)
     heading = Makie.GridLayout(fig[0, 1]; tellwidth=false)
-    Makie.Label(heading[1, 1], "Relaxation of " * replace(h0.structures[1].title, r" \(DFTK step .*\)$" => "");
+    Makie.Label(heading[1, 1], "Relaxation of " * replace(h0.structures[1].title, r" \(\w+ step \d+\)$" => "");
                 font=:bold, fontsize=16)
     sub = Makie.lift((h, s) -> @sprintf("%s, energy change %.4f eV, %s", plural(length(h) - 1, "step"),
                                         last(h.energies) - first(h.energies), s), history, state)
@@ -204,7 +204,7 @@ end
 """
     plot_relaxation(r; kw...) -> NamedTuple
 
-Open the relaxation steps ([`relax_figure`](@ref); `r` is a `DFTKResults` or
+Open the relaxation steps ([`relax_figure`](@ref); `r` is a `DFTResults` or
 an `Observable{RelaxHistory}`) in their own window.
 """
 function plot_relaxation(r; kw...)

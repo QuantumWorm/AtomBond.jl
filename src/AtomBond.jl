@@ -41,7 +41,10 @@ include("io/export.jl")
 include("io/atomsbase.jl")
 include("io/load.jl")
 include("io/library.jl")
+include("run/engines.jl")
 include("run/dftk.jl")
+include("run/qe.jl")
+include("run/castep.jl")
 
 include("analysis/neighbors.jl")
 include("analysis/bonds.jl")
@@ -96,10 +99,14 @@ export read_xdatcar, read_vasprun, read_pdb, write_pdb, read_lammps_data, write_
 export read_car, write_car, read_xsd, read_res, write_res
 export kpoint_grid, write_kpoints, write_vasp_inputs, write_qe, write_abinit, write_siesta, write_dftk, write_castep, write_cif, export_inputs
 export to_atomsbase, from_atomsbase
-export run_dftk, install_dftk, default_dftk_env, dftk_env_ready, dftk_cutoff_hints, recommended_ecut, DFTKJob, job_status, job_log, job_results, job_history, stop_job!
+export run_dftk, install_dftk, default_dftk_env, dftk_env_ready, dftk_cutoff_hints, recommended_ecut, DFTJob, job_status, job_log, job_results, job_history, stop_job!
 export run_dftk_convergence, read_convergence, job_convergence, converged_settings, ConvergenceResults, ConvergenceStep
 export convergence_figure, plot_convergence, relax_figure, plot_relaxation, show_forces!
-export DFTKResults, DenseLevels, BandPath, RelaxHistory, pressure, max_stress, cell_change, variable_cell, OrbitalWeights, pdos, read_dftk_results, band_gap, band_edges, is_metallic, dos, write_dos, dos_figure, plot_dos, write_bands, bands_figure, plot_bands
+export DFTEngine, register_engine!, dft_engines, dft_engine, find_engine, engine_status, run_dft
+export engine_id, engine_name, write_engine_inputs, read_engine_results, engine_executables, engine_command
+export engine_tasks, engine_finished, engine_history, engine_pseudo_default, engine_install_hint
+export engine_settings_file, engine_setting, set_engine_setting!, read_qe_results, read_castep_results, DFTKResults, DFTKJob
+export DFTResults, DenseLevels, BandPath, RelaxHistory, pressure, max_stress, cell_change, variable_cell, OrbitalWeights, pdos, read_dftk_results, band_gap, band_edges, is_metallic, dos, write_dos, dos_figure, plot_dos, write_bands, bands_figure, plot_bands
 # analysis
 export Bond, find_bonds, coordination, neighbor_pairs, bond_cutoff
 export spacegroup, symmetry_dataset, symmetrize, primitive_cell, conventional_cell

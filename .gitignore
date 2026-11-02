@@ -14,3 +14,8 @@ scratch/
 
 # Built documentation
 docs/build/
+
+# Calculation folders made by the Run calculation tool (run_dft / run_dftk) when started here
+dftk_*/
+qe_*/
+castep_*/

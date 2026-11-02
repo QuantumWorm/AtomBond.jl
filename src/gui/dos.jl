@@ -10,7 +10,7 @@ const PDOS_GROUPINGS = [("No projection", :none), ("Element and orbital", :eleme
                         ("Orbital (s, p, d)", :orbital), ("Each atom", :atom)]
 
 """The projection choices for `r` (each atom only for up to 12 atoms)."""
-pdos_choices(r::DFTKResults) = r.projections === nothing ? PDOS_GROUPINGS[1:1] :
+pdos_choices(r::DFTResults) = r.projections === nothing ? PDOS_GROUPINGS[1:1] :
                                filter(o -> o[2] !== :atom || natoms(r.structure) <= 12, PDOS_GROUPINGS)
 
 """
@@ -18,7 +18,7 @@ Draw the projected DOS of `r` grouped `by` on `ax` (energies relative to
 `ef`; `horizontal`: DOS along x), replacing the earlier curves in `plots`
 and the legend in `legend`.
 """
-function draw_pdos!(ax, plots, legend, r::DFTKResults, by::Symbol, width::Real, ef; horizontal::Bool=false)
+function draw_pdos!(ax, plots, legend, r::DFTResults, by::Symbol, width::Real, ef; horizontal::Bool=false)
     foreach(p -> delete!(ax, p), plots)
     empty!(plots)
     legend[] === nothing || delete!(legend[])
@@ -40,7 +40,7 @@ function draw_pdos!(ax, plots, legend, r::DFTKResults, by::Symbol, width::Real, 
 end
 
 """
-    dos_figure(r::DFTKResults; width=0.1, title="", dir=nothing, name="dos") -> (; figure, axis, width, save, ...)
+    dos_figure(r::DFTResults; width=0.1, title="", dir=nothing, name="dos") -> (; figure, axis, width, save, ...)
 
 A figure with the density of states of `r` ([`dos`](@ref)) against the
 energy relative to the Fermi level: the filled states (below the Fermi
@@ -53,7 +53,7 @@ levels by an empty range of more than `deep_gap` eV, 5 by default) are left
 out of the view unless *Show deep levels* is on; the CSV always has them. With `dir`, a Save button writes `name.dos.png`
 and `name.dos.csv` there. The figure is not displayed; see [`plot_dos`](@ref).
 """
-function dos_figure(r::DFTKResults; width::Real=0.1, title::AbstractString="", dir=nothing, name::AbstractString="dos",
+function dos_figure(r::DFTResults; width::Real=0.1, title::AbstractString="", dir=nothing, name::AbstractString="dos",
                     deep_gap::Real=5, projection::Symbol=:element_orbital)
     isempty(r.eigenvalues) && throw(ArgumentError("no levels in these results (a relaxation keeps none)"))
     fig = Makie.Figure(; size=(760, 520), backgroundcolor=:white)
@@ -132,7 +132,7 @@ end
 Lowest valence level (eV) when deep (semicore) levels lie below it, separated
 by an empty range wider than `gap` eV below the Fermi level; otherwise `nothing`.
 """
-function deep_levels_edge(r::DFTKResults; gap::Real=5)
+function deep_levels_edge(r::DFTResults; gap::Real=5)
     ef = something(r.fermi, Inf)
     levels = sort(filter(<(ef), collect(Iterators.flatten(r.eigenvalues))))
     length(levels) < 2 && return nothing
@@ -141,12 +141,12 @@ function deep_levels_edge(r::DFTKResults; gap::Real=5)
 end
 
 """
-    plot_dos(r::DFTKResults; kw...) -> NamedTuple
+    plot_dos(r::DFTResults; kw...) -> NamedTuple
 
 Open the DOS of `r` in its own window ([`dos_figure`](@ref) with the same
 keywords).
 """
-function plot_dos(r::DFTKResults; kw...)
+function plot_dos(r::DFTResults; kw...)
     d = dos_figure(r; kw...)
     GLMakie.activate!()
     display(GLMakie.Screen(; title="DOS — " * formula(r.structure)), d.figure)
@@ -160,7 +160,7 @@ The band structure of `r` ([`BandPath`](@ref)) as CSV: distance along the
 path (1/Å), the label of the point (if any), then every band (eV, relative to
 the Fermi level), spin up first for a spin-polarized run.
 """
-function write_bands(path::AbstractString, r::DFTKResults)
+function write_bands(path::AbstractString, r::DFTResults)
     p = r.path
     p === nothing && throw(ArgumentError("no band structure in these results"))
     ef = something(r.fermi, 0.0)
@@ -190,7 +190,7 @@ function band_lines(p::BandPath, m::AbstractMatrix, ef)
 end
 
 """
-    bands_figure(r::DFTKResults; width=0.1, window=nothing, title="", dir=nothing, name="bands") -> NamedTuple
+    bands_figure(r::DFTResults; width=0.1, window=nothing, title="", dir=nothing, name="bands") -> NamedTuple
 
 The band structure of `r` along the high-symmetry path (left) next to the
 DOS (right, sideways) on a shared energy axis relative to the Fermi level
@@ -204,7 +204,7 @@ The DOS panel shows the projected DOS ([`pdos`](@ref)) as coloured curves when
 the run has orbital projections (*Projected DOS* menu, `projection`).
 Not displayed; see [`plot_bands`](@ref).
 """
-function bands_figure(r::DFTKResults; width::Real=0.1, window=nothing, title::AbstractString="", dir=nothing,
+function bands_figure(r::DFTResults; width::Real=0.1, window=nothing, title::AbstractString="", dir=nothing,
                       name::AbstractString="bands", projection::Symbol=:element_orbital)
     p = r.path
     p === nothing && throw(ArgumentError("no band structure in these results (run with bands=true)"))
@@ -302,12 +302,12 @@ function bands_figure(r::DFTKResults; width::Real=0.1, window=nothing, title::Ab
 end
 
 """
-    plot_bands(r::DFTKResults; kw...) -> NamedTuple
+    plot_bands(r::DFTResults; kw...) -> NamedTuple
 
 Open the band structure and DOS of `r` in their own window
 ([`bands_figure`](@ref) with the same keywords).
 """
-function plot_bands(r::DFTKResults; kw...)
+function plot_bands(r::DFTResults; kw...)
     d = bands_figure(r; kw...)
     GLMakie.activate!()
     display(GLMakie.Screen(; title="Bands — " * formula(r.structure)), d.figure)
