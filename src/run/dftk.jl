@@ -122,6 +122,80 @@ function job_status(job::DFTKJob)
     return ok ? :done : :failed
 end
 
+# --- recommended cutoffs ------------------------------------------------------------
+
+"""Cutoff hints (Ha) per (family, element), filled by [`dftk_cutoff_hints`](@ref)."""
+const CUTOFF_HINTS = Dict{Tuple{String,Symbol},NamedTuple{(:low, :normal, :high),NTuple{3,Float64}}}()
+
+"""
+    dftk_cutoff_hints(elements; family=DFTK_PSEUDO_FAMILY, env=default_dftk_env()) -> Dict
+
+The kinetic-energy cutoffs (Ha) the pseudopotential family recommends for
+each element, `element => (; low, normal, high)` (PseudoDojo publishes these
+three levels; families with a single value give it for all three). They
+come from PseudoPotentialData in the DFTK environment, read by a short
+helper process (which downloads the family the first time), and are kept
+for the session. Elements the family lacks, or a family without hints
+(e.g. a `{El}` file pattern), are left out.
+"""
+function dftk_cutoff_hints(elements; family::AbstractString=DFTK_PSEUDO_FAMILY,
+                           env::AbstractString=default_dftk_env())
+    els = unique(Symbol.(collect(elements)))
+    occursin("{El}", family) && return Dict{Symbol,eltype(values(CUTOFF_HINTS))}()
+    missing_els = filter(e -> !haskey(CUTOFF_HINTS, (family, e)), els)
+    if !isempty(missing_els) && dftk_env_ready(env)
+        code = """
+        using PseudoPotentialData, TOML
+        f = PseudoFamily(ARGS[1]); out = Dict{String,Any}()
+        for el in ARGS[2:end]
+            m = try pseudometa(f, Symbol(el)) catch; continue end
+            e0 = get(m, "Ecut", 0)
+            out[el] = Dict(k => get(get(m, "cutoffs_" * k, Dict()), "Ecut", e0) for k in ("low", "normal", "high"))
+        end
+        TOML.print(out)
+        """
+        text = try
+            read(pipeline(julia_in(env, "-e", code, family, string.(missing_els)...); stderr=devnull), String)
+        catch
+            ""
+        end
+        merge!(CUTOFF_HINTS, parse_cutoff_hints(text, family))
+    end
+    return Dict(e => CUTOFF_HINTS[(family, e)] for e in els if haskey(CUTOFF_HINTS, (family, e)))
+end
+
+"""Hints from the helper's TOML output (element tables with low/normal/high Ecut, Ha)."""
+function parse_cutoff_hints(text::AbstractString, family::AbstractString)
+    d = try
+        TOML.parse(text)
+    catch
+        Dict{String,Any}()
+    end
+    out = Dict{Tuple{String,Symbol},NamedTuple{(:low, :normal, :high),NTuple{3,Float64}}}()
+    for (el, v) in d
+        v isa Dict && all(k -> get(v, k, 0) isa Real && get(v, k, 0) > 0, ("low", "normal", "high")) || continue
+        out[(family, Symbol(el))] = (low=Float64(v["low"]), normal=Float64(v["normal"]), high=Float64(v["high"]))
+    end
+    return out
+end
+
+"""
+    recommended_ecut(c; precision=:normal, family, env) -> cutoff in Ry, or nothing
+
+The cutoff for `c`: the largest recommendation ([`dftk_cutoff_hints`](@ref))
+among its elements at `precision` (`:low`, `:normal` or `:high`), in Ry
+(twice the Ha value, as the tools and `ecutwfc` use Ry). `nothing` when
+there are no hints for some element.
+"""
+function recommended_ecut(c::Crystal; precision::Symbol=:normal, family::AbstractString=DFTK_PSEUDO_FAMILY,
+                          env::AbstractString=default_dftk_env())
+    precision in (:low, :normal, :high) || throw(ArgumentError("precision must be :low, :normal or :high"))
+    els = species_list(c)
+    hints = dftk_cutoff_hints(els; family, env)
+    all(e -> haskey(hints, e), els) || return nothing
+    return 2 * maximum(getproperty(hints[e], precision) for e in els)
+end
+
 """Stop a running job."""
 function stop_job!(job::DFTKJob)
     process_running(job.process) || return job
@@ -439,4 +513,205 @@ end
 function Base.show(io::IO, ::MIME"text/plain", r::DFTKResults)
     println(io, "DFTK results for ", formula(r.structure), " (DFTK ", r.version, ")")
     print(io, summarize(r))
+end
+
+# --- convergence check -----------------------------------------------------------------
+
+"""Cutoffs (Ry) for a convergence check: around the recommended one, or a fixed series without hints."""
+function convergence_cutoffs(recommended::Union{Nothing,Real})
+    recommended === nothing && return [20.0, 30.0, 40.0, 50.0, 60.0, 80.0, 100.0]
+    return unique([2 * round(f * recommended / 2) for f in (0.5, 0.625, 0.75, 0.875, 1.0, 1.25, 1.5)])
+end
+
+"""k-spacings (1/Å) for a convergence check, coarse to fine, keeping one per distinct k-grid of `c`."""
+function convergence_kspacings(c::Crystal; spacings=(0.6, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15))
+    seen, out = Set{NTuple{3,Int}}(), Float64[]
+    for s in spacings
+        g = kpoint_grid(c; kspacing=s)
+        g in seen && continue
+        push!(seen, g); push!(out, s)
+    end
+    return out
+end
+
+"""
+    write_dftk_convergence(io, c; ecuts, kspacings, ecutwfc, kspacing, pseudo, results)
+
+A DFTK script that runs one SCF per cutoff in `ecuts` (Ry) at the k-grid of
+`kspacing`, then one per k-spacing in `kspacings` at the cutoff `ecutwfc`
+(Ry), and writes energy, Fermi level, band edges and SCF convergence of each
+to `results` (TOML) after every step, for [`read_convergence`](@ref).
+Constraints are ignored (no relaxation).
+"""
+function write_dftk_convergence(io::IO, c::Crystal; ecuts, kspacings, ecutwfc::Real=40, kspacing::Real=0.25,
+                                pseudo::AbstractString=DFTK_PSEUDO_FAMILY, results::AbstractString="convergence.toml")
+    title = isempty(c.title) ? formula(c) : c.title
+    println(io, "# ", title, " — DFTK.jl convergence check written by AtomBond")
+    println(io, "using DFTK, PseudoPotentialData, AtomsBase, Unitful, UnitfulAtomic")
+    println(io, "import TOML")
+    write_dftk_system(io, c, pseudo)
+    println(io, "model = model_DFT(system; model_kwargs...)")
+    println(io, "\n# (series, cutoff in Ry, k-spacing in 1/Å, k-grid)")
+    println(io, "steps = [")
+    for e in ecuts
+        @printf(io, "    (\"cutoff\", %.2f, %.4f, [%d, %d, %d]),\n", e, kspacing, kpoint_grid(c; kspacing)...)
+    end
+    for s in kspacings
+        @printf(io, "    (\"kpoints\", %.2f, %.4f, [%d, %d, %d]),\n", ecutwfc, s, kpoint_grid(c; kspacing=s)...)
+    end
+    println(io, "]")
+    print(io, """
+    rows = Dict{String,Any}[]
+    for (series, ecut_Ry, kspacing, kgrid) in steps
+        basis = PlaneWaveBasis(model; Ecut=ecut_Ry / 2, kgrid)
+        scfres = self_consistent_field(basis; ρ=guess_density(basis, system), tol=1e-8)
+        eigs = reduce(vcat, scfres.eigenvalues)
+        below, above = filter(<=(scfres.εF), eigs), filter(>(scfres.εF), eigs)
+        row = Dict{String,Any}("series" => series, "ecut_Ry" => ecut_Ry, "kspacing" => kspacing, "kgrid" => kgrid,
+                               "n_kpoints" => length(basis.kpoints), "energy_Ha" => scfres.energies.total,
+                               "converged" => scfres.converged, "iterations" => scfres.n_iter,
+                               "fermi_level_Ha" => scfres.εF)
+        isempty(below) || (row["homo_Ha"] = maximum(below))
+        isempty(above) || (row["lumo_Ha"] = minimum(above))
+        push!(rows, row)
+        out = Dict{String,Any}("program" => "DFTK", "version" => string(pkgversion(DFTK)), "natoms" => length(system),
+                               "planned" => length(steps), "steps" => rows)
+        open(io -> TOML.print(io, out), joinpath(@__DIR__, $(repr(String(results)))), "w")
+        println("AtomBond convergence step ", length(rows), "/", length(steps), ": ", series, " ",
+                ecut_Ry, " Ry, k-grid ", join(kgrid, "×"), ", E = ", scfres.energies.total, " Ha")
+    end
+    """)
+end
+
+"""
+    run_dftk_convergence(c; ecuts=auto, kspacings=auto, ecutwfc=auto, kspacing=0.25, dir, name, env, pseudo) -> DFTKJob
+
+Start a convergence check of `c` in DFTK (script from `write_dftk_convergence`):
+SCF total energies for a series of cutoffs (by default around the cutoff the
+pseudopotentials recommend, [`recommended_ecut`](@ref), from half to 1.5
+times it) at the k-grid of `kspacing`, and for a series of k-spacings (one
+per distinct k-grid; none for a molecule) at the cutoff `ecutwfc` (default:
+the recommended one, or 40 Ry). The results go to `name.convergence.toml`;
+read them with [`job_convergence`](@ref) or [`read_convergence`](@ref).
+"""
+function run_dftk_convergence(c::Crystal; name::AbstractString=formula(c),
+                              dir::AbstractString=joinpath(pwd(), "dftk_" * name * "_conv_" *
+                                                           Dates.format(Dates.now(), "yyyymmdd-HHMMSS")),
+                              env::AbstractString=default_dftk_env(), pseudo::AbstractString=DFTK_PSEUDO_FAMILY,
+                              ecuts=nothing, kspacings=nothing, ecutwfc=nothing, kspacing::Real=0.25)
+    dftk_env_ready(env) || throw(ArgumentError("no DFTK environment at $env; create it with install_dftk()"))
+    occursin(r"^[\w.+-]+$", name) || throw(ArgumentError("use letters, digits, . + - _ in the name"))
+    rec = ecuts === nothing || ecutwfc === nothing ? recommended_ecut(c; family=pseudo, env) : nothing
+    ecuts = ecuts === nothing ? convergence_cutoffs(rec) : Float64.(collect(ecuts))
+    ecutwfc = ecutwfc === nothing ? something(rec, 40.0) : Float64(ecutwfc)
+    kspacings = kspacings === nothing ? convergence_kspacings(c) : Float64.(collect(kspacings))
+    length(unique(kpoint_grid(c; kspacing=s) for s in kspacings)) > 1 || (kspacings = Float64[])
+    mkpath(dir)
+    script, log, results = (joinpath(dir, name * ext) for ext in (".conv.jl", ".conv.log", ".convergence.toml"))
+    isfile(results) && rm(results)
+    open(io -> write_dftk_convergence(io, c; ecuts, kspacings, ecutwfc, kspacing, pseudo, results=basename(results)),
+         script, "w")
+    proc = open(log, "w") do io
+        run(pipeline(julia_in(env, script; dir); stdout=io, stderr=io); wait=false)
+    end
+    return DFTKJob(c, dir, script, log, results, proc, time(), false)
+end
+
+"""One SCF of a convergence check: cutoff (Ry), k-spacing (1/Å), k-grid, energy (eV), gap (eV) or nothing."""
+struct ConvergenceStep
+    series::String
+    ecut::Float64
+    kspacing::Float64
+    kgrid::NTuple{3,Int}
+    nkpoints::Int
+    energy::Float64
+    converged::Bool
+    gap::Union{Nothing,Float64}
+end
+
+"""
+    ConvergenceResults
+
+A convergence check read by [`read_convergence`](@ref): `natoms`, the SCF
+`steps` ([`ConvergenceStep`](@ref)) of the `"cutoff"` and `"kpoints"`
+series, `planned` (all steps of the run; fewer are present while it runs)
+and the DFTK `version`.
+"""
+struct ConvergenceResults
+    natoms::Int
+    steps::Vector{ConvergenceStep}
+    planned::Int
+    version::String
+end
+
+"""Read a `name.convergence.toml` (also while the check is still running)."""
+function read_convergence(path::AbstractString)
+    d = TOML.parsefile(path)
+    steps = map(get(d, "steps", Any[])) do s
+        gap = haskey(s, "homo_Ha") && haskey(s, "lumo_Ha") ? HARTREE_EV * (s["lumo_Ha"] - s["homo_Ha"]) : nothing
+        ConvergenceStep(s["series"], s["ecut_Ry"], s["kspacing"], Tuple(Int.(s["kgrid"])), get(s, "n_kpoints", 0),
+                        HARTREE_EV * s["energy_Ha"], s["converged"], gap)
+    end
+    return ConvergenceResults(d["natoms"], steps, get(d, "planned", length(steps)), get(d, "version", ""))
+end
+
+"""The convergence results of a job so far (`nothing` before the first step)."""
+job_convergence(job::DFTKJob) = isfile(job.results) && endswith(job.results, ".convergence.toml") ?
+                                read_convergence(job.results) : nothing
+
+"""
+    convergence_series(cr, series) -> (; parameter, energy_error, gap, steps)
+
+The steps of one series (`"cutoff"`: by cutoff, ascending; `"kpoints"`: by
+k-spacing, coarse to fine) with each energy's difference from the most
+accurate one (highest cutoff, densest grid) in meV per atom.
+"""
+function convergence_series(cr::ConvergenceResults, series::AbstractString)
+    st = filter(s -> s.series == series, cr.steps)
+    sort!(st; by=s -> series == "cutoff" ? s.ecut : -s.kspacing)
+    isempty(st) && return (; parameter=Float64[], energy_error=Float64[], gap=Union{Nothing,Float64}[], steps=st)
+    ref = last(st).energy
+    return (; parameter=[series == "cutoff" ? s.ecut : s.kspacing for s in st],
+            energy_error=[1000 * (s.energy - ref) / cr.natoms for s in st], gap=[s.gap for s in st], steps=st)
+end
+
+"""
+    converged_settings(cr; tol=1.0) -> (; ecut, kspacing)
+
+The smallest cutoff (Ry) and the largest k-spacing (1/Å) whose total energy,
+and that of every more accurate step of the series, is within `tol` meV per
+atom of the most accurate one; `nothing` for a series that is missing or
+not converged within its range (only its most accurate step qualifies).
+"""
+function converged_settings(cr::ConvergenceResults; tol::Real=1.0)
+    function first_ok(series)
+        s = convergence_series(cr, series)
+        length(s.steps) < 2 && return nothing
+        for i in 1:length(s.steps) - 1
+            all(abs(e) <= tol for e in s.energy_error[i:end]) && return s.parameter[i]
+        end
+        return nothing
+    end
+    return (; ecut=first_ok("cutoff"), kspacing=first_ok("kpoints"))
+end
+
+"""A few lines summarising a convergence check."""
+function summarize(cr::ConvergenceResults; tol::Real=1.0)
+    rec = converged_settings(cr; tol)
+    lines = ["Convergence check: $(length(cr.steps)) of $(cr.planned) SCF runs" *
+             (any(s -> !s.converged, cr.steps) ? " (some SCF NOT converged)" : "")]
+    for (series, what, unit) in (("cutoff", "Cutoff", "Ry"), ("kpoints", "k-spacing", "1/Å"))
+        s = convergence_series(cr, series)
+        isempty(s.steps) && continue
+        val = series == "cutoff" ? rec.ecut : rec.kspacing
+        push!(lines, val === nothing ? @sprintf("%s: not within %g meV/atom below %g %s", what, tol, last(s.parameter), unit) :
+                     @sprintf("%s: %g %s is within %g meV/atom", what, val, unit, tol) *
+                     (series == "kpoints" ? " (k-grid " * join(s.steps[findfirst(==(val), s.parameter)].kgrid, "×") * ")" : ""))
+    end
+    return join(lines, "\n")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", cr::ConvergenceResults)
+    println(io, "DFTK convergence check (DFTK ", cr.version, ")")
+    print(io, summarize(cr))
 end

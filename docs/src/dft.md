@@ -87,8 +87,10 @@ repeat them. In code: [`fix_atoms`](@ref), [`free_atoms`](@ref),
 ## Running DFTK from AtomBond
 
 File → *Run DFTK…* runs the current structure in
-[DFTK.jl](https://dftk.org): an SCF, or a relaxation when the structure has
-constraints (the same script as the DFTK export). The calculation runs in a
+[DFTK.jl](https://dftk.org) (PBE, 1 mHa Gaussian smearing). *Task*: an SCF
+with or without the band structure, or a convergence check (below); an SCF
+becomes a relaxation when the structure has constraints (the same script as
+the DFTK export). The calculation runs in a
 separate Julia process, so the window stays usable; the tool shows the last
 lines of the log while it runs and, when it is done, a summary:
 
@@ -138,6 +140,29 @@ Unitful, UnitfulAtomic, GeometryOptimization; several minutes, mostly
 compiling). The PseudoDojo pseudopotentials are downloaded by
 PseudoPotentialData on the first run.
 
+**Cutoff.** The cutoff line of the tool shows what the pseudopotential
+family recommends for the elements of the structure — PseudoDojo gives a
+low, normal and high cutoff per element; the structure needs the largest
+of its elements — e.g. "Recommended 84 Ry (low 76, high 96)" for GaAs, and
+warns when the cutoff is below the low one. *Use recommended* puts the
+normal value in. The hints come from PseudoPotentialData in the DFTK
+environment ([`dftk_cutoff_hints`](@ref), [`recommended_ecut`](@ref)); a
+`{El}` file pattern has none.
+
+**Convergence check.** Task *Convergence check* runs one SCF per cutoff (7
+values from half to 1.5 times the recommended one, at the k-grid of the
+form's k-spacing) and one per k-grid (k-spacings 0.6 to 0.15 1/Å, one per
+distinct grid, at the form's cutoff; none for a molecule). Each total
+energy is compared with the most accurate of its series; the converged
+values are the smallest cutoff and largest k-spacing within 1 meV per atom
+(for those and every more accurate step). The summary updates while it
+runs; *Use converged values* puts them in the form and *Show plot* shows
+|ΔE| per atom (log scale) and the gap against cutoff and k-spacing. The gap
+on a k-grid jumps with the grid when the band edges lie between grid
+points (silicon); the band structure gives the real gap. Silicon (PseudoDojo,
+PBE): 32 Ry and a 9×9×9 grid (k-spacing 0.25) are within 1 meV/atom, in
+14 SCF runs and about 2 minutes. Constraints are ignored in the check.
+
 From Julia code:
 
 ```julia
@@ -154,6 +179,14 @@ plot_dos(r)                                # the DOS window
 band_edges(r)                              # VBM, CBM, gap, direct?, where (from the band path)
 write_bands("diamond.bands.csv", r)
 plot_bands(r)                              # bands + DOS window
+
+c = primitive_cell(load_library("Silicon"))
+recommended_ecut(c)                        # 36.0 Ry (PseudoDojo normal)
+cj = run_dftk_convergence(c; kspacing=0.3) # cutoff and k-grid series
+wait(cj)
+cr = job_convergence(cj)
+converged_settings(cr)                     # (ecut = 32.0, kspacing = 0.25)
+plot_convergence(cr)
 ```
 
 ## DFTK and AtomsBase

@@ -372,33 +372,7 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
     println(io, "# Unitful and UnitfulAtomic", relax ? " (and GeometryOptimization for the relaxation)." : ".")
     println(io, "using DFTK, PseudoPotentialData, AtomsBase, Unitful, UnitfulAtomic")
     relax && println(io, "using GeometryOptimization")
-    all(c.pbc) || println(io, "\n# Not periodic along every axis in AtomBond: DFTK treats the cell as periodic, ",
-                             "so keep enough vacuum.")
-    println(io, "\n# Cell vectors and Cartesian positions (Å)")
-    println(io, "cell_vectors = [")
-    for v in cell_vectors(c.lattice)
-        @printf(io, "    [%.10f, %.10f, %.10f],\n", v...)
-    end
-    println(io, "]u\"Å\"")
-    println(io, "atoms = [")
-    for (i, (s, r)) in enumerate(zip(c.species, cartesian_positions(c)))
-        props = String[]
-        m = c.magmoms[i]
-        isnan(m) || push!(props, @sprintf("magnetic_moment=%.4f", m))
-        relax && all(c.fixed[i]) && push!(props, "clamp=true")
-        @printf(io, "    Atom(:%s, [%.10f, %.10f, %.10f]u\"Å\"%s),\n", s, r..., isempty(props) ? "" : "; " * join(props, ", "))
-    end
-    println(io, "]")
-    println(io, "system = periodic_system(atoms, cell_vectors)")
-    any(!isnan, c.magmoms) && println(io, "# Initial magnetic moments (μB) on the atoms make the run spin-polarized.")
-
-    println(io, "\n# Model and basis (check Ecut against your pseudopotentials)")
-    if occursin("{El}", pseudo)
-        println(io, "pseudopotentials = Dict(", join((":$s => \"$(replace(pseudo, "{El}" => string(s)))\"" for s in spc), ", "), ")")
-    else
-        println(io, "pseudopotentials = PseudoFamily(\"", pseudo, "\")")
-    end
-    println(io, "model_kwargs = (; functionals=PBE(), pseudopotentials, temperature=1e-3, smearing=Smearing.Gaussian())")
+    write_dftk_system(io, c, pseudo; clamp=relax)
     n = kpoint_grid(c; kspacing)
     @printf(io, "basis_kwargs = (; Ecut=%.2f, kgrid=[%d, %d, %d])  # Ecut in Ha (= %.2f Ry); k-spacing %s 1/Å\n",
             ecutwfc / 2, n..., ecutwfc, kspacing)
@@ -434,6 +408,41 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
     println(io, "# To open the relaxed structure in AtomBond:")
     println(io, "#   using AtomBond; save_structure(\"relaxed.xyz\", from_atomsbase(relaxed))")
     results === nothing || write_dftk_results_code(io, results, :relax)
+end
+
+"""
+The structure (`system`), the pseudopotentials and `model_kwargs` (PBE, a
+little Gaussian smearing) of a DFTK script; `clamp` marks fully fixed atoms.
+"""
+function write_dftk_system(io::IO, c::Crystal, pseudo::AbstractString; clamp::Bool=false)
+    spc = species_list(c)
+    all(c.pbc) || println(io, "\n# Not periodic along every axis in AtomBond: DFTK treats the cell as periodic, ",
+                             "so keep enough vacuum.")
+    println(io, "\n# Cell vectors and Cartesian positions (Å)")
+    println(io, "cell_vectors = [")
+    for v in cell_vectors(c.lattice)
+        @printf(io, "    [%.10f, %.10f, %.10f],\n", v...)
+    end
+    println(io, "]u\"Å\"")
+    println(io, "atoms = [")
+    for (i, (s, r)) in enumerate(zip(c.species, cartesian_positions(c)))
+        props = String[]
+        m = c.magmoms[i]
+        isnan(m) || push!(props, @sprintf("magnetic_moment=%.4f", m))
+        clamp && all(c.fixed[i]) && push!(props, "clamp=true")
+        @printf(io, "    Atom(:%s, [%.10f, %.10f, %.10f]u\"Å\"%s),\n", s, r..., isempty(props) ? "" : "; " * join(props, ", "))
+    end
+    println(io, "]")
+    println(io, "system = periodic_system(atoms, cell_vectors)")
+    any(!isnan, c.magmoms) && println(io, "# Initial magnetic moments (μB) on the atoms make the run spin-polarized.")
+
+    println(io, "\n# Model and basis (check Ecut against your pseudopotentials)")
+    if occursin("{El}", pseudo)
+        println(io, "pseudopotentials = Dict(", join((":$s => \"$(replace(pseudo, "{El}" => string(s)))\"" for s in spc), ", "), ")")
+    else
+        println(io, "pseudopotentials = PseudoFamily(\"", pseudo, "\")")
+    end
+    println(io, "model_kwargs = (; functionals=PBE(), pseudopotentials, temperature=1e-3, smearing=Smearing.Gaussian())")
 end
 
 """

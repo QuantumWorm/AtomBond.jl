@@ -905,8 +905,8 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             d.show_dos.clicks[] += 1
             @test startswith(v.status[], "Band structure and DOS of") && haskey(d.state[:dos], :bands_axis)
             d.state[:results] = previous
-            @test occursin("bands along the path", AtomBond.dftk_plan(primitive_cell(load_library("Diamond")), 0.3, true))
-            @test occursin("no band path", AtomBond.dftk_plan(h2, 0.3, true))
+            @test occursin("bands along the path", AtomBond.dftk_plan(primitive_cell(load_library("Diamond")), 0.3, :bands))
+            @test occursin("no band path", AtomBond.dftk_plan(h2, 0.3, :bands))
             @test occursin("compute_bands", sprint(io -> write_dftk(io, h2; results="a.toml", bands="b.toml")))
             d.open_result.clicks[] += 1
             @test ntabs(v) == 2 && occursin("(DFTK)", v.crystal.title) && natoms(v.crystal) == 2
@@ -924,6 +924,114 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             d.run.clicks[] += 1
             @test length(readdir(dir)) == n
             @test "Run DFTK…" in [it.label for it in AtomBond.menubar_items(v, "File")]
+
+            # Cutoff hints (as the helper process prints them) and the recommended cutoff of a structure
+            hints_text = "[Si]\nlow = 14\nnormal = 18\nhigh = 24\n[H]\nlow = 32\nnormal = 36\nhigh = 42\n[Bad]\nlow = 0\n"
+            parsed = AtomBond.parse_cutoff_hints(hints_text, "fam")
+            @test parsed[("fam", :Si)] == (low=14.0, normal=18.0, high=24.0) && !haskey(parsed, ("fam", :Bad))
+            @test isempty(AtomBond.parse_cutoff_hints("not toml [", "fam"))
+            merge!(AtomBond.CUTOFF_HINTS, parsed)
+            sih = add_atom(load_library("Silicon"), :H, [0.1, 0.1, 0.1])
+            @test recommended_ecut(sih; family="fam", env=fake) == 72.0          # H: 36 Ha = 72 Ry
+            @test recommended_ecut(sih; family="fam", env=fake, precision=:high) == 84.0
+            @test recommended_ecut(load_library("Diamond"); family="fam", env=joinpath(dir, "none")) === nothing
+            @test isempty(dftk_cutoff_hints([:Si]; family="{El}.upf"))
+            @test AtomBond.convergence_cutoffs(36.0) == [18.0, 22.0, 28.0, 32.0, 36.0, 44.0, 54.0]
+            @test AtomBond.convergence_cutoffs(nothing)[end] == 100.0
+            si2 = primitive_cell(load_library("Silicon"))
+            ks = AtomBond.convergence_kspacings(si2)
+            @test length(unique(kpoint_grid(si2; kspacing=k) for k in ks)) == length(ks) >= 4
+            @test length(AtomBond.convergence_kspacings(h2)) == 1                  # a molecule: one k-point
+
+            # Convergence script and results: cutoff series (2 atoms) and k series
+            cs = sprint(io -> AtomBond.write_dftk_convergence(io, si2; ecuts=[20, 30, 40], kspacings=[0.5, 0.3],
+                                                              ecutwfc=30, kspacing=0.3, results="c.toml"))
+            @test !any(e -> e isa Expr && e.head in (:error, :incomplete), Meta.parseall(cs).args)
+            @test count("(\"cutoff\"", cs) == 3 && count("(\"kpoints\"", cs) == 2 && occursin("c.toml", cs)
+            conv = """
+            program = "DFTK"
+            version = "0.8.1"
+            natoms = 2
+            planned = 6
+            [[steps]]
+            series = "cutoff"
+            ecut_Ry = 20.0
+            kspacing = 0.3
+            kgrid = [5, 5, 5]
+            energy_Ha = -7.90
+            converged = true
+            homo_Ha = 0.20
+            lumo_Ha = 0.22
+            [[steps]]
+            series = "cutoff"
+            ecut_Ry = 30.0
+            kspacing = 0.3
+            kgrid = [5, 5, 5]
+            energy_Ha = -7.93000
+            converged = true
+            homo_Ha = 0.20
+            lumo_Ha = 0.221
+            [[steps]]
+            series = "cutoff"
+            ecut_Ry = 40.0
+            kspacing = 0.3
+            kgrid = [5, 5, 5]
+            energy_Ha = -7.93004
+            converged = true
+            [[steps]]
+            series = "kpoints"
+            ecut_Ry = 30.0
+            kspacing = 0.5
+            kgrid = [3, 3, 3]
+            energy_Ha = -7.92
+            converged = true
+            [[steps]]
+            series = "kpoints"
+            ecut_Ry = 30.0
+            kspacing = 0.3
+            kgrid = [5, 5, 5]
+            energy_Ha = -7.93
+            converged = false
+            """
+            write(joinpath(dir, "S.convergence.toml"), conv)
+            cr = read_convergence(joinpath(dir, "S.convergence.toml"))
+            @test cr.natoms == 2 && length(cr.steps) == 5 && cr.planned == 6 && cr.steps[1].gap ≈ 0.02 * AtomBond.HARTREE_EV
+            sc = AtomBond.convergence_series(cr, "cutoff")
+            @test sc.parameter == [20, 30, 40] && sc.energy_error[end] == 0
+            @test sc.energy_error[2] ≈ 1000 * 0.00004 * AtomBond.HARTREE_EV / 2     # 0.54 meV/atom
+            sk = AtomBond.convergence_series(cr, "kpoints")
+            @test sk.parameter == [0.5, 0.3]                                         # coarse to fine
+            @test converged_settings(cr) == (ecut=30.0, kspacing=nothing)              # k: only the reference passes
+            @test converged_settings(cr; tol=500) == (ecut=20.0, kspacing=0.5)       # 20 Ry: 408 meV/atom off
+            sm = AtomBond.summarize(cr)
+            @test occursin("5 of 6", sm) && occursin("NOT converged", sm) && occursin("Cutoff: 30 Ry", sm) &&
+                  occursin("k-spacing: not within", sm)
+            cf = convergence_figure(cr; dir, name="S")
+            @test length(cf.axes) == 4 && cf.settings.ecut == 30.0                    # energy and gap rows
+            cf.save.clicks[] += 1
+            @test isfile(joinpath(dir, "S.convergence.png"))
+
+            # The tool: task menu, hint line, Use recommended, and a finished convergence check
+            d.task.i_selected[] = 3
+            @test startswith(d.plan[], "Convergence check")
+            d.state[:hints][] = Dict{Symbol,Any}(:H => parsed[("fam", :H)])
+            @test d.hint[] == "⚠ below the low 64 Ry\nRecommended 72 Ry"           # the form still has 40 Ry
+            AtomBond.settext!(d.ecut, "80")
+            @test d.hint[] == "Recommended 72 Ry\n(low 64, high 84)"
+            AtomBond.settext!(d.ecut, "40")
+            @test occursin("below the low", d.hint[])
+            d.use_hint.clicks[] += 1
+            @test AtomBond.shown_text(d.ecut) == "72"
+            cjob = AtomBond.DFTKJob(si2, dir, joinpath(dir, "S.conv.jl"), joinpath(dir, "none.log"),
+                                    joinpath(dir, "S.convergence.toml"), run(`$(Base.julia_cmd()) --startup-file=no -e 0`),
+                                    time(), false)
+            d.state[:job] = cjob; d.state[:results] = nothing
+            @test AtomBond.show_job!(v, d) === :done && d.state[:results] isa ConvergenceResults
+            @test d.open_result.label[] == "Use converged values" && d.show_dos.label[] == "Show plot"
+            d.open_result.clicks[] += 1
+            @test AtomBond.shown_text(d.ecut) == "30" && startswith(v.status[], "Converged values in the form: cutoff 30 Ry")
+            d.show_dos.clicks[] += 1
+            @test haskey(d.state[:dos], :settings) && startswith(v.status[], "Convergence plot")
         end
     end
 
