@@ -2,10 +2,14 @@
 # progress and show the results when it is done (src/run/dftk.jl does the work).
 
 """The calculation `write_dftk` will set up for `c`, in words."""
-function dftk_plan(c::Crystal, kspacing)
-    what = has_constraints(c) ? "Relaxation (the structure has constraints)" : "SCF (energies, forces, levels)"
+function dftk_plan(c::Crystal, kspacing, bands::Bool=false)
+    relax = has_constraints(c)
+    what = relax ? "Relaxation (the structure has constraints)" : "SCF (energies, forces, levels)"
     k = kspacing === nothing ? "" : ", k-grid " * join(kpoint_grid(c; kspacing), " × ")
-    return what * "\n" * plural(natoms(c), "atom") * k
+    extra = !bands ? "" : relax ? "\nNo band structure after a relaxation" :
+            "\nThen DOS on a " * (kspacing === nothing ? "denser grid" : join(kpoint_grid(c; kspacing=kspacing / 2), " × ")) *
+            (any(vacuum_axes(c)) || !all(c.pbc) ? " (no band path: the cell has vacuum)" : " and bands along the path")
+    return what * "\n" * plural(natoms(c), "atom") * k * extra
 end
 
 """
@@ -38,6 +42,9 @@ function dftk_dialog(v::Viewer)
     kspacing = field!(f, "k-spacing (1/Å, incl. 2π)", "0.25", s -> isnum(s) && parse(Float64, s) > 0)
     ecut = field!(f, "Cutoff (Ry)", "40", s -> isnum(s) && parse(Float64, s) > 0)
     pseudo = field!(f, "Pseudopotentials", DFTK_PSEUDO_FAMILY, s -> occursin("{El}", s) || occursin(r"^[\w.+-]+$", s))
+    r = nextrow!(f)
+    bands = Makie.Toggle(f.g[r, 1]; active=true, halign=:left)
+    Makie.Label(f.g[r, 2], "Band structure and dense DOS after the SCF"; halign=:left, fontsize=PANEL_FONTSIZE)
     note!(f, "PBE, 1 mHa Gaussian smearing; cutoff/2 in Ha for DFTK.\nThe run goes into Folder/dftk_Name_<date-time>/.")
     r = nextrow!(f)
     run, stop = (with_click_feedback!(Makie.Button(f.g[r, k]; label, width=Makie.Relative(1), fontsize=PANEL_FONTSIZE,
@@ -51,11 +58,12 @@ function dftk_dialog(v::Viewer)
     r = nextrow!(f)
     open_result, show_dos = (with_click_feedback!(Makie.Button(f.g[r, k]; label, width=Makie.Relative(1),
                                                                fontsize=PANEL_FONTSIZE, padding=(6, 6, 5, 5)))
-                             for (k, label) in ((1, "Open structure"), (2, "Show DOS")))
+                             for (k, label) in ((1, "Open structure"), (2, "Show DOS / bands")))
 
     num(t) = (x = tryparse(Float64, strip(shown_text(t))); x === nothing || x <= 0 ? nothing : x)
-    update_plan(_...) = (plan[] = dftk_plan(v.crystal, num(kspacing)))
+    update_plan(_...) = (plan[] = dftk_plan(v.crystal, num(kspacing), bands.active[]))
     Makie.on(update_plan, kspacing.displayed_string)
+    Makie.on(update_plan, bands.active)
     Makie.on(update_plan, v.header)                  # the structure changed
     update_plan()
     update_env(_...) = (envstate[] = dftk_env_ready(strip(shown_text(env))) ? "DFTK is installed there" :
@@ -64,8 +72,8 @@ function dftk_dialog(v::Viewer)
     update_env()
 
     state = get!(v.dialogs, :dftk_state, Dict{Symbol,Any}())    # the job outlives the tool
-    controls = (; plan, env, envstate, install, folder, name, kspacing, ecut, pseudo, run, stop, progress, summary,
-                open_result, show_dos, state)
+    controls = (; plan, env, envstate, install, folder, name, kspacing, ecut, pseudo, bands, run, stop, progress,
+                summary, open_result, show_dos, state)
     show_job!(v, controls)
 
     Makie.on(install.clicks) do _
@@ -88,7 +96,8 @@ function dftk_dialog(v::Viewer)
         try
             stamp = Dates.format(Dates.now(), "yyyymmdd-HHMMSS")
             state[:job] = run_dftk(v.crystal; env=e, name=nm, dir=joinpath(expanduser(dir), "dftk_$(nm)_$stamp"),
-                                   kspacing=parse(Float64, ks), ecutwfc=parse(Float64, ec), pseudo=ps)
+                                   kspacing=parse(Float64, ks), ecutwfc=parse(Float64, ec), pseudo=ps,
+                                   bands=bands.active[])
             state[:results] = nothing
             v.status[] = "DFTK started in " * state[:job].dir
             follow_job!(v, controls)
@@ -119,10 +128,13 @@ function dftk_dialog(v::Viewer)
         isempty(r.eigenvalues) && (v.status[] = "A relaxation keeps no levels: run an SCF of the result for the DOS"; return)
         job = state[:job]
         try
-            d = (v.screen === nothing ? dos_figure : plot_dos)(r; dir=job.dir,
-                                                                name=splitext(basename(job.script))[1])
+            withbands = r.path !== nothing
+            show = withbands ? (v.screen === nothing ? bands_figure : plot_bands) :
+                               (v.screen === nothing ? dos_figure : plot_dos)
+            d = show(r; dir=job.dir, name=splitext(basename(job.script))[1])
             state[:dos] = d
-            v.status[] = "DOS of " * formula(r.structure) * (v.screen === nothing ? "" : " opened in a new window")
+            v.status[] = (withbands ? "Band structure and DOS of " : "DOS of ") * formula(r.structure) *
+                         (v.screen === nothing ? "" : " opened in a new window")
         catch err
             err isa InterruptException && rethrow()
             v.status[] = "Could not show the DOS: " * sprint(showerror, err)

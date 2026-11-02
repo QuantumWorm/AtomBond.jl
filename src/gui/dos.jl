@@ -100,3 +100,144 @@ function plot_dos(r::DFTKResults; kw...)
     display(GLMakie.Screen(; title="DOS — " * formula(r.structure)), d.figure)
     return d
 end
+
+"""
+    write_bands(path, r) -> path
+
+The band structure of `r` ([`BandPath`](@ref)) as CSV: distance along the
+path (1/Å), the label of the point (if any), then every band (eV, relative to
+the Fermi level), spin up first for a spin-polarized run.
+"""
+function write_bands(path::AbstractString, r::DFTKResults)
+    p = r.path
+    p === nothing && throw(ArgumentError("no band structure in these results"))
+    ef = something(r.fermi, 0.0)
+    cols = [r.n_spin == 1 ? "band$b" : "$(σ == 1 ? "up" : "down")$b" for (σ, m) in enumerate(p.eigenvalues) for b in axes(m, 2)]
+    open(path, "w") do io
+        println(io, "k_distance_inv_A,label,", join(cols, ","))
+        for k in eachindex(p.distances)
+            i = findfirst(t -> isapprox(t, p.distances[k]; atol=1e-6), p.ticks)
+            label = i === nothing ? "" : replace(p.labels[i], "," => " ")
+            vals = (@sprintf("%.5f", m[k, b] - ef) for m in p.eigenvalues for b in axes(m, 2))
+            println(io, @sprintf("%.6f", p.distances[k]), ",", label, ",", join(vals, ","))
+        end
+    end
+    return path
+end
+
+"""Polyline through every band of `m` (k × band), NaN between bands and path pieces, energies minus `ef`."""
+function band_lines(p::BandPath, m::AbstractMatrix, ef)
+    pieces = [s:(i < length(p.branch_starts) ? p.branch_starts[i+1] - 1 : length(p.distances))
+              for (i, s) in enumerate(p.branch_starts)]
+    xs, ys = Float64[], Float64[]
+    for b in axes(m, 2), piece in pieces
+        append!(xs, p.distances[piece]); push!(xs, NaN)
+        append!(ys, m[piece, b] .- ef); push!(ys, NaN)
+    end
+    return xs, ys
+end
+
+"""
+    bands_figure(r::DFTKResults; width=0.1, window=nothing, title="", dir=nothing, name="bands") -> NamedTuple
+
+The band structure of `r` along the high-symmetry path (left) next to the
+DOS (right, sideways) on a shared energy axis relative to the Fermi level
+(dashed); `window` is the energy range shown (eV, relative to the Fermi
+level), by default from the bottom of the valence levels (deep semicore
+levels left out) to 8 eV. The valence-band maximum
+and conduction-band minimum are marked and the gap is given in the subtitle
+([`band_edges`](@ref)). A slider sets the DOS broadening; with `dir`, a Save
+button writes `name.bands.png`, `name.bands.csv` and `name.dos.csv` there.
+Not displayed; see [`plot_bands`](@ref).
+"""
+function bands_figure(r::DFTKResults; width::Real=0.1, window=nothing, title::AbstractString="", dir=nothing,
+                      name::AbstractString="bands")
+    p = r.path
+    p === nothing && throw(ArgumentError("no band structure in these results (run with bands=true)"))
+    ef = something(r.fermi, 0.0)
+    head = !isempty(title) ? title : !isempty(r.structure.title) ? r.structure.title : formula(r.structure)
+    e = band_edges(r)
+    gapnote = is_metallic(r) ? "metallic" : e === nothing ? "" :
+              e.direct ? @sprintf("direct gap %.3f eV at %s", e.gap, e.vbm_at) :
+              @sprintf("indirect gap %.3f eV (VBM %s, CBM %s)", e.gap, e.vbm_at, e.cbm_at)
+    fig = Makie.Figure(; size=(900, 560), backgroundcolor=:white)
+    heading = Makie.GridLayout(fig[0, 1:2])
+    Makie.Label(heading[1, 1], head; font=:bold, fontsize=16)
+    Makie.Label(heading[2, 1], "DFTK $(r.version)" * (isempty(gapnote) ? "" : ", " * gapnote) *
+                               (r.n_spin == 2 ? ", spin up blue, down red" : ""); fontsize=13, color=:gray30)
+    Makie.rowgap!(heading, 2)
+    ylabel = r.fermi === nothing ? "E (eV)" : "E − E_F (eV)"
+    axb = Makie.Axis(fig[1, 1]; ylabel, xticks=(p.ticks, p.labels), xgridvisible=false, ygridvisible=false)
+    axd = Makie.Axis(fig[1, 2]; xlabel="DOS (states/eV)", yticklabelsvisible=false, xgridvisible=false,
+                     ygridvisible=false)
+    Makie.colsize!(fig.layout, 2, Makie.Relative(0.25))
+    Makie.linkyaxes!(axb, axd)
+    Makie.vlines!(axb, p.ticks; color=:gray70, linewidth=0.8)
+    for (σ, m) in enumerate(p.eigenvalues)
+        xs, ys = band_lines(p, m, ef)
+        Makie.lines!(axb, xs, ys; color=σ == 1 ? DOS_LINE : DOS_DOWN_LINE, linewidth=1.3)
+    end
+    r.fermi === nothing || Makie.hlines!(axb, [0.0]; color=:gray30, linestyle=:dash, linewidth=1)
+    if e !== nothing && e.direct !== nothing
+        kv = argmin(k -> abs(maximum(m[k, b] for m in p.eigenvalues for b in axes(m, 2) if m[k, b] <= ef; init=-Inf) - e.vbm),
+                    eachindex(p.distances))
+        kc = argmin(k -> abs(minimum(m[k, b] for m in p.eigenvalues for b in axes(m, 2) if m[k, b] > ef; init=Inf) - e.cbm),
+                    eachindex(p.distances))
+        Makie.scatter!(axb, [p.distances[kv], p.distances[kc]], [e.vbm - ef, e.cbm - ef];
+                       color=[:black, :black], markersize=8)
+    end
+    slider = Makie.Slider(fig[2, 1]; range=0.02:0.01:0.5, startvalue=clamp(width, 0.02, 0.5))
+    wlabel = Makie.lift(w -> @sprintf("DOS broadening %.2f eV", w), slider.value)
+    Makie.Label(fig[2, 2], wlabel; halign=:left)
+    data = Makie.lift(w -> dos(r; width=w), slider.value)
+    y = Makie.lift(d -> d.energies .- ef, data)
+    for σ in 1:r.n_spin
+        sgn = σ == 1 ? 1 : -1
+        x = Makie.lift(d -> sgn .* d.dos[:, σ], data)
+        filled = Makie.lift((ys, xs) -> [yi <= 0 ? xi : 0.0 for (yi, xi) in zip(ys, xs)], y, x)
+        Makie.band!(axd, y, Makie.lift(v -> zero(v), filled), filled; direction=:y,
+                    color=σ == 1 ? DOS_FILL : DOS_DOWN_FILL)
+        Makie.lines!(axd, x, y; color=σ == 1 ? DOS_LINE : DOS_DOWN_LINE, linewidth=1.2)
+    end
+    r.fermi === nothing || Makie.hlines!(axd, [0.0]; color=:gray30, linestyle=:dash, linewidth=1)
+    allb = reduce(vcat, [vec(m) for m in p.eigenvalues]) .- ef
+    if window === nothing
+        deep = deep_levels_edge(r)
+        bottom = deep === nothing ? minimum(allb) : deep - ef
+        lo, hi = bottom - 1.0, min(8.0, maximum(allb))
+    else
+        lo, hi = Float64.(window)
+    end
+    Makie.xlims!(axb, first(p.distances), last(p.distances))
+    function fit!(d)
+        sel = (d.energies .- ef .>= lo) .& (d.energies .- ef .<= hi)
+        top = maximum(d.dos[sel, :]; init=1.0) * 1.08
+        Makie.limits!(axd, r.n_spin == 2 ? -top : 0.0, top, lo, hi)
+        Makie.ylims!(axb, lo, hi)
+    end
+    Makie.on(fit!, data)
+    fit!(data[])
+    save = dir === nothing ? nothing : Makie.Button(fig[3, 1:2]; label="Save PNG and CSV to " * basename(dir) * "/")
+    if save !== nothing
+        Makie.on(save.clicks) do _
+            write_bands(joinpath(dir, name * ".bands.csv"), r)
+            write_dos(joinpath(dir, name * ".dos.csv"), r; width=slider.value[])
+            Makie.save(joinpath(dir, name * ".bands.png"), fig; update=false)
+            save.label[] = "Saved $name.bands.png, $name.bands.csv and $name.dos.csv"
+        end
+    end
+    return (; figure=fig, bands_axis=axb, dos_axis=axd, width=slider, save, data, edges=e)
+end
+
+"""
+    plot_bands(r::DFTKResults; kw...) -> NamedTuple
+
+Open the band structure and DOS of `r` in their own window
+([`bands_figure`](@ref) with the same keywords).
+"""
+function plot_bands(r::DFTKResults; kw...)
+    d = bands_figure(r; kw...)
+    GLMakie.activate!()
+    display(GLMakie.Screen(; title="Bands — " * formula(r.structure)), d.figure)
+    return d
+end

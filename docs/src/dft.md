@@ -95,12 +95,25 @@ lines of the log while it runs and, when it is done, a summary:
 - whether the SCF (or relaxation) converged, and in how many iterations
   (steps);
 - the total energy (eV and Ha) and the largest force (eV/Å);
-- the Fermi level and the gap between the levels around it (on the k-point
-  grid, so only an estimate of the true gap).
+- the Fermi level and the band gap: with the band structure, direct or
+  indirect and where the band edges are (e.g. "indirect: VBM Γ, CBM
+  between Γ and X"); without it, only the gap between the levels on the
+  k-point grid, an estimate; a run with partly filled levels is reported
+  as metallic.
+
+**Band structure and dense DOS** (on by default; SCF only): after the SCF
+the script also computes, non-self-consistently from the SCF density, the
+levels on a k-grid twice as dense, with more empty bands (for the DOS),
+and, for a crystal without vacuum, the bands along the standard
+high-symmetry path of its Brillouin zone (DFTK's `irrfbz_path`; for a
+supercell, the path of the primitive cell). They go into `Name.bands.toml`;
+a molecule or slab gets the dense DOS only.
 
 *Open structure* opens the final structure (the relaxed one after a
-relaxation) in a new tab. *Show DOS* opens the density of states of an SCF
-in its own window:
+relaxation) in a new tab. *Show DOS / bands* opens the band structure next
+to the DOS (shared energy axis, band edges marked, gap in the subtitle;
+*Save* writes `Name.bands.png`, `Name.bands.csv` and `Name.dos.csv`), or the
+DOS alone when there is no band path, in its own window:
 
 - every computed level is broadened into a Gaussian (the *Broadening*
   slider, 0.1 eV by default) and weighted with its k-point weight, in
@@ -112,9 +125,8 @@ in its own window:
   5 eV, are hidden until *Show deep levels* is switched on;
 - *Save* writes `Name.dos.png` and `Name.dos.csv` into the run folder.
 
-DFTK computes only a few levels above the Fermi level, so the DOS above it is
-incomplete; the gap in the summary is taken on the k-point grid only, and a
-run with partly filled levels is reported as metallic instead. Every run gets its own folder,
+Without the band step the DOS comes from the SCF levels only: few empty
+bands, so it stops a little above the Fermi level. Every run gets its own folder,
 `Folder/dftk_<Name>_<date-time>/`, with the script (`Name.jl`), the log
 (`Name.log`) and the results (`Name.results.toml`: energies, forces,
 eigenvalues and occupations per k-point, the final structure).
@@ -131,7 +143,7 @@ From Julia code:
 ```julia
 using AtomBond
 install_dftk() |> wait                     # once
-job = run_dftk(primitive_cell(load_library("Diamond")); ecutwfc=40)
+job = run_dftk(primitive_cell(load_library("Diamond")); ecutwfc=40, bands=true)
 job_status(job)                            # :running, then :done (or :failed, :stopped)
 wait(job)
 r = job_results(job)                       # DFTKResults: energy, forces, levels, structure
@@ -139,6 +151,9 @@ r.energy, band_gap(r), r.structure
 d = dos(r; width=0.1)                      # energies (eV), DOS per spin, Fermi level
 write_dos("diamond.dos.csv", r)
 plot_dos(r)                                # the DOS window
+band_edges(r)                              # VBM, CBM, gap, direct?, where (from the band path)
+write_bands("diamond.bands.csv", r)
+plot_bands(r)                              # bands + DOS window
 ```
 
 ## DFTK and AtomsBase

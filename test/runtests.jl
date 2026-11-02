@@ -820,10 +820,59 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             rm_ = read_dftk_results(joinpath(dir, "metal.toml"))
             @test is_metallic(rm_) && band_gap(rm_) === nothing && occursin("Metallic", AtomBond.summarize(rm_))
             @test AtomBond.deep_levels_edge(rm_) ≈ -0.3 * AtomBond.HARTREE_EV            # the -2.5 Ha level is deep
+            # An insulator whose Fermi level (smearing) sits at the valence-band top: partly filled there, not a metal
+            write(joinpath(dir, "edge.toml"), replace(toml, "kpoint_weights = [1.0]" => "kpoint_weights = [0.5, 0.5]",
+                  "eigenvalues_Ha = [[-0.3635426618843136, -0.01722241231680253, 0.03424307647279534]]" =>
+                  "eigenvalues_Ha = [[-0.5, -0.1903, 0.2], [-0.6, -0.4, 0.1]]",
+                  "occupations = [[2.0, 0.0, 0.0]]" => "occupations = [[2.0, 1.33, 0.0], [2.0, 2.0, 0.0]]"))
+            re_ = read_dftk_results(joinpath(dir, "edge.toml"))
+            @test !is_metallic(re_) && band_gap(re_) ≈ (0.1 + 0.1903) * AtomBond.HARTREE_EV
+            write(joinpath(dir, "cross.toml"), replace(toml, "kpoint_weights = [1.0]" => "kpoint_weights = [0.5, 0.5]",
+                  "eigenvalues_Ha = [[-0.3635426618843136, -0.01722241231680253, 0.03424307647279534]]" =>
+                  "eigenvalues_Ha = [[-0.5, -0.25, 0.2], [-0.6, -0.1, 0.1]]",
+                  "occupations = [[2.0, 0.0, 0.0]]" => "occupations = [[2.0, 2.0, 0.0], [2.0, 0.0, 0.0]]"))
+            @test is_metallic(read_dftk_results(joinpath(dir, "cross.toml")))     # band 2 crosses the Fermi level
             fm = dos_figure(rm_)
             @test fm.axis.limits[][1][1] > (-2.5 + 0.19) * AtomBond.HARTREE_EV               # hidden by default
             fm.showdeep[] = true
             @test fm.axis.limits[][1][1] < (-2.5 + 0.19) * AtomBond.HARTREE_EV
+            # Band file: dense levels and a path with two pieces (Γ–X, then K–Γ), one band below and one above E_F.
+            # Valence top at Γ (k = 1), conduction bottom between Γ and X (k = 2): indirect.
+            bands = """
+            dos_kgrid = [2, 2, 2]
+            dos_kpoint_weights = [0.5, 0.5]
+            dos_eigenvalues_Ha = [[-0.4, -0.25, 0.0, 0.1], [-0.35, -0.22, 0.02, 0.12]]
+            path_distances_inv_A = [0.0, 0.5, 1.0, 1.0, 1.6]
+            path_branch_starts = [1, 4]
+            path_tick_distances_inv_A = [0.0, 1.0, 1.6]
+            path_tick_labels = ["Γ", "X | K", "Γ"]
+            path_eigenvalues_Ha = [[[-0.21, 0.05], [-0.24, -0.01], [-0.26, 0.03], [-0.25, 0.04], [-0.21, 0.05]]]
+            """
+            write(joinpath(dir, "B.results.toml"), toml)
+            write(joinpath(dir, "B.bands.toml"), bands)
+            rb = read_dftk_results(joinpath(dir, "B.results.toml"))
+            @test rb.dense isa DenseLevels && rb.dense.kgrid == (2, 2, 2) && rb.path isa BandPath
+            @test size(rb.path.eigenvalues[1]) == (5, 2) && rb.path.labels[2] == "X | K"
+            db = dos(rb; width=0.05)                                           # the dense levels: 4 bands × 2 k-points
+            @test sum(db.dos) * (db.energies[2] - db.energies[1]) ≈ 8 atol=1e-3
+            @test size(dos(rb; levels=:scf).dos, 2) == 1
+            @test sum(dos(rb; width=0.05, levels=:scf).dos) * 0.005 ≈ 6 atol=1e-2
+            eb = band_edges(rb)
+            @test eb.vbm ≈ -0.21 * AtomBond.HARTREE_EV                         # path, Γ
+            @test eb.cbm ≈ -0.01722241231680253 * AtomBond.HARTREE_EV          # lowest of all: an SCF k-point
+            @test eb.direct == false && eb.vbm_at == "Γ" && eb.cbm_at == "between Γ and X" && band_gap(rb) ≈ eb.gap
+            @test occursin("indirect: VBM Γ, CBM between Γ and X", AtomBond.summarize(rb))
+            @test band_edges(rm_) === nothing && band_edges(r).direct === nothing     # metal; no path
+            bcsv = readlines(write_bands(joinpath(dir, "B.bands.csv"), rb))
+            @test bcsv[1] == "k_distance_inv_A,label,band1,band2" && length(bcsv) == 6 && split(bcsv[2], ",")[2] == "Γ"
+            bf = AtomBond.bands_figure(rb; dir, name="B")
+            @test bf.bands_axis.xticks[][2] == ["Γ", "X | K", "Γ"] && !bf.edges.direct
+            @test bf.bands_axis.limits[][2][1] < (-0.26 - (-0.19)) * AtomBond.HARTREE_EV      # whole valence band in view
+            bf.save.clicks[] += 1
+            @test all(isfile, joinpath.(dir, ["B.bands.png", "B.bands.csv", "B.dos.csv"]))
+            xs, ys = AtomBond.band_lines(rb.path, rb.path.eigenvalues[1], 0.0)
+            @test count(isnan, xs) == 4 && length(xs) == 2 * (5 + 2)          # 2 bands × 2 pieces, NaN-separated
+            @test_throws ArgumentError AtomBond.bands_figure(r)                # no path
 
             # No DFTK environment → refused; an environment without the packages installed → the run fails.
             @test !dftk_env_ready(joinpath(dir, "none"))
@@ -851,6 +900,14 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             @test occursin("done", d.progress[]) && occursin("Total energy", d.summary[])
             d.show_dos.clicks[] += 1                                           # no window here: the figure only
             @test haskey(d.state, :dos) && startswith(v.status[], "DOS of H2")
+            previous = d.state[:results]
+            d.state[:results] = rb                                             # with a band path: bands + DOS
+            d.show_dos.clicks[] += 1
+            @test startswith(v.status[], "Band structure and DOS of") && haskey(d.state[:dos], :bands_axis)
+            d.state[:results] = previous
+            @test occursin("bands along the path", AtomBond.dftk_plan(primitive_cell(load_library("Diamond")), 0.3, true))
+            @test occursin("no band path", AtomBond.dftk_plan(h2, 0.3, true))
+            @test occursin("compute_bands", sprint(io -> write_dftk(io, h2; results="a.toml", bands="b.toml")))
             d.open_result.clicks[] += 1
             @test ntabs(v) == 2 && occursin("(DFTK)", v.crystal.title) && natoms(v.crystal) == 2
             d.state[:job] = job                                               # a failed job

@@ -351,11 +351,19 @@ PseudoPotentialData, AtomsBase, Unitful and UnitfulAtomic
 writes at the end for [`read_dftk_results`](@ref): energies, forces, the
 final structure and, for an SCF, the eigenvalues and occupations. This is
 what [`run_dftk`](@ref) uses.
+
+`bands`: the name of a second TOML file; after an SCF the script then also
+computes, non-self-consistently from the SCF density, the levels on a k-grid
+twice as dense (for the DOS) and, for a cell without vacuum, the band
+structure along the standard high-symmetry path (DFTK's `irrfbz_path`), and
+writes them there. A failure there is reported in the log and leaves the SCF
+results alone.
 """
 write_dftk(path::AbstractString, c::Crystal; kw...) = open(io -> write_dftk(io, c; kw...), path, "w")
 
 function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
-                    pseudo::AbstractString=DFTK_PSEUDO_FAMILY, results::Union{Nothing,AbstractString}=nothing)
+                    pseudo::AbstractString=DFTK_PSEUDO_FAMILY, results::Union{Nothing,AbstractString}=nothing,
+                    bands::Union{Nothing,AbstractString}=nothing)
     spc = species_list(c)
     title = isempty(c.title) ? formula(c) : c.title
     relax = has_constraints(c)
@@ -404,6 +412,7 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
         println(io, "forces = compute_forces_cart(scfres)  # Ha/bohr")
         println(io, "foreach(((i, f),) -> println(\"atom \", i, \": \", f), enumerate(forces))")
         results === nothing || write_dftk_results_code(io, results, :scf)
+        bands === nothing || write_dftk_bands_code(io, bands, c, kspacing)
         return
     end
     cc = c.cell_constraints
@@ -425,6 +434,50 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
     println(io, "# To open the relaxed structure in AtomBond:")
     println(io, "#   using AtomBond; save_structure(\"relaxed.xyz\", from_atomsbase(relaxed))")
     results === nothing || write_dftk_results_code(io, results, :relax)
+end
+
+"""
+The part of a DFTK script that computes the dense-grid levels (DOS) and the
+band structure along the high-symmetry path after the SCF and writes them
+for AtomBond (TOML; eigenvalues in Ha, path distances in 1/Å with 2π).
+"""
+function write_dftk_bands_code(io::IO, file::AbstractString, c::Crystal, kspacing::Real)
+    dense = kpoint_grid(c; kspacing=kspacing / 2)
+    path = !any(vacuum_axes(c)) && all(c.pbc)
+    moments = any(!isnan, c.magmoms) ? "[" * join((@sprintf("%.4f", isnan(m) ? 0.0 : m) for m in c.magmoms), ", ") * "]" :
+              "[]"
+    print(io, """
+
+    # Levels on a denser k-grid (DOS)$(path ? " and the band structure along the high-symmetry path" : ""),
+    # non-self-consistent from the SCF density; written for AtomBond
+    try
+        dense = compute_bands(scfres, MonkhorstPack([$(join(dense, ", "))]))
+        bands_out = Dict{String,Any}(
+            "dos_kgrid" => [$(join(dense, ", "))],
+            "dos_kpoint_weights" => collect(dense.basis.kweights),
+            "dos_eigenvalues_Ha" => [collect(e) for e in dense.eigenvalues])
+    """)
+    if path
+        print(io, """
+            path = compute_bands(scfres; magnetic_moments=$moments)
+            plotdata = DFTK.data_for_plotting(path)
+            bohr_in_A = ustrip(u"Å", 1u"bohr")
+            merge!(bands_out, Dict{String,Any}(
+                "path_distances_inv_A" => collect(plotdata.kdistances) ./ bohr_in_A,
+                "path_branch_starts" => [first(b) for b in plotdata.kbranches],
+                "path_tick_distances_inv_A" => collect(plotdata.ticks.distances) ./ bohr_in_A,
+                "path_tick_labels" => collect(String.(plotdata.ticks.labels)),
+                "path_eigenvalues_Ha" => [[collect(plotdata.eigenvalues[ik, :, σ]) for ik in 1:plotdata.n_kcoord]
+                                          for σ in 1:plotdata.n_spin]))
+        """)
+    end
+    print(io, """
+        open(io -> TOML.print(io, bands_out), joinpath(@__DIR__, $(repr(String(file)))), "w")
+        println("AtomBond bands written to ", $(repr(String(file))))
+    catch err
+        println("Band structure / DOS step failed: ", sprint(showerror, err))
+    end
+    """)
 end
 
 """The end of a DFTK script that writes its results for AtomBond (TOML)."""
