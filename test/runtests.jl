@@ -6,7 +6,25 @@ using AtomBond: RGBf
 
 const STRUCTS = joinpath(@__DIR__, "..", "examples", "structures")
 
-@testset "AtomBond" begin
+# On GitHub Actions, failures and errors are also printed as workflow "::error" commands, which GitHub
+# turns into annotations of the run (readable without the full log). Elsewhere this is the default test set.
+struct CITestSet <: Test.AbstractTestSet
+    ts::Test.DefaultTestSet
+end
+CITestSet(desc::AbstractString; kw...) = CITestSet(Test.DefaultTestSet(desc; kw...))
+function Test.record(c::CITestSet, t::Union{Test.Fail,Test.Error})
+    if get(ENV, "GITHUB_ACTIONS", "") == "true"
+        line = t.source isa LineNumberNode ? t.source.line : 0
+        msg = sprint(show, t; context=:color => false)
+        msg = replace(first(msg, 3000), "%" => "%25", "\r" => "", "\n" => "%0A")
+        println("::error file=test/runtests.jl,line=$line,title=$(c.ts.description)::", msg)
+    end
+    return Test.record(c.ts, t)
+end
+Test.record(c::CITestSet, t) = Test.record(c.ts, t)
+Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
+
+@testset CITestSet "AtomBond" begin
     @testset "elements" begin
         @test element(:Si).Z == 14
         @test element("SI").symbol == :Si
