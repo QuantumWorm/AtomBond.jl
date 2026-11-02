@@ -713,9 +713,22 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             @test occursin("Dict(:Ga => \"Ga.upf\", :N => \"N.upf\")", sprint(io -> write_dftk(io, gan; pseudo="{El}.upf")))
             dj = sprint(io -> write_dftk(io, gc))
             @test occursin("using GeometryOptimization", dj) && occursin("variablecell=true", dj) &&
-                  count("clamp=true", dj) == 2 && occursin("cell constraints are not applied", dj) &&
+                  count("clamp=true", dj) == 2 && occursin("are not applied", dj) &&
                   occursin("symmetries=false", dj)
             @test occursin("variablecell=false", sprint(io -> write_dftk(io, with_constraints(gc; cell=(0, 0, 0, 0, 0, 0)))))
+            # asked for: a cell relaxation without constraints, atoms only, or an SCF despite constraints
+            vc = sprint(io -> write_dftk(io, gan; relax=:cell, results="G.results.toml"))
+            @test occursin("variablecell=true", vc) && occursin("tol_virial = ", vc) && occursin(" tol_virial,", vc) &&
+                  occursin("virial_Ha", vc) && !occursin("clamp=true", vc) && !occursin("not applied", vc)
+            @test !any(e -> e isa Expr && e.head in (:error, :incomplete), Meta.parseall(vc).args)
+            tv = parse(Float64, match(r"tol_virial = ([\d.e-]+)", vc)[1])
+            @test tv ≈ 0.05 / AtomBond.EV_PER_A3_IN_GPA * cell_volume(gan.lattice) rtol=1e-5
+            va = sprint(io -> write_dftk(io, gan; relax=:atoms))
+            @test occursin("variablecell=false", va) && !occursin("tol_virial", va)
+            @test !occursin("minimize_energy!", sprint(io -> write_dftk(io, gc; relax=:none)))
+            @test occursin("cell constraints (cell fixed) are not applied",
+                           sprint(io -> write_dftk(io, with_constraints(gan; cell=(0, 0, 0, 0, 0, 0)); relax=:cell)))
+            @test_throws ArgumentError write_dftk(IOBuffer(), gan; relax=:md)
             @test count("magnetic_moment=1.0000", sprint(io -> write_dftk(io, mag))) == natoms(si)
             p = only(export_inputs(gan, :dftk, dir, "GaN"))                   # default .UPF pattern → PseudoDojo family
             @test endswith(p, "GaN.jl") && occursin("PseudoFamily(", read(p, String))
@@ -1058,7 +1071,7 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             @test isfile(joinpath(dir, "S.convergence.png"))
 
             # The tool: task menu, hint line, Use recommended, and a finished convergence check
-            d.task.i_selected[] = 3
+            d.task.i_selected[] = 5
             @test startswith(d.plan[], "Convergence check")
             d.state[:hints][] = Dict{Symbol,Any}(:H => parsed[("fam", :H)])
             @test AtomBond.shown_text(d.ecut) == "72"                               # the default cutoff follows the hint
@@ -1162,6 +1175,42 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             @test ow.step.value[] == 0 && isempty(news)
             AtomBond.Makie.set_close_to!(ow.step, 2); obs[] = short; obs[] = full   # at the end: follows
             @test ow.step.value[] == 2 && news == [3]
+
+            # A cell relaxation of Si: the cell grows by 1 % per step, the stress (from the virial) goes to zero
+            cdir = joinpath(dir, "cell"); mkpath(cdir)
+            vhist = "clamped = [false, false]\n" * join(["""
+                [[steps]]
+                step = $(k - 1)
+                energy_Ha = $(-8.46 - 0.001k)
+                cell_A = $(repr([collect(x) .* 1.01^(k - 1) for x in cell_vectors(si2.lattice)]))
+                positions_frac = $(repr([collect(f) for f in si2.frac]))
+                forces_Ha_per_bohr = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+                virial_Ha = [[$w, 0.0, 0.0], [0.0, $w, 0.0], [0.0, 0.0, $w]]
+                """ for (k, w) in enumerate((0.0176, 0.004, 0.0))], "")
+            write(joinpath(cdir, "C.relax.toml"), vhist)
+            ch = AtomBond.read_relax_history(joinpath(cdir, "C.relax.toml"), si2)
+            @test variable_cell(ch) && length(ch.stresses) == 3
+            V0 = cell_volume(si2.lattice)
+            @test pressure(ch)[1] ≈ 0.0176 * AtomBond.HARTREE_EV * AtomBond.EV_PER_A3_IN_GPA / V0       # σ = −virial/V
+            @test pressure(ch)[3] == 0 && max_stress(ch)[1] ≈ pressure(ch)[1]
+            cc3 = cell_change(ch)
+            @test cc3.volume ≈ 100 * (1.01^6 - 1) && isapprox(cc3.a, 2.01; atol=1e-9) && abs(cc3.α) < 1e-9
+            @test occursin("volume +6.15 %", AtomBond.relax_progress(ch)) && occursin("pressure 0.000 GPa", AtomBond.relax_progress(ch))
+            @test !variable_cell(hh) && isempty(pressure(hh))
+            cw = relax_figure(AtomBond.Makie.Observable(ch))
+            @test cw.volume_axis !== nothing && cw.pressure_axis !== nothing && relax_figure(rr).volume_axis === nothing
+            write(joinpath(cdir, "C.results.toml"), relaxed)
+            crr = read_dftk_results(joinpath(cdir, "C.results.toml"); title="Si")
+            @test occursin("Cell a 3.8403 → 3.9174 Å (+2.01 %)", AtomBond.summarize(crr)) && occursin("Pressure 0.000 GPa", AtomBond.summarize(crr))
+            # the tool: relaxation tasks and their plans; a job knows it relaxes
+            @test AtomBond.dftk_relax_mode(:relax_cell) === :cell && AtomBond.dftk_relax_mode(:relax_atoms) === :atoms &&
+                  AtomBond.dftk_relax_mode(:bands) === :auto
+            @test startswith(AtomBond.dftk_plan(si2, 0.3, :relax_cell), "Relaxation of the atoms and the cell")
+            @test occursin("vacuum", AtomBond.dftk_plan(h2, 0.3, :relax_cell))
+            @test occursin("1 atom kept fixed", AtomBond.dftk_plan(fix_atoms(si2, [1]), 0.3, :relax_atoms))
+            sjob = AtomBond.DFTKJob(si2, cdir, "", "", joinpath(cdir, "C.results.toml"), ljob.process, time(), false, true)
+            @test AtomBond.is_relax_job(sjob) && !AtomBond.is_relax_job(AtomBond.DFTKJob(si2, cdir, "", "", "x.results.toml",
+                                                                                          ljob.process, time(), false))
         end
     end
 

@@ -18,7 +18,9 @@ File → *Export DFT inputs…* writes:
   pseudopotentials from a PseudoPotentialData family (the PseudoDojo
   `dojo.nc.sr.pbe.v0_4_1.standard.upf` by default) or a `{El}` file
   pattern. It runs an SCF and prints energies and forces; with constraints
-  it relaxes the structure with GeometryOptimization.jl instead. Magnetic
+  it relaxes the structure with GeometryOptimization.jl instead (in code,
+  `relax=:atoms` or `:cell` asks for a relaxation of the atoms, or of the
+  atoms and the cell, and `:none` for an SCF). Magnetic
   moments go on the atoms (`magnetic_moment`). Run it with `julia name.jl`
   in an environment with DFTK, PseudoPotentialData, AtomsBase, Unitful and
   UnitfulAtomic (+ GeometryOptimization).
@@ -88,9 +90,10 @@ repeat them. In code: [`fix_atoms`](@ref), [`free_atoms`](@ref),
 
 File → *Run DFTK…* runs the current structure in
 [DFTK.jl](https://dftk.org) (PBE, 1 mHa Gaussian smearing). *Task*: an SCF
-with or without the band structure, or a convergence check (below); an SCF
-becomes a relaxation when the structure has constraints (the same script as
-the DFTK export). The calculation runs in a
+with or without the band structure, a relaxation of the atoms (*Relax
+atoms*) or of the atoms and the cell (*Relax atoms and cell*, below), or a
+convergence check (below); an SCF becomes a relaxation when the structure
+has constraints (the same script as the DFTK export). The calculation runs in a
 separate Julia process, so the window stays usable; the tool shows the last
 lines of the log while it runs and, when it is done, a summary:
 
@@ -139,14 +142,33 @@ as red arrows (*Force arrows*; the largest force of the relaxation gets a
 2 Å arrow, the same scale for every step). *Band structure / DOS of the
 result* opens those plots when they were computed.
 
+**Cell relaxation.** *Relax atoms and cell* also changes the cell, driven
+by DFTK's stress, until the largest force is below 1 meV/Å and every stress
+component below 0.05 GPa (Quantum ESPRESSO's default, 0.5 kbar); fixed
+atoms stay clamped, but the whole cell relaxes (GeometryOptimization has no
+partial cell constraints, so a strained-layer setup is not kept: use *Relax
+atoms* for that). The atoms are first symmetrized, which keeps the stress
+exactly symmetric. Each step records the stress too, and the window gets a
+third panel with the volume change (%) and the pressure (GPa, dashed, zero
+dotted); the summary gives the lattice parameters before and after, the
+volume change and the remaining pressure. The cutoff matters more than for
+energies: at a fixed cutoff the number of plane waves changes with the cell,
+so the stress converges more slowly — use the *high* recommended cutoff or
+check the lattice constant at two cutoffs. Silicon from the library
+(a = 5.431 Å) at the recommended 36 Ry and a 9×9×9 k-grid: the pressure
+starts at +1.92 GPa (the PBE cell wants to be larger) and one step later
+it is −0.045 GPa, with a = 5.469 Å (+0.71 %, volume +2.15 %), in two SCF
+runs. In code: [`pressure`](@ref), [`max_stress`](@ref),
+[`cell_change`](@ref), [`variable_cell`](@ref).
+
 While a relaxation runs, the tool's summary shows the latest step (energy
 change, largest force) and *Show relaxation* already works: the window adds
 the steps as they come and its slider moves on to the newest one — unless it
 was moved back to an earlier step — and the relaxation tab of the main window
 follows it while that tab is shown. In code: [`job_history`](@ref) reads the
 steps of a running job; [`relax_figure`](@ref) and
-[`plot_relaxation`](@ref) also take an `Observable{RelaxHistory}`. In code:
-[`relax_figure`](@ref), [`plot_relaxation`](@ref), [`show_forces!`](@ref)
+[`plot_relaxation`](@ref) also take an `Observable{RelaxHistory}`; and
+[`show_forces!`](@ref)
 (arrows for any forces, e.g. those of an SCF).
 
 *Open structure* opens the final structure (the relaxed one after a

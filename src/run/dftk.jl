@@ -57,7 +57,11 @@ mutable struct DFTKJob
     process::Base.Process
     started::Float64
     stopped::Bool
+    relax::Bool              # a relaxation (it writes `name.relax.toml` step by step)
 end
+
+DFTKJob(c, dir, script, log, results, process, started, stopped) =
+    DFTKJob(c, dir, script, log, results, process, started, stopped, c !== nothing && has_constraints(c))
 
 """
     install_dftk(env=default_dftk_env()) -> DFTKJob
@@ -79,10 +83,12 @@ function install_dftk(env::AbstractString=default_dftk_env())
 end
 
 """
-    run_dftk(c; dir, name, env=default_dftk_env(), kspacing=0.25, ecutwfc=40, pseudo) -> DFTKJob
+    run_dftk(c; dir, name, env=default_dftk_env(), kspacing=0.25, ecutwfc=40, pseudo, relax=:auto) -> DFTKJob
 
 Start a DFTK calculation of `c` in the background: writes `name.jl` (see
-[`write_dftk`](@ref): an SCF, or a relaxation when `c` has constraints) into
+[`write_dftk`](@ref): an SCF, or a relaxation when `c` has constraints;
+`relax=:atoms` or `:cell` asks for a relaxation of the atoms, or of the atoms
+and the cell, `:none` for an SCF) into
 `dir` and runs it with Julia in `env`, logging to `name.log`. When it
 finishes, `name.results.toml` holds the results ([`job_results`](@ref)).
 `dir` defaults to a new folder `dftk_<name>_<time>` under the current folder.
@@ -93,12 +99,14 @@ vacuum, the band structure along the high-symmetry path, in
 `symmetrize` (default: when `bands`) the atoms are first put on exactly
 symmetric positions ([`symmetrize`](@ref), within 0.001 Å), so that DFTK and
 the k-path code, whose symmetry tolerance is much tighter, see the crystal's
-full symmetry (CIF coordinates are often rounded).
+full symmetry (CIF coordinates are often rounded); also the default for a
+cell relaxation, where it keeps the stress exactly symmetric.
 """
 function run_dftk(c::Crystal; name::AbstractString=formula(c),
                   dir::AbstractString=joinpath(pwd(), "dftk_" * name * "_" * Dates.format(Dates.now(), "yyyymmdd-HHMMSS")),
                   env::AbstractString=default_dftk_env(), kspacing::Real=0.25, ecutwfc::Real=40,
-                  pseudo::AbstractString=DFTK_PSEUDO_FAMILY, bands::Bool=false, symmetrize::Bool=bands)
+                  pseudo::AbstractString=DFTK_PSEUDO_FAMILY, bands::Bool=false, relax::Symbol=:auto,
+                  symmetrize::Bool=bands || relax === :cell)
     dftk_env_ready(env) || throw(ArgumentError("no DFTK environment at $env; create it with install_dftk()"))
     occursin(r"^[\w.+-]+$", name) || throw(ArgumentError("use letters, digits, . + - _ in the name"))
     mkpath(dir)
@@ -107,11 +115,12 @@ function run_dftk(c::Crystal; name::AbstractString=formula(c),
     foreach(f -> isfile(f) && rm(f), (results, bandsfile, joinpath(dir, name * ".pdos.toml"), joinpath(dir, name * ".relax.toml")))
     run_c = symmetrize ? AtomBond.symmetrize(c) : c
     write_dftk(script, run_c; kspacing, ecutwfc, pseudo, results=basename(results),
-               bands=bands ? basename(bandsfile) : nothing)
+               bands=bands ? basename(bandsfile) : nothing, relax)
     proc = open(log, "w") do io
         run(pipeline(julia_in(env, script; dir); stdout=io, stderr=io); wait=false)
     end
-    return DFTKJob(c, dir, script, log, results, proc, time(), false)
+    relaxing = relax === :auto ? has_constraints(c) : relax !== :none
+    return DFTKJob(c, dir, script, log, results, proc, time(), false, relaxing)
 end
 
 """
@@ -298,7 +307,10 @@ end
 The steps of a relaxation: `energies` (eV), the largest force on an atom
 that may move (`max_forces`, eV/Å; clamped atoms keep their forces and are
 left out), the structure of each step (`structures`) and the force on every
-atom (`forces`, eV/Å), and which atoms were `clamped`.
+atom (`forces`, eV/Å), and which atoms were `clamped`. When the cell was
+relaxed too, `stresses` holds the stress tensor of each step (GPa, positive
+= tensile: the cell would shrink; empty for a fixed cell); see
+[`pressure`](@ref) and [`cell_change`](@ref).
 """
 struct RelaxHistory
     energies::Vector{Float64}
@@ -306,9 +318,44 @@ struct RelaxHistory
     structures::Vector{Crystal}
     forces::Vector{Vector{Vec3}}
     clamped::Vector{Bool}
+    stresses::Vector{Matrix{Float64}}
 end
 
+RelaxHistory(energies, max_forces, structures, forces, clamped) =
+    RelaxHistory(energies, max_forces, structures, forces, clamped, Matrix{Float64}[])
+
 Base.length(h::RelaxHistory) = length(h.energies)
+
+"""Whether the cell was relaxed too (the steps carry a stress)."""
+variable_cell(h::RelaxHistory) = !isempty(h.stresses)
+
+"""
+    pressure(σ) -> GPa
+    pressure(h::RelaxHistory) -> Vector (GPa per step)
+
+The pressure −tr(σ)/3 of a stress tensor `σ` (GPa): positive when the cell
+would expand.
+"""
+pressure(σ::AbstractMatrix) = -(σ[1, 1] + σ[2, 2] + σ[3, 3]) / 3 + 0.0     # + 0.0: no −0
+pressure(h::RelaxHistory) = pressure.(h.stresses)
+
+"""Largest stress component per step (GPa) of a cell relaxation."""
+max_stress(h::RelaxHistory) = [maximum(abs, σ) for σ in h.stresses]
+
+"""
+    cell_change(h::RelaxHistory, k=length(h)) -> NamedTuple
+
+How the cell of step `k` differs from the start: `volume` and `a`, `b`,
+`c` in percent, the angles `α`, `β`, `γ` in degrees, and the lattice
+parameters `before` and `after` (Å and degrees).
+"""
+function cell_change(h::RelaxHistory, k::Integer=length(h))
+    p0, p = lattice_parameters(h.structures[1].lattice), lattice_parameters(h.structures[k].lattice)
+    pct(x, x0) = 100 * (x / x0 - 1)
+    return (; volume=pct(cell_volume(h.structures[k].lattice), cell_volume(h.structures[1].lattice)),
+            a=pct(p[1], p0[1]), b=pct(p[2], p0[2]), c=pct(p[3], p0[3]),
+            α=p[4] - p0[4], β=p[5] - p0[5], γ=p[6] - p0[6], before=p0, after=p)
+end
 
 """The relaxation steps from `<name>.relax.toml` (species and periodicity from `like`), or `nothing`."""
 function read_relax_history(path::AbstractString, like::Crystal)
@@ -326,7 +373,14 @@ function read_relax_history(path::AbstractString, like::Crystal)
     forces = [[Vec3(HA_PER_BOHR_EV_PER_A .* Float64.(f)) for f in s["forces_Ha_per_bohr"]] for s in steps]
     free = findall(!, clamped)
     maxf = [isempty(free) ? 0.0 : maximum(norm, f[free]) for f in forces]
-    return RelaxHistory([HARTREE_EV * s["energy_Ha"] for s in steps], maxf, structures, forces, clamped)
+    stresses = Matrix{Float64}[]
+    if all(s -> haskey(s, "virial_Ha"), steps)       # a cell relaxation: σ = −virial / volume
+        stresses = map(zip(steps, structures)) do (s, c)
+            vir = permutedims(reduce(hcat, [Float64.(row) for row in s["virial_Ha"]]))
+            -HARTREE_EV * EV_PER_A3_IN_GPA / cell_volume(c.lattice) .* vir
+        end
+    end
+    return RelaxHistory([HARTREE_EV * s["energy_Ha"] for s in steps], maxf, structures, forces, clamped, stresses)
 end
 
 """
@@ -439,8 +493,10 @@ end
 
 """One line about the latest step of a relaxation in progress."""
 function relax_progress(h::RelaxHistory)
-    return @sprintf("Step %d: energy change %.4f eV, largest force %.4f eV/Å", length(h) - 1,
-                    last(h.energies) - first(h.energies), last(h.max_forces))
+    t = @sprintf("Step %d: energy change %.4f eV, largest force %.4f eV/Å", length(h) - 1,
+                 last(h.energies) - first(h.energies), last(h.max_forces))
+    variable_cell(h) && (t *= @sprintf(",\nvolume %+.2f %%, pressure %.3f GPa", cell_change(h).volume, last(pressure(h))))
+    return t
 end
 
 """The results of a finished job, or `nothing` while it runs or when it failed."""
@@ -653,15 +709,26 @@ end
 
 """A few lines summarising the results."""
 function summarize(r::DFTKResults)
-    lines = [@sprintf("%s %s (%d %s)", r.calculation == "scf" ? "SCF" : "Relaxation",
-                      r.converged ? "converged" : "NOT converged", r.iterations,
-                      r.calculation == "scf" ? "iterations" : "steps"),
+    lines = [@sprintf("%s %s (%s)", r.calculation == "scf" ? "SCF" : "Relaxation",
+                      r.converged ? "converged" : "NOT converged",
+                      plural(r.iterations, r.calculation == "scf" ? "iteration" : "step")),
              @sprintf("Total energy %.6f eV (%.8f Ha)", r.energy, r.energy / HARTREE_EV),
              @sprintf("Largest force %.4f eV/Å", max_force(r))]
     h = r.history
     if h !== nothing && length(h) > 1
-        push!(lines, @sprintf("Energy change %.4f eV over %d steps; largest force on a free atom %.3f → %.3f eV/Å",
-                              last(h.energies) - first(h.energies), length(h) - 1, first(h.max_forces), last(h.max_forces)))
+        push!(lines, @sprintf("Energy change %.4f eV over %s; largest force on a free atom %.3f → %.3f eV/Å",
+                              last(h.energies) - first(h.energies), plural(length(h) - 1, "step"), first(h.max_forces),
+                              last(h.max_forces)))
+        if variable_cell(h)
+            d = cell_change(h)
+            p0, p = d.before, d.after
+            push!(lines, @sprintf("Cell a %.4f → %.4f Å (%+.2f %%), b %.4f → %.4f Å, c %.4f → %.4f Å; volume %+.2f %%",
+                                  p0[1], p[1], d.a, p0[2], p[2], p0[3], p[3], d.volume))
+            maximum(abs, (d.α, d.β, d.γ)) > 0.01 &&
+                push!(lines, @sprintf("Angles %.2f° %.2f° %.2f° (were %.2f° %.2f° %.2f°)", p[4:6]..., p0[4:6]...))
+            push!(lines, @sprintf("Pressure %.3f GPa, largest stress %.3f GPa (was %.3f GPa)", last(pressure(h)),
+                                  last(max_stress(h)), first(max_stress(h))))
+        end
     end
     r.fermi === nothing || push!(lines, @sprintf("Fermi level %.4f eV", r.fermi))
     e = band_edges(r)

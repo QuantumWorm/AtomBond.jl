@@ -326,8 +326,11 @@ end
 """Default pseudopotential family of DFTK scripts (PseudoDojo, norm-conserving, PBE)."""
 const DFTK_PSEUDO_FAMILY = "dojo.nc.sr.pbe.v0_4_1.standard.upf"
 
+"""1 eV/Å³ in GPa."""
+const EV_PER_A3_IN_GPA = 160.21766339999999
+
 """
-    write_dftk(path, c; kspacing=0.25, ecutwfc=40, pseudo=DFTK_PSEUDO_FAMILY)
+    write_dftk(path, c; kspacing=0.25, ecutwfc=40, pseudo=DFTK_PSEUDO_FAMILY, relax=:auto)
 
 A Julia script that runs the structure in [DFTK.jl](https://dftk.org)
 (DFTK 0.8): the cell and Cartesian positions as an AtomsBase system, a PBE
@@ -337,12 +340,15 @@ is a PseudoPotentialData family name, or a file pattern with `{El}` (one
 file per element). Initial magnetic moments go on the atoms
 (`magnetic_moment`), which makes the calculation spin-polarized.
 
-Without constraints the script runs an SCF and prints the energies and
-forces. With constraints it relaxes the structure with GeometryOptimization.jl
-instead: fully fixed atoms are clamped (`clamp=true`), and the cell is
-relaxed as a whole when any of it may change (`variablecell`); partly fixed
-atoms and partial cell constraints cannot be expressed there and are noted
-in a comment. With clamped atoms the script switches DFTK's symmetries off
+`relax` chooses between an SCF and a relaxation with GeometryOptimization.jl:
+`:auto` (default) relaxes when the structure has constraints, with the cell
+when the cell constraints let any of it change; `:none` always runs an SCF
+(printing energies and forces); `:atoms` relaxes the atoms in a fixed cell;
+`:cell` relaxes the atoms and the cell (`variablecell`, using DFTK's stress)
+until the largest force is below 1 meV/Å and every stress component below
+0.05 GPa (Quantum ESPRESSO's default 0.5 kbar). In a relaxation fully fixed
+atoms are clamped (`clamp=true`); partly fixed atoms and partial cell
+constraints cannot be expressed there and are noted in a comment. With clamped atoms the script switches DFTK's symmetries off
 (they no longer hold once the free atoms move). Run with `julia <name>.jl` in an environment that has DFTK,
 PseudoPotentialData, AtomsBase, Unitful and UnitfulAtomic
 (+ GeometryOptimization for a relaxation).
@@ -363,10 +369,12 @@ write_dftk(path::AbstractString, c::Crystal; kw...) = open(io -> write_dftk(io, 
 
 function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
                     pseudo::AbstractString=DFTK_PSEUDO_FAMILY, results::Union{Nothing,AbstractString}=nothing,
-                    bands::Union{Nothing,AbstractString}=nothing)
+                    bands::Union{Nothing,AbstractString}=nothing, relax::Symbol=:auto)
+    relax in (:auto, :none, :atoms, :cell) || throw(ArgumentError("relax is :auto, :none, :atoms or :cell, got :$relax"))
     spc = species_list(c)
     title = isempty(c.title) ? formula(c) : c.title
-    relax = has_constraints(c)
+    mode = relax === :auto ? (!has_constraints(c) ? :none : c.cell_constraints == (0, 0, 0, 0, 0, 0) ? :atoms : :cell) : relax
+    relax = mode !== :none
     println(io, "# ", title, " — DFTK.jl script written by AtomBond")
     println(io, "# Run with `julia <this file>` in an environment with DFTK, PseudoPotentialData, AtomsBase,")
     println(io, "# Unitful and UnitfulAtomic", relax ? " (and GeometryOptimization for the relaxation)." : ".")
@@ -390,10 +398,16 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
         return
     end
     cc = c.cell_constraints
-    variable = cc != (0, 0, 0, 0, 0, 0)
-    println(io, "\n# Relaxation: ", describe_cell_constraints(cc))
+    variable = mode === :cell
+    println(io, "\n# Relaxation: ", variable ? "atoms and cell" : "atoms in a fixed cell")
     variable && cc != FREE_CELL &&
-        println(io, "# Note: GeometryOptimization relaxes the whole cell; these cell constraints are not applied")
+        println(io, "# Note: GeometryOptimization relaxes the whole cell; the structure's cell constraints (",
+                describe_cell_constraints(cc), ") are not applied")
+    if variable
+        println(io, "# The cell changes at a fixed cutoff: converge the cutoff (the stress needs more than the energy)")
+        @printf(io, "tol_virial = %.6g * u\"eV\"  # = 0.05 GPa × cell volume (%.3f Å³)\n",
+                0.05 / EV_PER_A3_IN_GPA * cell_volume(c.lattice), cell_volume(c.lattice))
+    end
     any(f -> any(f) && !all(f), c.fixed) &&
         println(io, "# Note: partly fixed atoms are not written (only fully fixed atoms are clamped)")
     if any(all, c.fixed)
@@ -404,7 +418,7 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
     history = results === nothing ? nothing : replace(results, r"\.results\.toml$" => "") * ".relax.toml"
     if history === nothing
         println(io, "results = minimize_energy!(system, calc; variablecell=", variable,
-                ", tol_forces=1e-3u\"eV/Å\", maxiters=100, verbosity=1)")
+                ", tol_forces=1e-3u\"eV/Å\",", variable ? " tol_virial," : "", " maxiters=100, verbosity=1)")
     else
         print(io, """
 
@@ -422,12 +436,14 @@ function write_dftk(io::IO, c::Crystal; kspacing::Real=0.25, ecutwfc::Real=40,
                 "cell_A" => [collect(model.lattice[:, i]) .* bohr_in_A for i in 1:3],
                 "positions_frac" => [collect(p) for p in model.positions],
                 "forces_Ha_per_bohr" => [collect(austrip.(f)) for f in geoopt_state.forces]))
+            $(variable ? "relax_steps[end][\"virial_Ha\"] = [collect(austrip.(geoopt_state.virial[i, :])) for i in 1:3]" :
+                         "# (fixed cell: no stress)")
             open(io -> TOML.print(io, Dict("clamped" => clamped, "steps" => relax_steps)),
                  joinpath(@__DIR__, $(repr(String(history)))), "w")
             print_step(optim_state, geoopt_state)
         end
-        results = minimize_energy!(system, calc; variablecell=$variable, tol_forces=1e-3u"eV/Å", maxiters=100,
-                                   verbosity=1, callback=record_step)
+        results = minimize_energy!(system, calc; variablecell=$variable, tol_forces=1e-3u"eV/Å",$(variable ? " tol_virial," : "")
+                                   maxiters=100, verbosity=1, callback=record_step)
         """)
     end
     println(io, "relaxed = results.system")
@@ -603,6 +619,7 @@ function write_dftk_results_code(io::IO, file::AbstractString, kind::Symbol)
             "energy_Ha" => ustrip(u"hartree", results.energy),
             "forces_Ha_per_bohr" => [collect(ustrip.(u"hartree/bohr", f)) for f in results.forces]))
         """)
+        println(io, "iszero(results.virial) || (out[\"virial_Ha\"] = [collect(austrip.(results.virial[i, :])) for i in 1:3])")
     end
     print(io, """
     open(io -> TOML.print(io, out), joinpath(@__DIR__, $(repr(String(file)))), "w")

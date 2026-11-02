@@ -2,7 +2,11 @@
 # progress and show the results when it is done (src/run/dftk.jl does the work).
 
 """Tasks of the Run DFTK tool."""
-const DFTK_TASKS = [("SCF + band structure", :bands), ("SCF only", :scf), ("Convergence check", :convergence)]
+const DFTK_TASKS = [("SCF + band structure", :bands), ("SCF only", :scf), ("Relax atoms", :relax_atoms),
+                    ("Relax atoms and cell", :relax_cell), ("Convergence check", :convergence)]
+
+"""The `relax` setting of [`run_dftk`](@ref) for a task of the tool."""
+dftk_relax_mode(task::Symbol) = task === :relax_atoms ? :atoms : task === :relax_cell ? :cell : :auto
 
 """The calculation the tool will set up for `c`, in words."""
 function dftk_plan(c::Crystal, kspacing, task::Symbol=:scf)
@@ -12,10 +16,20 @@ function dftk_plan(c::Crystal, kspacing, task::Symbol=:scf)
         return "Convergence check, $(plural(natoms(c), "atom")): 7 cutoffs$k,\n" *
                (nk > 1 ? "then $nk k-grids at the cutoff below" : "one k-point only: no k-grid series")
     end
+    k = kspacing === nothing ? "" : ", k-grid " * join(kpoint_grid(c; kspacing), " × ")
+    if task === :relax_atoms
+        nfix = count(all, c.fixed)
+        return "Relaxation of the atoms (cell fixed)\n" * plural(natoms(c), "atom") * k *
+               (nfix > 0 ? "\n" * plural(nfix, "atom") * " kept fixed" : "")
+    elseif task === :relax_cell
+        warn = any(vacuum_axes(c)) || !all(c.pbc) ? "\n⚠ vacuum in the cell: it would shrink" :
+               c.cell_constraints != FREE_CELL ? "\nWhole cell relaxes (cell constraints not applied)" :
+               "\nStress needs a converged cutoff (use high)"
+        return "Relaxation of the atoms and the cell\n" * plural(natoms(c), "atom") * k * warn
+    end
     bands = task === :bands
     relax = has_constraints(c)
     what = relax ? "Relaxation (the structure has constraints)" : "SCF (energies, forces, levels)"
-    k = kspacing === nothing ? "" : ", k-grid " * join(kpoint_grid(c; kspacing), " × ")
     extra = !bands ? "" :
             (relax ? "\nThen an SCF of the result with " : "\nThen ") * "DOS on a " *
             (kspacing === nothing ? "denser grid" : join(kpoint_grid(c; kspacing=kspacing / 2), " × ")) *
@@ -39,7 +53,8 @@ end
 
 Run DFTK tool: runs the current structure in DFTK.jl in a separate Julia
 process. *Task*: an SCF with or without the band structure and dense DOS
-([`run_dftk`](@ref); a relaxation when the structure has constraints), or a
+([`run_dftk`](@ref); a relaxation when the structure has constraints), a
+relaxation of the atoms or of the atoms and the cell, or a
 convergence check of the cutoff and k-grid ([`run_dftk_convergence`](@ref)).
 The cutoff line shows what the pseudopotentials recommend for the elements
 of the structure ([`recommended_ecut`](@ref)); the cutoff starts at that
@@ -170,7 +185,8 @@ function dftk_dialog(v::Viewer)
                 run_dftk_convergence(v.crystal; env=e, name=nm, dir=joinpath(expanduser(dir), "dftk_$(nm)_conv_$stamp"),
                                      kspacing=parse(Float64, ks), ecutwfc=parse(Float64, ec), pseudo=ps) :
                 run_dftk(v.crystal; env=e, name=nm, dir=joinpath(expanduser(dir), "dftk_$(nm)_$stamp"),
-                         kspacing=parse(Float64, ks), ecutwfc=parse(Float64, ec), pseudo=ps, bands=t === :bands)
+                         kspacing=parse(Float64, ks), ecutwfc=parse(Float64, ec), pseudo=ps, bands=t === :bands,
+                         relax=dftk_relax_mode(t))
             state[:results] = nothing
             delete!(state, :live); delete!(state, :live_state)
             summary[] = ""
@@ -262,8 +278,8 @@ end
 
 busy(state) = (job = get(state, :job, nothing); job !== nothing && job_status(job) === :running)
 
-"""Whether `job` is a relaxation (its structure has constraints, and it is not a convergence check)."""
-is_relax_job(job::DFTKJob) = job.crystal !== nothing && !is_convergence_job(job) && has_constraints(job.crystal)
+"""Whether `job` is a relaxation (not a convergence check)."""
+is_relax_job(job::DFTKJob) = job.crystal !== nothing && job.relax && !is_convergence_job(job)
 
 """Whether the main window shows the relaxation tab of `h`."""
 function relax_tab_active(v::Viewer, h::RelaxHistory)
