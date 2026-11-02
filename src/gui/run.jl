@@ -172,6 +172,7 @@ function dftk_dialog(v::Viewer)
                 run_dftk(v.crystal; env=e, name=nm, dir=joinpath(expanduser(dir), "dftk_$(nm)_$stamp"),
                          kspacing=parse(Float64, ks), ecutwfc=parse(Float64, ec), pseudo=ps, bands=t === :bands)
             state[:results] = nothing
+            delete!(state, :live); delete!(state, :live_state)
             summary[] = ""
             v.status[] = "DFTK started in " * state[:job].dir
             follow_job!(v, controls)
@@ -209,8 +210,20 @@ function dftk_dialog(v::Viewer)
     end
     Makie.on(show_dos.clicks) do _
         r = get(state, :results, nothing)
+        job = get(state, :job, nothing)
+        if r === nothing && job !== nothing && is_relax_job(job) && job_status(job) === :running
+            live = get(state, :live, nothing)
+            live === nothing && (v.status[] = "No relaxation step yet: wait for the first one"; return)
+            base = replace(splitext(basename(job.script))[1], r"\.conv$" => "")
+            state[:dos] = (v.screen === nothing ? relax_figure : plot_relaxation)(live; state=state[:live_state],
+                dir=job.dir, name=base,
+                on_step=(k, arrows) -> show_relax_step!(v, live[], k; arrows),
+                on_new_step=(k, arrows) -> relax_tab_active(v, live[]) && show_relax_step!(v, live[], k; arrows))
+            v.status[] = "Relaxation in progress" * (v.screen === nothing ? "" : ", shown in a new window") *
+                         ": it follows the new steps"
+            return
+        end
         r === nothing && (v.status[] = "No results yet"; return)
-        job = state[:job]
         base = replace(splitext(basename(job.script))[1], r"\.conv$" => "")
         try
             if r isa ConvergenceResults
@@ -249,6 +262,15 @@ end
 
 busy(state) = (job = get(state, :job, nothing); job !== nothing && job_status(job) === :running)
 
+"""Whether `job` is a relaxation (its structure has constraints, and it is not a convergence check)."""
+is_relax_job(job::DFTKJob) = job.crystal !== nothing && !is_convergence_job(job) && has_constraints(job.crystal)
+
+"""Whether the main window shows the relaxation tab of `h`."""
+function relax_tab_active(v::Viewer, h::RelaxHistory)
+    base = replace(h.structures[1].title, r" \(DFTK step .*\)$" => "")
+    return relax_tab(v, base) == v.active
+end
+
 """Whether `job` is a convergence check."""
 is_convergence_job(job::DFTKJob) = endswith(job.results, ".convergence.toml")
 
@@ -270,6 +292,15 @@ function show_job!(v::Viewer, t)
         if conv                                                     # partial results as they come
             cr = try job_convergence(job) catch; nothing end
             cr === nothing || (t.summary[] = summarize(cr))
+        elseif is_relax_job(job)                                    # relaxation steps as they come
+            h = job_history(job)
+            if h !== nothing
+                live = get!(() -> Makie.Observable(h), t.state, :live)
+                get!(() -> Makie.Observable("running"), t.state, :live_state)
+                length(h) != length(live[]) && (live[] = h)
+                t.summary[] = "Relaxation running\n" * relax_progress(h)
+                t.show_dos.label[] = "Show relaxation"
+            end
         end
     elseif st === :done
         if job.crystal === nothing
@@ -278,6 +309,10 @@ function show_job!(v::Viewer, t)
         else
             r = get(t.state, :results, nothing)
             r === nothing && (r = t.state[:results] = conv ? job_convergence(job) : job_results(job))
+            if r isa DFTKResults && r.history !== nothing && haskey(t.state, :live)   # a live window: the final steps
+                length(r.history) != length(t.state[:live][]) && (t.state[:live][] = r.history)
+                t.state[:live_state][] = r.converged ? "converged" : "NOT converged"
+            end
             t.progress[] = "$what: done ($secs s), files in " * basename(job.dir) * "/"
             t.summary[] = summarize(r)
             r isa DFTKResults && r.history !== nothing && (t.show_dos.label[] = "Show relaxation")

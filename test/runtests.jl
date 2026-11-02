@@ -1128,6 +1128,40 @@ Test.finish(c::CITestSet) = (Test.finish(c.ts); c)
             Makie_set.value[] = 0
             @test ntabs(v) == n0 + 1 && occursin("step 0)", v.crystal.title)
             @test occursin("Then an SCF of the result", AtomBond.dftk_plan(fix_atoms(si2, [1]), 0.3, :bands))
+
+            # Live progress: a relaxation still running (a sleeping process) whose history grows step by step
+            ldir = joinpath(dir, "live"); mkpath(ldir)
+            write(joinpath(ldir, "L.relax.toml"), join(split(hist, "[[steps]]")[1:3], "[[steps]]"))   # the first two steps
+            h2c = fix_atoms(h2, [1])
+            ljob = AtomBond.DFTKJob(h2c, ldir, joinpath(ldir, "L.jl"), joinpath(ldir, "L.log"), joinpath(ldir, "L.results.toml"),
+                                    run(`$(Base.julia_cmd()) --startup-file=no -e "sleep(120)"`; wait=false), time(), false)
+            lh = job_history(ljob)
+            @test lh isa RelaxHistory && length(lh) == 2 && startswith(AtomBond.relax_progress(lh), "Step 1: energy change")
+            d.state[:job] = ljob; d.state[:results] = nothing
+            delete!(d.state, :live); delete!(d.state, :live_state)
+            @test AtomBond.show_job!(v, d) === :running && startswith(d.summary[], "Relaxation running\nStep 1")
+            @test d.show_dos.label[] == "Show relaxation" && length(d.state[:live][]) == 2
+            d.show_dos.clicks[] += 1                                          # the live window
+            lw = d.state[:dos]
+            @test lw.step.value[] == 1 && startswith(lw.state[], "running") && occursin("Relaxation in progress", v.status[])
+            write(joinpath(ldir, "L.relax.toml"), hist)                       # a third step arrives
+            AtomBond.show_job!(v, d)
+            @test length(d.state[:live][]) == 3 && lw.step.value[] == 2 && startswith(d.summary[], "Relaxation running\nStep 2")
+            stop_job!(ljob)
+            wait(ljob.process)                                                # the kill takes a moment
+            @test AtomBond.show_job!(v, d) === :stopped
+            # the window keeps the slider where the user put it when new steps come
+            obs = AtomBond.Makie.Observable(AtomBond.read_relax_history(joinpath(ldir, "L.relax.toml"), h2c))
+            short = RelaxHistory(obs[].energies[1:2], obs[].max_forces[1:2], obs[].structures[1:2], obs[].forces[1:2], obs[].clamped)
+            full = obs[]
+            obs[] = short
+            news = Int[]
+            ow = relax_figure(obs; on_new_step=(k, a) -> push!(news, k))
+            AtomBond.Makie.set_close_to!(ow.step, 0)                           # the user looks at step 0
+            obs[] = full
+            @test ow.step.value[] == 0 && isempty(news)
+            AtomBond.Makie.set_close_to!(ow.step, 2); obs[] = short; obs[] = full   # at the end: follows
+            @test ow.step.value[] == 2 && news == [3]
         end
     end
 

@@ -96,7 +96,7 @@ export read_xdatcar, read_vasprun, read_pdb, write_pdb, read_lammps_data, write_
 export read_car, write_car, read_xsd, read_res, write_res
 export kpoint_grid, write_kpoints, write_vasp_inputs, write_qe, write_abinit, write_siesta, write_dftk, write_castep, write_cif, export_inputs
 export to_atomsbase, from_atomsbase
-export run_dftk, install_dftk, default_dftk_env, dftk_env_ready, dftk_cutoff_hints, recommended_ecut, DFTKJob, job_status, job_log, job_results, stop_job!
+export run_dftk, install_dftk, default_dftk_env, dftk_env_ready, dftk_cutoff_hints, recommended_ecut, DFTKJob, job_status, job_log, job_results, job_history, stop_job!
 export run_dftk_convergence, read_convergence, job_convergence, converged_settings, ConvergenceResults, ConvergenceStep
 export convergence_figure, plot_convergence, relax_figure, plot_relaxation, show_forces!
 export DFTKResults, DenseLevels, BandPath, RelaxHistory, OrbitalWeights, pdos, read_dftk_results, band_gap, band_edges, is_metallic, dos, write_dos, dos_figure, plot_dos, write_bands, bands_figure, plot_bands

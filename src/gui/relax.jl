@@ -66,7 +66,8 @@ function show_relax_step!(v::Viewer, h::RelaxHistory, k::Integer; arrows::Bool=t
 end
 
 """
-    relax_figure(r::DFTKResults; on_step=nothing, dir=nothing, name="relax") -> NamedTuple
+    relax_figure(r::DFTKResults; on_step=nothing, on_bands=nothing, dir=nothing, name="relax") -> NamedTuple
+    relax_figure(history::Observable{RelaxHistory}; state=Observable("running"), kw...) -> NamedTuple
 
 The steps of a relaxation ([`RelaxHistory`](@ref)): the energy relative to
 the last step (meV) and the largest force on a free atom (eV/Å, log scale,
@@ -76,49 +77,87 @@ changes (the Run DFTK tool shows that step in the main window). With
 `on_bands` (called without arguments) a *Band structure / DOS* button is
 added, for a run that computed them for the relaxed structure. With `dir`,
 Save writes `name.relax.png` there.
+
+Given an `Observable` history (a relaxation still running), the figure
+follows it: new steps are added as the observable changes, and the slider
+moves on to the newest step when it was on the last one; such automatic
+moves call `on_new_step(k, arrows)` instead of `on_step`. `state` is shown in
+the subtitle ("running", "converged", …).
 """
-function relax_figure(r::DFTKResults; on_step=nothing, on_bands=nothing, dir=nothing, name::AbstractString="relax")
-    h = r.history
-    h === nothing && throw(ArgumentError("no relaxation steps in these results"))
-    n = length(h)
+function relax_figure(r::DFTKResults; kw...)
+    r.history === nothing && throw(ArgumentError("no relaxation steps in these results"))
+    return relax_figure(Makie.Observable(r.history); state=Makie.Observable(r.converged ? "converged" : "NOT converged"),
+                        kw...)
+end
+
+function relax_figure(history::Makie.Observable{RelaxHistory}; state=Makie.Observable("running"), on_step=nothing,
+                      on_new_step=nothing, on_bands=nothing, dir=nothing, name::AbstractString="relax")
+    h0 = history[]
     fig = Makie.Figure(; size=(760, 600), backgroundcolor=:white)
-    heading = Makie.GridLayout(fig[0, 1])
-    Makie.Label(heading[1, 1], "Relaxation of " * replace(h.structures[1].title, r" \(DFTK step .*\)$" => "");
+    heading = Makie.GridLayout(fig[0, 1]; tellwidth=false)
+    Makie.Label(heading[1, 1], "Relaxation of " * replace(h0.structures[1].title, r" \(DFTK step .*\)$" => "");
                 font=:bold, fontsize=16)
-    Makie.Label(heading[2, 1], @sprintf("%d steps, energy change %.4f eV, %s", n - 1, last(h.energies) - first(h.energies),
-                                        r.converged ? "converged" : "NOT converged"); fontsize=13, color=:gray30)
+    sub = Makie.lift((h, s) -> @sprintf("%d steps, energy change %.4f eV, %s", length(h) - 1,
+                                        last(h.energies) - first(h.energies), s), history, state)
+    Makie.Label(heading[2, 1], sub; fontsize=13, color=:gray30)
     Makie.rowgap!(heading, 2)
-    steps = collect(0:n-1)
+    epts = Makie.lift(h -> [Makie.Point2f(k - 1, 1000 * (e - last(h.energies))) for (k, e) in enumerate(h.energies)], history)
+    fpts = Makie.lift(h -> [Makie.Point2f(k - 1, max(f, 1e-5)) for (k, f) in enumerate(h.max_forces)], history)
     axe = Makie.Axis(fig[1, 1]; ylabel="E − E_last (meV)", xgridvisible=false)
-    Makie.scatterlines!(axe, steps, 1000 .* (h.energies .- last(h.energies)); color=DOS_LINE, markersize=7)
-    axf = Makie.Axis(fig[2, 1]; xlabel="Step", ylabel="Largest force (eV/Å)", yscale=log10, xgridvisible=false,
-                     xticks=collect(0:max(1, cld(n - 1, 10)):n-1))
-    Makie.scatterlines!(axf, steps, max.(h.max_forces, 1e-5); color=DOS_DOWN_LINE, markersize=7)
+    Makie.scatterlines!(axe, epts; color=DOS_LINE, markersize=7)
+    axf = Makie.Axis(fig[2, 1]; xlabel="Step", ylabel="Largest force (eV/Å)", yscale=log10, xgridvisible=false)
+    Makie.scatterlines!(axf, fpts; color=DOS_DOWN_LINE, markersize=7)
     Makie.hlines!(axf, [1e-3]; color=:gray30, linestyle=:dash)
     Makie.linkxaxes!(axe, axf)
     Makie.hidexdecorations!(axe; grid=false, ticks=false)
-    Makie.xlims!(axf, -0.5, n - 0.5)
-    ev = 1000 .* (h.energies .- last(h.energies))
-    Makie.ylims!(axe, min(minimum(ev), 0.0) - 0.05 * (maximum(ev) - minimum(ev) + 1), maximum(ev) * 1.05 + 0.5)
-    Makie.ylims!(axf, max(minimum(h.max_forces), 1e-5) / 2, max(maximum(h.max_forces), 2e-3) * 2)
+    function fit!(h)                          # limits from the data (autolimits needs a displayed figure)
+        n = length(h)
+        ev = 1000 .* (h.energies .- last(h.energies))
+        axf.xticks[] = collect(0:max(1, cld(n - 1, 10)):max(n - 1, 0))
+        Makie.xlims!(axf, -0.5, n - 0.5)
+        Makie.ylims!(axe, min(minimum(ev), 0.0) - 0.05 * (maximum(ev) - minimum(ev) + 1), maximum(ev) * 1.05 + 0.5)
+        Makie.ylims!(axf, max(minimum(h.max_forces), 1e-5) / 2, max(maximum(h.max_forces), 2e-3) * 2)
+    end
+    fit!(h0)
     controls = Makie.GridLayout(fig[3, 1])
     Makie.Label(controls[1, 1], "Step"; halign=:right)
-    slider = Makie.Slider(controls[1, 2]; range=0:n-1, startvalue=n - 1)
-    info = Makie.lift(k -> @sprintf("step %d: E − E_last = %.2f meV, largest force %.4f eV/Å", k,
-                                    1000 * (h.energies[k+1] - last(h.energies)), h.max_forces[k+1]), slider.value)
-    Makie.Label(controls[2, 1:4], info; halign=:left, fontsize=13)
+    n0 = length(h0)
+    slider = Makie.Slider(controls[1, 2]; range=0:max(n0 - 1, 1), startvalue=n0 - 1)
+    info = Makie.lift(slider.value, history) do k, h
+        k = clamp(k, 0, length(h) - 1)
+        @sprintf("step %d: E − E_last = %.2f meV, largest force %.4f eV/Å", k,
+                 1000 * (h.energies[k+1] - last(h.energies)), h.max_forces[k+1])
+    end
+    Makie.Label(controls[2, 1:4], info; halign=:left, fontsize=13, tellwidth=false)
     arrows = Makie.Toggle(controls[1, 3]; active=true)
     Makie.Label(controls[1, 4], "Force arrows"; halign=:left)
-    Makie.colsize!(controls, 2, Makie.Relative(0.55))
+    Makie.colsize!(controls, 2, Makie.Relative(0.6))
+    controls.tellwidth = false
     marker = Makie.lift(k -> [Float64(k)], slider.value)
     Makie.vlines!(axe, marker; color=:firebrick, linewidth=1)
     Makie.vlines!(axf, marker; color=:firebrick, linewidth=1)
+    automatic = Ref(false)                    # the slider is being moved to a new step, not by the user
+    last_n = Ref(n0)
+    Makie.on(history) do h
+        n = length(h)
+        fit!(h)
+        follow = slider.value[] >= last_n[] - 1
+        slider.range[] = 0:max(n - 1, 1)
+        if follow && n - 1 != slider.value[]
+            automatic[] = true
+            Makie.set_close_to!(slider, n - 1)
+            automatic[] = false
+            on_new_step === nothing || on_new_step(n, arrows.active[])
+        end
+        last_n[] = n
+    end
     if on_step !== nothing
         Makie.onany(slider.value, arrows.active) do k, a
-            on_step(k + 1, a)
+            automatic[] && return
+            k + 1 <= length(history[]) && on_step(k + 1, a)
         end
     end
-    buttons = Makie.GridLayout(fig[4, 1])
+    buttons = Makie.GridLayout(fig[4, 1]; tellwidth=false)
     bands = on_bands === nothing ? nothing : Makie.Button(buttons[1, 1]; label="Band structure / DOS of the result")
     bands === nothing || Makie.on(_ -> on_bands(), bands.clicks)
     save = dir === nothing ? nothing : Makie.Button(buttons[1, 2]; label="Save PNG to " * basename(dir) * "/")
@@ -128,17 +167,18 @@ function relax_figure(r::DFTKResults; on_step=nothing, on_bands=nothing, dir=not
             save.label[] = "Saved $name.relax.png"
         end
     end
-    return (; figure=fig, energy_axis=axe, force_axis=axf, step=slider, arrows, save, bands)
+    return (; figure=fig, energy_axis=axe, force_axis=axf, step=slider, arrows, save, bands, history, state)
 end
 
 """
-    plot_relaxation(r::DFTKResults; kw...) -> NamedTuple
+    plot_relaxation(r; kw...) -> NamedTuple
 
-Open the relaxation steps ([`relax_figure`](@ref)) in their own window.
+Open the relaxation steps ([`relax_figure`](@ref); `r` is a `DFTKResults` or
+an `Observable{RelaxHistory}`) in their own window.
 """
-function plot_relaxation(r::DFTKResults; kw...)
+function plot_relaxation(r; kw...)
     d = relax_figure(r; kw...)
     GLMakie.activate!()
-    display(GLMakie.Screen(; title="Relaxation — " * formula(r.structure)), d.figure)
+    display(GLMakie.Screen(; title="Relaxation — " * formula(d.history[].structures[1])), d.figure)
     return d
 end

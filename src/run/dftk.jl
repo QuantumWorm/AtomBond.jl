@@ -417,6 +417,32 @@ function read_bands_file(path::AbstractString)
     return (dense, kpath)
 end
 
+"""
+    job_history(job) -> RelaxHistory or nothing
+
+The relaxation steps a relaxation job has written so far (`name.relax.toml`
+is rewritten after every step), also while it is still running; `nothing`
+before the first step or for a job that is not a relaxation.
+"""
+function job_history(job::DFTKJob)
+    (job.crystal === nothing || isempty(job.results)) && return nothing
+    path = companion_file(job.results, ".relax.toml")
+    isempty(path) && return nothing
+    title = isempty(job.crystal.title) ? formula(job.crystal) : job.crystal.title
+    like = Crystal(job.crystal.lattice, job.crystal.species, job.crystal.frac; pbc=job.crystal.pbc, title)
+    return try
+        read_relax_history(path, like)
+    catch                                           # caught while the file is being rewritten: try again later
+        nothing
+    end
+end
+
+"""One line about the latest step of a relaxation in progress."""
+function relax_progress(h::RelaxHistory)
+    return @sprintf("Step %d: energy change %.4f eV, largest force %.4f eV/Å", length(h) - 1,
+                    last(h.energies) - first(h.energies), last(h.max_forces))
+end
+
 """The results of a finished job, or `nothing` while it runs or when it failed."""
 function job_results(job::DFTKJob)
     job_status(job) === :done && isfile(job.results) || return nothing

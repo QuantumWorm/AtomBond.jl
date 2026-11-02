@@ -137,7 +137,15 @@ move (clamped atoms keep their forces and are left out; DFTK's target,
 in a tab of the main window — *(DFTK relaxation, step k)* — with the forces
 as red arrows (*Force arrows*; the largest force of the relaxation gets a
 2 Å arrow, the same scale for every step). *Band structure / DOS of the
-result* opens those plots when they were computed. In code:
+result* opens those plots when they were computed.
+
+While a relaxation runs, the tool's summary shows the latest step (energy
+change, largest force) and *Show relaxation* already works: the window adds
+the steps as they come and its slider moves on to the newest one — unless it
+was moved back to an earlier step — and the relaxation tab of the main window
+follows it while that tab is shown. In code: [`job_history`](@ref) reads the
+steps of a running job; [`relax_figure`](@ref) and
+[`plot_relaxation`](@ref) also take an `Observable{RelaxHistory}`. In code:
 [`relax_figure`](@ref), [`plot_relaxation`](@ref), [`show_forces!`](@ref)
 (arrows for any forces, e.g. those of an SCF).
 
