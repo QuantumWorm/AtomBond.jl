@@ -60,7 +60,7 @@ function dos_figure(r::DFTResults; width::Real=0.1, title::AbstractString="", di
     ef = something(r.fermi, 0.0)
     head = !isempty(title) ? title : !isempty(r.structure.title) ? r.structure.title : formula(r.structure)
     nk = length(first(dos_levels(r))) ÷ r.n_spin
-    sub = "DFTK $(r.version), $(nk) k-point$(nk == 1 ? "" : "s")" * (r.n_spin == 2 ? ", spin-polarized" : "") *
+    sub = "$(program_label(r)), $(nk) k-point$(nk == 1 ? "" : "s")" * (r.n_spin == 2 ? ", spin-polarized" : "") *
           (r.fermi === nothing ? "" : ", energies relative to the Fermi level")
     ax = Makie.Axis(fig[1, 1:3]; title=head, subtitle=sub, xlabel=r.fermi === nothing ? "E (eV)" : "E − E_F (eV)",
                     ylabel="DOS (states/eV per cell)", xgridvisible=false, ygridvisible=false)
@@ -217,7 +217,7 @@ function bands_figure(r::DFTResults; width::Real=0.1, window=nothing, title::Abs
     fig = Makie.Figure(; size=(900, 560), backgroundcolor=:white)
     heading = Makie.GridLayout(fig[0, 1:2])
     Makie.Label(heading[1, 1], head; font=:bold, fontsize=16)
-    Makie.Label(heading[2, 1], "DFTK $(r.version)" * (isempty(gapnote) ? "" : ", " * gapnote) *
+    Makie.Label(heading[2, 1], program_label(r) * (isempty(gapnote) ? "" : ", " * gapnote) *
                                (r.n_spin == 2 ? ", spin up blue, down red" : ""); fontsize=13, color=:gray30)
     Makie.rowgap!(heading, 2)
     ylabel = r.fermi === nothing ? "E (eV)" : "E − E_F (eV)"

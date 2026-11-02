@@ -27,12 +27,32 @@ as Quantum ESPRESSO, ABINIT, SIESTA and [DFTK.jl](https://dftk.org).
   ([Labels](labels.md)).
 - **DFT inputs:** fixed atoms and cell constraints, k-point meshes and spin
   ([DFT inputs](dft.md)).
+- **Calculations:** runs the structure with [DFTK.jl](https://dftk.org)
+  (the default, installed on first use), Quantum ESPRESSO, CASTEP or a code
+  you add, and shows the DOS, band structure and relaxation steps
+  ([DFT engines](engines.md), [Examples](examples.md)).
 - **Structure library:** 239 crystals and molecules: Crystallography Open
   Database structures and experimental geometries from the literature, each
   with its reference
   ([Library and element data](library.md)).
 
 ![Methanol with bond lengths and angles](assets/methanol_labels.png)
+
+## Calculations
+
+AtomBond prepares a structure for DFT and can also run it. DFTK.jl, an
+open-source plane-wave code written in Julia, is the default: the first run
+installs it into a separate Julia environment, with the PseudoDojo
+pseudopotentials, so nothing else needs to be set up. Your own installation
+of Quantum ESPRESSO or CASTEP works from the same tool, and other codes
+(ABINIT, SIESTA, VASP, in-house programs) can be added with a short adapter;
+the programs themselves are never part of AtomBond
+([DFT engines](engines.md)).
+
+![Band structure and DOS of silicon from a DFTK run](assets/si_bands.png)
+
+See [Examples](examples.md) for the projected DOS of GaAs and the band
+structure of MgO.
 
 ## Installation
 

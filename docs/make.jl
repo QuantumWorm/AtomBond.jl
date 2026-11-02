@@ -23,6 +23,7 @@ makedocs(;
         "File formats" => "formats.md",
         "DFT inputs and constraints" => "dft.md",
         "DFT engines" => "engines.md",
+        "Examples of calculations" => "examples.md",
         "Library and element data" => "library.md",
         "Working from Julia code" => "scripting.md",
         "API reference" => [

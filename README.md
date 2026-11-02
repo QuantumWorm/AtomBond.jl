@@ -21,10 +21,25 @@ SIESTA and DFTK.jl.
 - Labels bond lengths, angles, dihedrals, coordinates, charges and magnetic
   moments, and detects space groups (spglib).
 - Writes DFT inputs with k-point meshes, fixed atoms and cell constraints.
-- Runs calculations and shows their results (DOS, band structure,
-  relaxation steps): DFTK.jl by default, installed on first use; Quantum
-  ESPRESSO, CASTEP or your own codes from your own installation (the
-  programs are never part of AtomBond; see *DFT engines* in the manual).
+- Runs calculations and shows the results: DOS, band structure and
+  relaxation steps (below).
+
+## Calculations
+
+File → *Run calculation…* runs the open structure with a DFT code.
+[DFTK.jl](https://dftk.org) is the default: it is open source, and AtomBond
+installs it into its own environment on the first run, with its
+pseudopotentials. You can also use your own installation of an open-source
+code such as Quantum ESPRESSO, a licensed code such as CASTEP, or add
+another code through a short adapter. The programs are never part of
+AtomBond; it only writes their input, starts them and reads their output
+([DFT engines](https://quantumworm.github.io/AtomBond.jl/dev/engines/)).
+
+![Band structure and DOS of silicon from a DFTK run](docs/src/assets/si_bands.png)
+
+More in [Examples](https://quantumworm.github.io/AtomBond.jl/dev/examples/):
+the
+projected DOS of GaAs and the band structure of MgO.
 
 ## Installation
 

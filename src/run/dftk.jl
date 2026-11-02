@@ -779,9 +779,12 @@ function summarize(r::DFTResults)
     return join(lines, "\n")
 end
 
+"""The program and its version, e.g. "DFTK 0.8.1" (DFTK when the results do not say)."""
+program_label(r::DFTResults) = strip((isempty(r.program) ? "DFTK" : r.program) * " " * r.version)
+
 function Base.show(io::IO, ::MIME"text/plain", r::DFTResults)
     prog = isempty(r.program) ? "DFTK" : r.program
-    println(io, prog, " results for ", formula(r.structure), " (", strip(prog * " " * r.version), ")")
+    println(io, prog, " results for ", formula(r.structure), " (", program_label(r), ")")
     print(io, summarize(r))
 end
 
