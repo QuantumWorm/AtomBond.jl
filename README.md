@@ -86,6 +86,18 @@ julia --project=. scripts/run_atombond.jl [file]               # open a window
 `scripts/build_element_table.jl` and `scripts/build_library.jl` rebuild the
 element table and the structure library from their published sources.
 
+## Use of AI
+
+Most of AtomBond's code, tests and documentation were written with Claude
+Code (Anthropic) under my direction; the commits say so. I review the
+changes and check the results. The structure library was collected the same
+way, and each entry comes from its original source (Crystallography Open
+Database, or the experimental geometry in the cited paper), with the
+reference stored with it. The test suite runs in CI. Calculations were
+checked by running the same structures with DFTK.jl, Quantum ESPRESSO and
+CASTEP; the comparison is in the *Checked* table on the
+[DFT engines](https://quantumworm.github.io/AtomBond.jl/dev/engines/) page.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
