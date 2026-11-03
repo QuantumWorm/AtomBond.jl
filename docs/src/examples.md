@@ -60,3 +60,24 @@ plot_bands(job_results(job))
 ```
 
 ![Band structure and DOS of MgO](assets/mgo_bands.png)
+
+## Cell relaxation
+
+The 8-atom cell of silicon with its lattice stretched by 3 % and one atom
+moved off its site. The relaxation moves the atom back and shrinks the cell
+until the forces are below 1 meV/Å and the pressure is zero: 17 steps,
+lattice constant 5.594 → 5.469 Å, pressure −4.8 → 0.00 GPa. The slider
+steps through the relaxation, and the main window shows each step with the
+forces as arrows.
+
+```julia
+si = load_library("Silicon")
+frac = copy(si.frac)
+frac[1] = frac[1] .+ (0.03, 0.02, 0.0)                    # one atom moved by about 0.2 Å
+start = with_positions(si, frac; lattice=Lattice(1.03 .* si.lattice.matrix))
+job = run_dftk(start; relax=:cell, ecutwfc=36, kspacing=0.35)
+wait(job)
+plot_relaxation(job_results(job))
+```
+
+![Cell relaxation of silicon](assets/si_relax.png)

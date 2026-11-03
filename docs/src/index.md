@@ -51,17 +51,17 @@ the programs themselves are never part of AtomBond
 
 ![Band structure and DOS of silicon from a DFTK run](assets/si_bands.png)
 
-See [Examples](examples.md) for the projected DOS of GaAs and the band
-structure of MgO.
+See [Examples](examples.md) for the projected DOS of GaAs, the band
+structure of MgO and a cell relaxation.
 
 ## Installation
 
 AtomBond needs Julia 1.10 or newer and OpenGL 3.3 (any desktop; on Windows it
-also runs in WSL2). It is not registered yet, so install it from GitHub:
+also runs in WSL2). Install it from the General registry:
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/QuantumWorm/AtomBond.jl")
+Pkg.add("AtomBond")
 ```
 
 Installing compiles AtomBond and caches a typical session (reading files,

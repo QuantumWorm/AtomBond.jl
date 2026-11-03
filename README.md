@@ -39,15 +39,16 @@ AtomBond; it only writes their input, starts them and reads their output
 
 More in [Examples](https://quantumworm.github.io/AtomBond.jl/dev/examples/):
 the
-projected DOS of GaAs and the band structure of MgO.
+projected DOS of GaAs, the band structure of MgO and a cell relaxation.
 
 ## Installation
 
-AtomBond needs Julia 1.10 or newer and OpenGL 3.3. It is not registered yet:
+AtomBond needs Julia 1.10 or newer and OpenGL 3.3. Install it from the
+General registry:
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/QuantumWorm/AtomBond.jl")
+Pkg.add("AtomBond")
 ```
 
 Installing compiles AtomBond and caches a typical session (reading files,

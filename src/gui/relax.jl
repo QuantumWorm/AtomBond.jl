@@ -96,7 +96,8 @@ function relax_figure(history::Makie.Observable{RelaxHistory}; state=Makie.Obser
     h0 = history[]
     fig = Makie.Figure(; size=(760, variable_cell(h0) ? 760 : 600), backgroundcolor=:white)
     heading = Makie.GridLayout(fig[0, 1]; tellwidth=false)
-    Makie.Label(heading[1, 1], "Relaxation of " * replace(h0.structures[1].title, r" \(\w+ step \d+\)$" => "");
+    start_title = replace(h0.structures[1].title, r" \(\w+ step \d+\)$" => "")
+    Makie.Label(heading[1, 1], "Relaxation of " * (isempty(start_title) ? formula(h0.structures[1]) : start_title);
                 font=:bold, fontsize=16)
     sub = Makie.lift((h, s) -> @sprintf("%s, energy change %.4f eV, %s", plural(length(h) - 1, "step"),
                                         last(h.energies) - first(h.energies), s), history, state)
@@ -188,7 +189,8 @@ function relax_figure(history::Makie.Observable{RelaxHistory}; state=Makie.Obser
             k + 1 <= length(history[]) && on_step(k + 1, a)
         end
     end
-    buttons = Makie.GridLayout(fig[row+1, 1]; tellwidth=false)
+    # the buttons row only when there is a button (an empty row would leave a blank band)
+    buttons = on_bands === nothing && dir === nothing ? nothing : Makie.GridLayout(fig[row+1, 1]; tellwidth=false)
     bands = on_bands === nothing ? nothing : Makie.Button(buttons[1, 1]; label="Band structure / DOS of the result")
     bands === nothing || Makie.on(_ -> on_bands(), bands.clicks)
     save = dir === nothing ? nothing : Makie.Button(buttons[1, 2]; label="Save PNG to " * basename(dir) * "/")
